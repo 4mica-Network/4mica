@@ -92,7 +92,6 @@ async def test_lists_positions_in_whole_units_with_their_deadlines():
     assert debit.final_at == datetime.fromtimestamp(1_700_007_200, timezone.utc)
     assert debit.network == "eip155:84532"
 
-    # An asset core no longer lists is still reported, in base units.
     assert credit.role == "creditor"
     assert credit.asset == Token(DELISTED, DELISTED, 0)
     assert credit.amount == "42"
@@ -116,7 +115,7 @@ async def test_pays_debits_and_claims_credits():
     client.settlement.claim.assert_called_once_with("c2")
 
 
-@pytest.mark.parametrize("only,settled", [("pay", ["c1"]), ("claim", ["c2"])])
+@pytest.mark.parametrize(("only", "settled"), [("pay", ["c1"]), ("claim", ["c2"])])
 async def test_only_settles_one_side(only, settled):
     _, session = settling(
         [position("c1"), position("c2", ClearingParticipantRole.NET_CREDITOR)]

@@ -1,12 +1,3 @@
-"""The operator's guarantee receipt: layout, decoding, and offline verification.
-
-``guarantee_vectors.json`` is core's cross-boundary fixture
-(``contracts/test/fixtures/guarantee_vectors.json`` in 4mica-core), which the
-GuaranteeRegistry's Solidity suite verifies through ``verifyGuarantee``. To
-refresh it, rerun core's ``guarantee_golden_vectors`` test with
-``REGEN_GUARANTEE_VECTORS=1`` and copy the file here.
-"""
-
 import json
 from pathlib import Path
 
@@ -34,7 +25,6 @@ from fourmica_sdk.models import PaymentRequestPayload
 FIXTURES = Path(__file__).parent / "fixtures"
 VECTORS = json.loads((FIXTURES / "guarantee_vectors.json").read_text())
 
-# The deterministic key core's fixture stands the operator in with.
 OPERATOR_KEY = "0x" + "24" * 32
 OPERATOR = Account.from_key(OPERATOR_KEY)
 CHAIN_ID = VECTORS["domain"]["chainId"]
@@ -66,18 +56,16 @@ def test_the_fixture_signer_is_the_operator_key():
 
 
 def test_domain_is_the_guarantee_registrys():
-    assert GUARANTEE_REGISTRY_EIP712_NAME == VECTORS["domain"]["name"]
-    assert GUARANTEE_REGISTRY_EIP712_VERSION == VECTORS["domain"]["version"]
+    assert VECTORS["domain"]["name"] == GUARANTEE_REGISTRY_EIP712_NAME
+    assert VECTORS["domain"]["version"] == GUARANTEE_REGISTRY_EIP712_VERSION
 
 
 def test_type_hash_matches_the_registered_layout():
-    """The type hash is the key the layout's verifier is registered under, so
-    a drift unregisters the layout rather than merely breaking a signature."""
     assert GUARANTEE_V1_TYPE == (
         "GuaranteeV1(uint256 cycleId,uint256 reqId,address client,"
         "address recipient,uint256 amount,address asset,uint64 timestamp)"
     )
-    assert GUARANTEE_V1_TYPE_HASH == keccak(text=GUARANTEE_V1_TYPE)
+    assert keccak(text=GUARANTEE_V1_TYPE) == GUARANTEE_V1_TYPE_HASH
     assert "0x" + GUARANTEE_V1_TYPE_HASH.hex() == VECTORS["typeHash"]
 
 
@@ -117,8 +105,6 @@ def test_a_receipt_from_anyone_else_is_refused():
 
 
 def test_a_receipt_does_not_carry_to_another_deployment():
-    """The domain is inside the digest, so a receipt minted for one
-    deployment cannot be replayed against another."""
     _, receipt = issued()
     elsewhere = guarantee_registry_domain_separator(
         CHAIN_ID, "0x00000000000000000000000000000000000000Be"

@@ -4,6 +4,8 @@
 
 ### Added
 
+- The package ships `py.typed`, so type checkers read its annotations; it
+  passes `mypy --strict`.
 - **`FourMica`**: a short way in, matching `FourMica` in the TypeScript SDK.
   Connect once, then deposit, pay and withdraw with amounts written the way
   people write them.
@@ -76,6 +78,17 @@
 
 ### Changed
 
+- The SDK no longer sets `SSL_CERT_FILE` and `REQUESTS_CA_BUNDLE` in the
+  process environment. The chain provider gets certifi's bundle directly.
+- `FacilitatorRejectedError(code, message, *, retryable=, transaction=,
+  details=)` and `RpcProxy.update_user_suspension(user, *, suspended=)` take
+  their flags by keyword.
+- `FourMica.settle()` reports SDK errors per position as before, and the
+  deposit wait keeps polling through them; any other exception now
+  propagates instead of being recorded as a failure or retried until the
+  timeout.
+- `aiohttp` and `eth-keys`, imported directly, are declared dependencies;
+  `typing-extensions`, unused, is not.
 - **`ConfigBuilder.network()` also selects the network's hosted
   facilitator**, where one exists. A `Client` built with
   `.network("base-sepolia")` and no `.facilitator_url(...)` used to
@@ -92,6 +105,16 @@
 
 ### Fixed
 
+- Integers above `2**256 - 1`, negative ones and `True`/`False` are refused
+  wherever a u256 is read, including deposit and withdrawal amounts, where
+  a negative amount is now an `InvalidParamsError` rather than
+  `AmountZeroError`.
+- Validation params that are not hex raise `ValidationError`, so an x402
+  offer carrying them is refused as an `X402Error` instead of escaping as a
+  bare `ValueError`.
+- `examples/payer_quickstart.py` and `examples/recipient_quickstart.py` used
+  the 1.x API and failed on import; they use `new_payment`, `sign_request`
+  and `issue_guarantee`.
 - **An x402 v2 payment echoes `extra` as the seller advertised it.** An
   advertised `extra: {}` was dropped from `accepted`, which the upstream
   TypeScript seller middleware refuses as "No matching payment

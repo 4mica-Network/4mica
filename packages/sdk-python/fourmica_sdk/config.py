@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Mapping, Optional, Union
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from .signing import EvmSigner
@@ -18,13 +19,10 @@ from .utils import (
 
 DEFAULT_RPC_URL = NETWORKS[DEFAULT_NETWORK].rpc_url
 
-# Shells cannot ``export`` a name starting with a digit, hence ``FOURMICA_``.
 _ENV_PREFIXES = ("FOURMICA_", "4MICA_")
 
 
-def read_env(env: Mapping[str, str], name: str) -> Optional[str]:
-    """``FOURMICA_<name>``, else the older ``4MICA_<name>``; empty counts as
-    unset. Both set to different values is a :class:`ConfigError`."""
+def read_env(env: Mapping[str, str], name: str) -> str | None:
     preferred, legacy = (env.get(prefix + name) for prefix in _ENV_PREFIXES)
     if preferred and legacy and preferred != legacy:
         raise ConfigError(
@@ -43,45 +41,39 @@ class AuthConfig:
 @dataclass
 class Config:
     rpc_url: str
-    # Secrets stay out of repr(), and so out of logs and tracebacks.
-    wallet_private_key: Optional[str] = field(repr=False)
-    evm_signer: Optional["EvmSigner"] = None
-    ethereum_http_rpc_url: Optional[str] = None
-    contract_address: Optional[str] = None
-    bearer_token: Optional[str] = field(default=None, repr=False)
-    auth: Optional[AuthConfig] = None
-    facilitator_url: Optional[str] = None
-    """Facilitator that sponsors gas. Without one, every operation is self-funded."""
+    wallet_private_key: str | None = field(repr=False)
+    evm_signer: EvmSigner | None = None
+    ethereum_http_rpc_url: str | None = None
+    contract_address: str | None = None
+    bearer_token: str | None = field(default=None, repr=False)
+    auth: AuthConfig | None = None
+    facilitator_url: str | None = None
 
 
 class ConfigBuilder:
-    """Builds a :class:`Config`; hand it to ``Client.connect``. SIWE auth is on
-    by default; a bearer token replaces it."""
+    """SIWE auth is on by default; a bearer token replaces it."""
 
     def __init__(self) -> None:
-        self._rpc_url: Optional[str] = DEFAULT_RPC_URL
-        self._wallet_private_key: Optional[str] = None
-        self._evm_signer: Optional["EvmSigner"] = None
-        self._ethereum_http_rpc_url: Optional[str] = None
-        self._contract_address: Optional[str] = None
-        self._bearer_token: Optional[str] = None
+        self._rpc_url: str | None = DEFAULT_RPC_URL
+        self._wallet_private_key: str | None = None
+        self._evm_signer: EvmSigner | None = None
+        self._ethereum_http_rpc_url: str | None = None
+        self._contract_address: str | None = None
+        self._bearer_token: str | None = None
         self._auth_enabled: bool = True
-        self._auth_url: Optional[str] = None
-        self._auth_refresh_margin_secs: Optional[Union[int, str]] = 60
-        self._facilitator_url: Optional[str] = None
-        self._network_facilitator_url: Optional[str] = None
+        self._auth_url: str | None = None
+        self._auth_refresh_margin_secs: int | str | None = 60
+        self._facilitator_url: str | None = None
+        self._network_facilitator_url: str | None = None
 
-    def rpc_url(self, value: str) -> "ConfigBuilder":
-        """Set the 4Mica core API URL directly; :meth:`network` selects a hosted
-        network by name instead."""
+    def rpc_url(self, value: str) -> ConfigBuilder:
         self._rpc_url = value
         self._network_facilitator_url = None
         return self
 
-    def network(self, value: str) -> "ConfigBuilder":
-        """Select a hosted 4Mica network by shorthand (``"base"``) or CAIP-2 id
-        (``"eip155:8453"``): its core API URL and, where one is hosted, its
-        facilitator. Mutually exclusive with :meth:`rpc_url` — last call wins."""
+    def network(self, value: str) -> ConfigBuilder:
+        """A shorthand (``"base"``) or CAIP-2 id (``"eip155:8453"``): sets its
+        core API URL and any hosted facilitator. Exclusive with :meth:`rpc_url`."""
         resolved = resolve_network(value)
         if not resolved:
             raise ConfigError(
@@ -93,59 +85,56 @@ class ConfigBuilder:
         self._network_facilitator_url = info.facilitator_url
         return self
 
-    def wallet_private_key(self, value: str) -> "ConfigBuilder":
+    def wallet_private_key(self, value: str) -> ConfigBuilder:
         self._wallet_private_key = value
         return self
 
-    def evm_signer(self, signer: "EvmSigner") -> "ConfigBuilder":
+    def evm_signer(self, signer: EvmSigner) -> ConfigBuilder:
         self._evm_signer = signer
         return self
 
-    def ethereum_http_rpc_url(self, value: str) -> "ConfigBuilder":
-        """Ethereum endpoint for on-chain reads and self-funded transactions.
-        Normally unnecessary: core advertises one."""
+    def ethereum_http_rpc_url(self, value: str) -> ConfigBuilder:
+        """Normally unnecessary: core advertises one."""
         self._ethereum_http_rpc_url = value
         return self
 
-    def contract_address(self, value: str) -> "ConfigBuilder":
+    def contract_address(self, value: str) -> ConfigBuilder:
         """Normally unnecessary: core advertises the deployment."""
         self._contract_address = value
         return self
 
-    def facilitator_url(self, value: str) -> "ConfigBuilder":
-        """Facilitator that sponsors gas. Without one, every operation is
-        self-funded."""
+    def facilitator_url(self, value: str) -> ConfigBuilder:
+        """Without one, every operation is self-funded."""
         self._facilitator_url = value
         return self
 
-    def bearer_token(self, value: str) -> "ConfigBuilder":
+    def bearer_token(self, value: str) -> ConfigBuilder:
         self._bearer_token = value
         return self
 
-    def enable_auth(self) -> "ConfigBuilder":
+    def enable_auth(self) -> ConfigBuilder:
         self._auth_enabled = True
         return self
 
-    def disable_auth(self) -> "ConfigBuilder":
+    def disable_auth(self) -> ConfigBuilder:
         self._auth_enabled = False
         return self
 
-    def auth_url(self, value: str) -> "ConfigBuilder":
-        """Auth base URL for SIWE credentials. Defaults to the RPC URL."""
+    def auth_url(self, value: str) -> ConfigBuilder:
+        """Defaults to the RPC URL."""
         self._auth_url = value
         return self
 
-    def auth_refresh_margin_secs(self, value: int) -> "ConfigBuilder":
+    def auth_refresh_margin_secs(self, value: int) -> ConfigBuilder:
         self._auth_refresh_margin_secs = value
         return self
 
-    def from_env(self, env: Optional[Mapping[str, str]] = None) -> "ConfigBuilder":
-        """Load settings from ``FOURMICA_*`` variables (the older ``4MICA_``
-        prefix also works): ``NETWORK`` (which wins over ``RPC_URL``),
-        ``RPC_URL``, ``WALLET_PRIVATE_KEY``, ``ETHEREUM_HTTP_RPC_URL``,
-        ``CONTRACT_ADDRESS``, ``FACILITATOR_URL``, ``BEARER_TOKEN``,
-        ``AUTH_URL`` and ``AUTH_REFRESH_MARGIN_SECS``. Reads ``os.environ``
-        unless *env* is given."""
+    def from_env(self, env: Mapping[str, str] | None = None) -> ConfigBuilder:
+        """Reads ``FOURMICA_*`` (or the older ``4MICA_*``) from *env*, else
+        ``os.environ``: ``NETWORK`` (wins over ``RPC_URL``), ``RPC_URL``,
+        ``WALLET_PRIVATE_KEY``, ``ETHEREUM_HTTP_RPC_URL``, ``CONTRACT_ADDRESS``,
+        ``FACILITATOR_URL``, ``BEARER_TOKEN``, ``AUTH_URL``,
+        ``AUTH_REFRESH_MARGIN_SECS``."""
         source = os.environ if env is None else env
         network = read_env(source, "NETWORK")
         rpc_url = read_env(source, "RPC_URL")

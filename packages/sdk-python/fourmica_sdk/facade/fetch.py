@@ -1,16 +1,11 @@
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 from fractions import Fraction
+from http import HTTPStatus
 from typing import (
     Any,
-    Callable,
-    Iterable,
-    List,
-    Optional,
-    Sequence,
-    Tuple,
-    Union,
 )
 
 import httpx
@@ -22,11 +17,9 @@ from .protocols import PaymentProtocol, PaymentTerms
 from .session import NetworkSession, asset_ref
 
 
-def _as_list(value: Union[str, Sequence[str], None]) -> List[str]:
+def _as_list(value: str | Sequence[str] | None) -> list[str]:
     if value is None:
         return []
-    # Anything that is not a collection is one entry, for `parse_amount` to
-    # accept or refuse with a message that names it.
     if isinstance(value, str) or not isinstance(value, Iterable):
         return [value]
     return list(value)
@@ -34,17 +27,13 @@ def _as_list(value: Union[str, Sequence[str], None]) -> List[str]:
 
 @dataclass(frozen=True)
 class Reservation:
-    budget: Optional[int]
-    """Index of the ``total`` entry counted against; ``None`` with no total."""
+    budget: int | None
     units: Fraction
     asset: AssetRef
 
 
 class SpendLimiter:
-    """Reserves before signing, so concurrent payments cannot overshoot
-    ``total``."""
-
-    def __init__(self, limits: Optional[SpendLimits] = None) -> None:
+    def __init__(self, limits: SpendLimits | None = None) -> None:
         limits = limits or SpendLimits()
         self._per_payment = _as_list(limits.per_payment)
         self._total = _as_list(limits.total)
@@ -55,15 +44,12 @@ class SpendLimiter:
         )
         for spec in (*self._per_payment, *self._total):
             parse_amount(spec)
-        # One count per ``total`` entry, in whole units: the entry is one
-        # budget on every network, whatever the asset's decimals are there.
-        self._spent: List[Fraction] = [Fraction(0)] * len(self._total)
+        # Whole units: one budget across networks, whatever their decimals.
+        self._spent: list[Fraction] = [Fraction(0)] * len(self._total)
 
     async def reserve(
         self, session: NetworkSession, terms: PaymentTerms, url: str
     ) -> Reservation:
-        """Counts *terms* against the limits, or raises
-        :class:`SpendLimitError`."""
         if self._pay_to is not None and terms.pay_to.lower() not in self._pay_to:
             raise SpendLimitError(
                 "pay_to", url, f"{terms.pay_to} is not in the allowed payees"
@@ -102,8 +88,7 @@ class SpendLimiter:
             return Reservation(budget=None, units=asked, asset=asset)
         total = await self._limit_for(session, self._total, asset)
         if total is None:
-            # A total that names some assets caps the session; leaving the
-            # rest uncapped would make it a limit that is easy to walk around.
+            # Leaving unnamed assets uncapped would let spending walk around it.
             raise SpendLimitError(
                 "assets",
                 url,
@@ -128,9 +113,7 @@ class SpendLimiter:
 
     async def _limit_for(
         self, session: NetworkSession, specs: Sequence[str], asset: AssetRef
-    ) -> Optional[Tuple[int, Fraction]]:
-        """The first entry of *specs* that names *asset* on this network: its
-        index, and its amount in whole units."""
+    ) -> tuple[int, Fraction] | None:
         for index, spec in enumerate(specs):
             parsed = parse_amount(spec)
             token = await session.try_token(parsed.asset)
@@ -143,14 +126,11 @@ class SpendLimiter:
 _DEFAULT_PORTS = {"http": 80, "https": 443}
 
 
-def _port(url: httpx.URL) -> Optional[int]:
+def _port(url: httpx.URL) -> int | None:
     return url.port or _DEFAULT_PORTS.get(url.scheme)
 
 
 def _same_party(asked: httpx.URL, answered: httpx.URL) -> bool:
-    """Whether a redirect stayed with the origin the caller named. The same
-    host moving from http to https counts, as it does when httpx decides
-    whether to forward credentials."""
     if asked.host != answered.host:
         return False
     if asked.scheme == answered.scheme:
@@ -167,14 +147,13 @@ def _same_party(asked: httpx.URL, answered: httpx.URL) -> bool:
 class FetchContext:
     http: httpx.AsyncClient
     protocols: Sequence[PaymentProtocol]
-    session_for: Callable[[str], Optional[NetworkSession]]
-    """``None`` where this session does not pay."""
+    session_for: Callable[[str], NetworkSession | None]
     limiter: SpendLimiter
     record: Callable[[httpx.Response, PaymentRecord], None]
 
 
 async def paying_fetch(
-    ctx: FetchContext, method: str, url: Union[str, httpx.URL], **kwargs: Any
+    ctx: FetchContext, method: str, url: str | httpx.URL, **kwargs: Any
 ) -> httpx.Response:
     send_options = {
         name: kwargs.pop(name)
@@ -182,22 +161,18 @@ async def paying_fetch(
         if name in kwargs
     }
     request = ctx.http.build_request(method, url, **kwargs)
-    # Read once, so a resend carries the same bytes whatever the body was
-    # built from: a file or a generator would be spent by the first send.
+    # Read once, so the paid retry resends the same bytes.
     await request.aread()
     response = await ctx.http.send(request, **send_options)
-    if response.status_code != 402:
+    if response.status_code != HTTPStatus.PAYMENT_REQUIRED:
         return response
 
-    # After a redirect the 402 answers a different request than the caller
-    # made: another URL, and after a 303 another method with no body. That
-    # request is the one paid for. A redirect to another origin is not paid
-    # at all: the caller never named that party.
+    # A redirect to another origin is never paid: the caller never named it.
     challenged = response.request
     if not _same_party(request.url, challenged.url):
         return response
 
-    options: List[Tuple[PaymentProtocol, PaymentTerms, NetworkSession]] = []
+    options: list[tuple[PaymentProtocol, PaymentTerms, NetworkSession]] = []
     for protocol in ctx.protocols:
         for terms in protocol.terms(response):
             session = ctx.session_for(terms.network)
@@ -207,7 +182,7 @@ async def paying_fetch(
         return response
 
     body = await challenged.aread()
-    refusals: List[SpendLimitError] = []
+    refusals: list[SpendLimitError] = []
     for protocol, terms, session in options:
         try:
             reservation = await ctx.limiter.reserve(session, terms, str(challenged.url))
@@ -216,7 +191,6 @@ async def paying_fetch(
             continue
 
         headers = challenged.headers.copy()
-        # The body goes out as bytes with a length, whatever it was read from.
         headers.pop("transfer-encoding", None)
         try:
             headers.update(await protocol.pay(terms, session.client, ctx.http))
@@ -224,11 +198,8 @@ async def paying_fetch(
             # Nothing has left this process.
             ctx.limiter.release(reservation)
             raise
-        # Retried once, and never across a redirect, which would hand the
-        # payment to wherever it points. From here the amount stays reserved
-        # whatever comes back, an error or a second 402 included: the seller
-        # holds a signed payment, and no answer of its own proves it cannot
-        # redeem it.
+        # No redirects: they would hand the payment to wherever they point.
+        # Stays reserved whatever comes back: the seller holds a signed payment.
         paid = await ctx.http.send(
             httpx.Request(
                 challenged.method,
@@ -239,7 +210,7 @@ async def paying_fetch(
             ),
             **{**send_options, "follow_redirects": False},
         )
-        if paid.status_code == 402:
+        if paid.status_code == HTTPStatus.PAYMENT_REQUIRED:
             return paid
         # A seller that says nothing is taken to charge for what it delivered.
         settled = protocol.settled(paid)
@@ -256,5 +227,4 @@ async def paying_fetch(
                 ),
             )
         return paid
-    # Every option was refused; the first is the one the seller preferred.
     raise refusals[0]

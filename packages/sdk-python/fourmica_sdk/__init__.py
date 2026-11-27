@@ -1,4 +1,4 @@
-"""4Mica Python SDK — credit-layer infrastructure for the agentic economy.
+"""4Mica Python SDK.
 
 Quickstart::
 
@@ -7,9 +7,6 @@ Quickstart::
     async with await FourMica.connect(private_key="0x...") as client:
         await client.deposit("5 USDC")
         response = await client.fetch("https://api.example.com/data")
-
-``Client`` and ``ConfigBuilder`` give exact control over each step;
-``await client.low_level()`` hands over the ``Client`` behind a session.
 """
 
 from .amounts import AmountSpec, Token
@@ -163,6 +160,16 @@ from .x402 import (
 )
 
 __all__ = [
+    "CLEARING_HOUSE_EIP712_NAME",
+    "CLEARING_HOUSE_EIP712_VERSION",
+    "DEFAULT_NETWORK",
+    "GUARANTEE_REGISTRY_EIP712_NAME",
+    "GUARANTEE_REGISTRY_EIP712_VERSION",
+    "GUARANTEE_STATUSES",
+    "NETWORKS",
+    "PAYMENT_PAYLOAD_VERSION",
+    "SCHEME_4MICA_CREDIT",
+    "ZERO_ADDRESS",
     "ActiveCycleResponse",
     "AddressMismatchError",
     "AmbiguousTokenError",
@@ -188,9 +195,6 @@ __all__ = [
     "CheckpointRequiredDetails",
     "CheckpointRequiredError",
     "ClaimReceipt",
-    "clearing_house_domain_separator",
-    "CLEARING_HOUSE_EIP712_NAME",
-    "CLEARING_HOUSE_EIP712_VERSION",
     "ClearingParticipantProof",
     "ClearingParticipantRole",
     "ClearingPosition",
@@ -207,7 +211,6 @@ __all__ = [
     "CoreRefusalError",
     "CycleMismatchDetails",
     "CycleMismatchError",
-    "DEFAULT_NETWORK",
     "DepositReceipt",
     "DepositResult",
     "Eip2612Permit",
@@ -223,10 +226,6 @@ __all__ = [
     "GasRequiredError",
     "GracePeriodNotElapsedError",
     "Guarantee",
-    "guarantee_registry_domain_separator",
-    "GUARANTEE_REGISTRY_EIP712_NAME",
-    "GUARANTEE_REGISTRY_EIP712_VERSION",
-    "GUARANTEE_STATUSES",
     "GuaranteeReceipt",
     "InsufficientBalanceError",
     "InvalidParamsError",
@@ -235,13 +234,12 @@ __all__ = [
     "MalformedReceiptError",
     "MissingTokenDomainSeparatorError",
     "NetworkInfo",
-    "NETWORKS",
     "NoWithdrawalRequestedError",
     "OutcomeUnknownError",
+    "PayReceipt",
     "PayerGuaranteeInfo",
     "PayerGuaranteesPage",
     "PayerSigner",
-    "PAYMENT_PAYLOAD_VERSION",
     "PaymentError",
     "PaymentRecord",
     "PaymentRequest",
@@ -249,7 +247,6 @@ __all__ = [
     "PaymentRequirementsExtra",
     "PaymentRequirementsV1",
     "PaymentRequirementsV2",
-    "PayReceipt",
     "PendingWithdrawal",
     "Permit2AllowanceRequiredError",
     "Permit2Authorization",
@@ -257,17 +254,13 @@ __all__ = [
     "RawBalance",
     "ReceiptSignerMismatchError",
     "ReceiveAuthorization",
-    "recipient_commitment",
     "RecipientPaymentInfo",
-    "resolve_network",
-    "resolve_network_rpc_url",
     "RevertedOnChainError",
     "Route",
     "RpcError",
     "RpcProxy",
-    "SCHEME_4MICA_CREDIT",
-    "SettlementReceipt",
     "SettleResult",
+    "SettlementReceipt",
     "SignedCheckpoint",
     "SigningError",
     "SiweTemplate",
@@ -281,7 +274,6 @@ __all__ = [
     "SupportedTokensResponse",
     "TimestampNotPastCutoffDetails",
     "TimestampNotPastCutoffError",
-    "to_caip2",
     "Token",
     "TokenNotSupportedError",
     "TokenRoute",
@@ -293,16 +285,21 @@ __all__ = [
     "UserSuspensionStatus",
     "ValidationExtra",
     "ValidationRequirement",
-    "verify_guarantee_receipt",
-    "WithdrawalCancelAuthorization",
-    "WithdrawalRequestAuthorization",
     "WithdrawReceipt",
     "WithdrawResult",
+    "WithdrawalCancelAuthorization",
+    "WithdrawalRequestAuthorization",
     "X402Error",
     "X402Flow",
     "X402PaymentRequired",
     "X402ResourceInfo",
     "X402SettledPayment",
     "X402SignedPayment",
-    "ZERO_ADDRESS",
+    "clearing_house_domain_separator",
+    "guarantee_registry_domain_separator",
+    "recipient_commitment",
+    "resolve_network",
+    "resolve_network_rpc_url",
+    "to_caip2",
+    "verify_guarantee_receipt",
 ]

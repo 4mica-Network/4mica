@@ -1,16 +1,9 @@
-"""``FourMica``: a short way in. Connect once, then deposit, pay and withdraw
-with amounts written the way people write them::
-
-    async with await FourMica.connect(private_key="0x...") as client:
-        await client.deposit("5 USDC")
-        response = await client.fetch("https://api.example.com/data")
-"""
-
 from __future__ import annotations
 
 import asyncio
 import os
-from typing import Any, Dict, List, Mapping, Optional, Sequence, Union, overload
+from collections.abc import Mapping, Sequence
+from typing import Any, overload
 from weakref import WeakKeyDictionary
 
 import httpx
@@ -68,18 +61,17 @@ __all__ = [
 ]
 
 
-# httpx's default gives up on the answer after 5 seconds, which on the paid
-# retry is after the payment has left. A slow seller gets five minutes.
+# httpx's 5 s read default would abandon a paid retry.
 _FETCH_TIMEOUT = httpx.Timeout(connect=10.0, read=300.0, write=30.0, pool=10.0)
 
 
 def _home_config(
-    private_key: Optional[str],
-    signer: Optional[EvmSigner],
-    env: Optional[Mapping[str, str]],
-    network: Optional[str],
-    rpc_url: Optional[str],
-    facilitator_url: Optional[str],
+    private_key: str | None,
+    signer: EvmSigner | None,
+    env: Mapping[str, str] | None,
+    network: str | None,
+    rpc_url: str | None,
+    facilitator_url: str | None,
 ) -> Config:
     builder = ConfigBuilder()
     network_from_env = False
@@ -130,13 +122,8 @@ def _to_balance(asset: AssetRef, total: int, locked: int) -> Balance:
 
 
 class FourMica:
-    """Connect once, then deposit, pay and withdraw with amounts like
-    ``"5 USDC"``. Each network the session touches gets its own
-    :class:`~fourmica_sdk.Client`, connected on first use; :meth:`low_level`
-    returns it.
-
-    Build one with :meth:`connect`, not the constructor. Like the HTTP client
-    inside it, a session belongs to the event loop it was connected on."""
+    """Build with :meth:`connect`, not the constructor. A session belongs to
+    the event loop it was connected on."""
 
     def __init__(
         self,
@@ -145,6 +132,7 @@ class FourMica:
         protocols: Sequence[PaymentProtocol],
         limiter: SpendLimiter,
         http: httpx.AsyncClient,
+        *,
         owns_http: bool,
     ) -> None:
         self._cfg = cfg
@@ -153,33 +141,30 @@ class FourMica:
         self._limiter = limiter
         self._http = http
         self._owns_http = owns_http
-        self._sessions: Dict[str, NetworkSession] = {home.caip2: home}
-        self._payments: "WeakKeyDictionary[httpx.Response, PaymentRecord]" = (
+        self._sessions: dict[str, NetworkSession] = {home.caip2: home}
+        self._payments: WeakKeyDictionary[httpx.Response, PaymentRecord] = (
             WeakKeyDictionary()
         )
         self._lock = asyncio.Lock()
-        self._closing: Optional["asyncio.Future[None]"] = None
+        self._closing: asyncio.Future[None] | None = None
 
     @classmethod
     async def connect(
         cls,
         *,
-        private_key: Optional[str] = None,
-        signer: Optional[EvmSigner] = None,
-        env: Optional[Mapping[str, str]] = None,
-        network: Optional[str] = None,
-        rpc_url: Optional[str] = None,
-        facilitator_url: Optional[str] = None,
-        spend: Optional[SpendLimits] = None,
-        protocols: Union[str, Sequence[str]] = ("x402",),
-        http_client: Optional[httpx.AsyncClient] = None,
-    ) -> "FourMica":
-        """Signs with *private_key* or *signer*. With neither, the whole
-        configuration is read from ``FOURMICA_*`` in *env* (``os.environ`` by
-        default); with one, the environment is not read at all. *network*
-        defaults to ``DEFAULT_NETWORK``; *rpc_url* names a self-hosted core
-        instead. *protocols* is in order of preference. *http_client* is what
-        :meth:`fetch` sends with, and stays the caller's to close."""
+        private_key: str | None = None,
+        signer: EvmSigner | None = None,
+        env: Mapping[str, str] | None = None,
+        network: str | None = None,
+        rpc_url: str | None = None,
+        facilitator_url: str | None = None,
+        spend: SpendLimits | None = None,
+        protocols: str | Sequence[str] = ("x402",),
+        http_client: httpx.AsyncClient | None = None,
+    ) -> FourMica:
+        """With neither *private_key* nor *signer*, all configuration comes from
+        ``FOURMICA_*`` in *env*; with one, the environment is not read. *rpc_url*
+        names a self-hosted core. *http_client* stays the caller's to close."""
         if private_key and signer is not None:
             raise ConfigError("pass private_key or signer, not both")
         chosen = []
@@ -213,7 +198,7 @@ class FourMica:
         """A hosted shorthand, or the CAIP-2 id of a self-hosted core."""
         return self._home.name
 
-    async def _session(self, network: Optional[str] = None) -> NetworkSession:
+    async def _session(self, network: str | None = None) -> NetworkSession:
         if self._closing is not None:
             raise ClientError("this FourMica session is closed")
         if network is None:
@@ -241,50 +226,37 @@ class FourMica:
                 self._sessions[info.caip2] = session
             return session
 
-    async def low_level(self, network: Optional[str] = None) -> Client:
-        """The :class:`~fourmica_sdk.Client` behind *network*, for anything the
-        facade does not cover."""
+    async def low_level(self, network: str | None = None) -> Client:
         return (await self._session(network)).client
 
     async def deposit(
         self,
         amount: AmountInput,
         *,
-        network: Optional[str] = None,
+        network: str | None = None,
         gas: Gas = "auto",
         wait: Wait = "spendable",
         timeout_secs: float = DEFAULT_DEPOSIT_TIMEOUT_SECS,
     ) -> DepositResult:
-        """Deposits collateral, gasless where it can, and waits for core to
-        count it. ``gas="self"`` sends the wallet's own transaction;
-        ``wait="mined"`` returns without waiting for core. Running out of
-        time is not an error: the result says ``"pending"``.
-
-        ``"spendable"`` is inferred from the account's collateral at core
-        having grown by the amount; core does not say which deposit it
-        counted. Deposits of one asset through this session run one after
-        another, so each is measured from the one before. A deposit to the
-        same account from elsewhere at the same time can be taken for this
-        one."""
+        """Gasless where it can; waits for core to count it unless
+        ``wait="mined"``. Timing out returns ``"pending"``, not an error. A
+        concurrent deposit to the same account from elsewhere can pass for this one."""
         session = await self._session(network)
         return await _deposit(session, amount, gas, wait, timeout_secs)
 
     @overload
-    async def balance(self, *, network: Optional[str] = None) -> Balances: ...
+    async def balance(self, *, network: str | None = None) -> Balances: ...
 
     @overload
-    async def balance(
-        self, asset: str, *, network: Optional[str] = None
-    ) -> Balance: ...
+    async def balance(self, asset: str, *, network: str | None = None) -> Balance: ...
 
     async def balance(
-        self, asset: Optional[str] = None, *, network: Optional[str] = None
-    ) -> Union[Balance, Balances]:
-        """The collateral held in *asset*, or without one, in every asset the
-        wallet holds collateral in."""
+        self, asset: str | None = None, *, network: str | None = None
+    ) -> Balance | Balances:
+        """Without *asset*, every asset the wallet holds collateral in."""
         session = await self._session(network)
 
-        async def read(ref: AssetRef) -> Optional[Balance]:
+        async def read(ref: AssetRef) -> Balance | None:
             info = await session.client.account.asset_balance(ref.address)
             return _to_balance(ref, info.total, info.locked) if info else None
 
@@ -303,71 +275,51 @@ class FourMica:
         return balances
 
     async def withdraw(
-        self, amount: AmountInput, *, network: Optional[str] = None
+        self, amount: AmountInput, *, network: str | None = None
     ) -> WithdrawResult:
-        """Requests a withdrawal; :meth:`finalize_withdrawal` pays it out
-        after the grace period."""
+        """:meth:`finalize_withdrawal` pays it out after the grace period."""
         return await request_withdrawal(await self._session(network), amount)
 
     async def finalize_withdrawal(
-        self, asset: str, *, network: Optional[str] = None
+        self, asset: str, *, network: str | None = None
     ) -> WithdrawResult:
-        """Pays out the pending withdrawal of *asset*. Before the grace period
-        has passed it raises, saying when it will be possible."""
+        """Raises before the grace period has passed, saying when it will."""
         return await finalize_withdrawal(await self._session(network), asset)
 
     async def cancel_withdrawal(
-        self, asset: str, *, network: Optional[str] = None
+        self, asset: str, *, network: str | None = None
     ) -> WithdrawResult:
-        """Cancels the pending withdrawal of *asset*."""
         return await cancel_withdrawal(await self._session(network), asset)
 
     async def withdrawals(
-        self, *, network: Optional[str] = None
-    ) -> List[PendingWithdrawal]:
-        """Pending withdrawal requests, and when each can be finalized."""
+        self, *, network: str | None = None
+    ) -> list[PendingWithdrawal]:
         return await pending_withdrawals(await self._session(network))
 
-    async def positions(self, *, network: Optional[str] = None) -> List[Position]:
-        """What the wallet still owes and is still owed: one entry per asset
-        and settlement cycle, soonest deadline first. Paid, claimed and
-        defaulted positions are not listed."""
+    async def positions(self, *, network: str | None = None) -> list[Position]:
+        """Soonest deadline first. Paid, claimed and defaulted positions are not
+        listed."""
         return await open_positions(await self._session(network))
 
     async def settle(
         self,
         *,
-        only: Optional[SettleAction] = None,
-        network: Optional[str] = None,
-    ) -> List[SettleResult]:
-        """Pays every open debit and claims every open credit, gaslessly
-        where possible; ``only="pay"`` or ``only="claim"`` does one side. One
-        that fails does not stop the others: read each result's ``status``.
-        A debit left unpaid past its deadline is taken from the wallet's
-        collateral, so this is the call to run after a cycle closes.
-
-        A credit is claimable only once its cycle is funded; until then its
-        claim comes back ``"failed"``, before anything is sent. With no
-        facilitator configured the wallet sends the transactions itself and
-        pays their gas: for a token debit that is an approval of the exact
-        amount, when the ClearingHouse lacks one, and then the payment."""
+        only: SettleAction | None = None,
+        network: str | None = None,
+    ) -> list[SettleResult]:
+        """One failure does not stop the others: read each result's ``status``.
+        An unpaid debit past its deadline is taken from collateral. With no
+        facilitator the wallet sends the transactions and pays their gas."""
         if only not in (None, "pay", "claim"):
             raise InvalidParamsError(f'only must be "pay" or "claim", not {only!r}')
         return await settle_all(await self._session(network), only)
 
     async def fetch(
-        self, url: Union[str, httpx.URL], *, method: str = "GET", **kwargs: Any
+        self, url: str | httpx.URL, *, method: str = "GET", **kwargs: Any
     ) -> httpx.Response:
-        """Sends the request, taking the keyword arguments of
-        ``httpx.AsyncClient.request``. Pays a 4Mica 402 on a network this
-        session has open, within the spend limits, and retries once; anything
-        else comes back untouched. The body is read into memory once and sent
-        again unchanged on the retry.
-
-        With ``follow_redirects``, the request paid for is the one that was
-        answered 402, at the URL the redirect led to. A 402 from another
-        origin than *url* is not paid, and the paid retry follows no
-        redirect: its answer comes back as it is."""
+        """Takes ``httpx.AsyncClient.request`` keyword arguments. Pays a 4Mica 402
+        within the spend limits and retries once with the same body. A 402 from
+        another origin than *url* is not paid; the retry follows no redirect."""
         await self._session()
         open_sessions = dict(self._sessions)
         return await paying_fetch(
@@ -383,20 +335,17 @@ class FourMica:
             **kwargs,
         )
 
-    def payment_for(self, response: httpx.Response) -> Optional[PaymentRecord]:
+    def payment_for(self, response: httpx.Response) -> PaymentRecord | None:
         """What :meth:`fetch` paid for *response*, or ``None`` if nothing."""
         return self._payments.get(response)
 
     async def aclose(self) -> None:
-        """Closes every network's client. Concurrent and repeated calls share
-        one cleanup, and its outcome."""
         if self._closing is None:
             self._closing = asyncio.create_task(self._close())
-        # Shielded: one caller being cancelled must not cancel it for the rest.
+        # Shielded: one cancelled caller must not cancel cleanup for the rest.
         await asyncio.shield(self._closing)
 
     async def _close(self) -> None:
-        # The lock waits out a network that is still connecting.
         async with self._lock:
             outcomes = await asyncio.gather(
                 *(s.client.aclose() for s in self._sessions.values()),
@@ -408,8 +357,8 @@ class FourMica:
             if isinstance(outcome, BaseException):
                 raise outcome
 
-    async def __aenter__(self) -> "FourMica":
+    async def __aenter__(self) -> FourMica:
         return self
 
-    async def __aexit__(self, exc_type, exc, tb) -> None:
+    async def __aexit__(self, *_: object) -> None:
         await self.aclose()

@@ -1,9 +1,3 @@
-"""``fourmica_sdk.amounts`` against the monorepo's shared cases.
-
-``packages/sdk/amounts.vectors.json`` pins how every SDK reads a human amount;
-the TypeScript SDK runs the same file.
-"""
-
 import json
 from pathlib import Path
 
@@ -41,7 +35,9 @@ TOKENS = [
 def test_shared_vectors_are_present():
     if not VECTORS_JSON.is_file():
         pytest.skip(f"{VECTORS_JSON} not found: not running inside the 4Mica monorepo")
-    assert VECTORS["toBaseUnits"] and VECTORS["parseAmount"] and VECTORS["formatUnits"]
+    assert VECTORS["toBaseUnits"]
+    assert VECTORS["parseAmount"]
+    assert VECTORS["formatUnits"]
 
 
 @pytest.mark.parametrize("case", VECTORS.get("toBaseUnits", []), ids=repr)
@@ -51,7 +47,6 @@ def test_to_base_units_vector(case):
         return
     with pytest.raises(ERRORS[case["error"]]) as raised:
         to_base_units(case["amount"], case["decimals"])
-    # AmountPrecisionError is an InvalidParamsError; "invalid" means not that.
     assert isinstance(raised.value, AmountPrecisionError) == (
         case["error"] == "precision"
     )
@@ -121,7 +116,8 @@ def test_resolve_token_maps_the_native_asset_itself():
         )
         assert token.native
     assert resolve_token([], "pol", native_symbol="POL").symbol == "POL"
-    assert is_native_asset("ETH") and not is_native_asset("ETH", "POL")
+    assert is_native_asset("ETH")
+    assert not is_native_asset("ETH", "POL")
 
 
 def test_resolve_token_names_what_is_accepted():
@@ -133,7 +129,8 @@ def test_resolve_token_names_what_is_accepted():
         "eip155:84532",
         TOKENS,
     )
-    assert "on eip155:84532" in str(error) and f"USDC ({USDC})" in str(error)
+    assert "on eip155:84532" in str(error)
+    assert f"USDC ({USDC})" in str(error)
     with pytest.raises(TokenNotSupportedError, match="accepted: none"):
         resolve_token([], "0x" + "11" * 20)
 

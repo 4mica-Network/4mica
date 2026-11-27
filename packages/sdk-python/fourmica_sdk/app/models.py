@@ -1,9 +1,6 @@
-"""What the 4Mica app API answers, as it sends it: camelCase keys, amounts
-and timestamps as strings."""
-
 from __future__ import annotations
 
-from typing import List, Literal, Optional, TypedDict
+from typing import Literal, TypedDict
 
 ResourceKind = Literal["listing", "agent"]
 AppNetwork = Literal["BASE", "BASE_SEPOLIA", "ETHEREUM_SEPOLIA"]
@@ -25,53 +22,52 @@ class AppListing(TypedDict):
     id: str
     slug: str
     name: str
-    summary: Optional[str]
-    description: Optional[str]
-    url: Optional[str]
+    summary: str | None
+    description: str | None
+    url: str | None
     method: str
-    docsUrl: Optional[str]
-    category: Optional[str]
-    tags: List[str]
-    priceLabel: Optional[str]
+    docsUrl: str | None
+    category: str | None
+    tags: list[str]
+    priceLabel: str | None
     visibility: AppVisibility
-    publishedAt: Optional[str]
-    walletId: Optional[str]
-    network: Optional[AppNetwork]
-    payToAddress: Optional[str]
-    assetAddress: Optional[str]
-    assetDecimals: Optional[int]
-    """Prices an x402 route in base units: ``to_base_units(priceAmount, assetDecimals)``."""
-    priceAmount: Optional[str]
-    priceCurrency: Optional[str]
-    x402Endpoint: Optional[str]
+    publishedAt: str | None
+    walletId: str | None
+    network: AppNetwork | None
+    payToAddress: str | None
+    assetAddress: str | None
+    assetDecimals: int | None
+    priceAmount: str | None
+    priceCurrency: str | None
+    x402Endpoint: str | None
     createdAt: str
     updatedAt: str
 
 
 class AppAgent(TypedDict):
     id: str
-    slug: Optional[str]
+    slug: str | None
     name: str
-    headline: Optional[str]
-    description: Optional[str]
-    avatarUrl: Optional[str]
-    docsUrl: Optional[str]
+    headline: str | None
+    description: str | None
+    avatarUrl: str | None
+    docsUrl: str | None
     status: AppAgentStatus
     visibility: AppVisibility
     network: AppNetwork
-    walletAddress: Optional[str]
-    payerWalletId: Optional[str]
+    walletAddress: str | None
+    payerWalletId: str | None
     creditLimit: str
-    walletId: Optional[str]
-    payToAddress: Optional[str]
-    assetAddress: Optional[str]
-    assetDecimals: Optional[int]
-    priceAmount: Optional[str]
-    priceCurrency: Optional[str]
-    priceLabel: Optional[str]
-    endpointUrl: Optional[str]
-    x402Endpoint: Optional[str]
-    publishedAt: Optional[str]
+    walletId: str | None
+    payToAddress: str | None
+    assetAddress: str | None
+    assetDecimals: int | None
+    priceAmount: str | None
+    priceCurrency: str | None
+    priceLabel: str | None
+    endpointUrl: str | None
+    x402Endpoint: str | None
+    publishedAt: str | None
     createdAt: str
     updatedAt: str
 
@@ -80,16 +76,16 @@ class AppPolicy(TypedDict):
     id: str
     policyEnabled: bool
     faqEnabled: bool
-    refundPolicy: Optional[str]
-    uptimeTarget: Optional[str]
-    supportResponse: Optional[str]
-    supportEmail: Optional[str]
-    rateLimit: Optional[str]
-    dataRetention: Optional[str]
-    testEndpoint: Optional[str]
-    termsUrl: Optional[str]
-    privacyUrl: Optional[str]
-    statusUrl: Optional[str]
+    refundPolicy: str | None
+    uptimeTarget: str | None
+    supportResponse: str | None
+    supportEmail: str | None
+    rateLimit: str | None
+    dataRetention: str | None
+    testEndpoint: str | None
+    termsUrl: str | None
+    privacyUrl: str | None
+    statusUrl: str | None
     createdAt: str
     updatedAt: str
 
@@ -105,16 +101,16 @@ class AppFaq(TypedDict):
 
 class ResourceContext(TypedDict):
     kind: ResourceKind
-    listing: Optional[AppListing]
-    agent: Optional[AppAgent]
-    policy: Optional[AppPolicy]
-    faqs: List[AppFaq]
+    listing: AppListing | None
+    agent: AppAgent | None
+    policy: AppPolicy | None
+    faqs: list[AppFaq]
 
 
 class CustomerResolution(TypedDict):
-    customerId: Optional[str]
+    customerId: str | None
     allowed: bool
-    deniedReason: Optional[CustomerDeniedReason]
+    deniedReason: CustomerDeniedReason | None
     needsApproval: bool
     gross: str
     quotaApplied: str
@@ -122,38 +118,37 @@ class CustomerResolution(TypedDict):
     discountApplied: str
     creditApplied: str
     payable: str
-    couponSkippedReason: Optional[CouponSkippedReason]
+    couponSkippedReason: CouponSkippedReason | None
 
 
 class AppPayment(TypedDict):
     id: str
-    listingId: Optional[str]
-    agentId: Optional[str]
+    listingId: str | None
+    agentId: str | None
     payerAddress: str
     recipientAddress: str
     network: AppNetwork
-    assetAddress: Optional[str]
+    assetAddress: str | None
     amount: str
     status: AppPaymentStatus
-    failureReason: Optional[str]
+    failureReason: str | None
     reqId: str
-    txHash: Optional[str]
-    resource: Optional[str]
-    description: Optional[str]
-    settledAt: Optional[str]
+    txHash: str | None
+    resource: str | None
+    description: str | None
+    settledAt: str | None
     createdAt: str
     updatedAt: str
-    listingSlug: Optional[str]
-    listingName: Optional[str]
-    agentSlug: Optional[str]
-    agentName: Optional[str]
+    listingSlug: str | None
+    listingName: str | None
+    agentSlug: str | None
+    agentName: str | None
     direction: Literal["sent", "received"]
 
 
 class ReportedPayment(TypedDict):
     payment: AppPayment
     created: bool
-    """``False`` when a payment with this ``reqId`` was already reported."""
 
 
 class AppIssue(TypedDict):

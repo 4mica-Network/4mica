@@ -1,13 +1,11 @@
-"""Reading a 4Mica payment on the seller's side: from the ``X-PAYMENT``
-header, or from the context of an x402 after-settle hook."""
-
 from __future__ import annotations
 
 import base64
 import binascii
 import json
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Mapping, Optional
+from typing import Any
 
 from ..amounts import format_units
 from ..errors import InvalidParamsError, X402Error
@@ -24,19 +22,15 @@ class ParsedPayment:
 
 @dataclass(frozen=True)
 class SettledPayment:
-    """What :meth:`AppClient.report_payment` takes, in base units, with the
-    guarantee receipt."""
-
     req_id: str
     payer_address: str
     amount: str
     """Base units, as a decimal string."""
-    guarantee_claims: Optional[str]
-    guarantee_signature: Optional[str]
+    guarantee_claims: str | None
+    guarantee_signature: str | None
 
 
 def _field(source: Any, *names: str) -> Any:
-    """A field of a mapping or an object, under the first name it has."""
     for name in names:
         if isinstance(source, Mapping):
             if name in source:
@@ -46,7 +40,7 @@ def _field(source: Any, *names: str) -> Any:
     return None
 
 
-def _as_int(value: Any) -> Optional[int]:
+def _as_int(value: Any) -> int | None:
     if isinstance(value, bool):
         return None
     if isinstance(value, int):
@@ -61,7 +55,6 @@ def _as_int(value: Any) -> Optional[int]:
 
 
 def _read_payment(signed: Any, decimals: int) -> ParsedPayment:
-    """*signed* is an envelope's ``payload``: the request and its signature."""
     payment = _field(signed, "payload")
     req_id = _field(payment, "req_id", "reqId")
     payer_address = _field(payment, "user_address", "userAddress")
@@ -81,7 +74,6 @@ def _read_payment(signed: Any, decimals: int) -> ParsedPayment:
 
 
 def parse_payment_header(header: str) -> Any:
-    """The JSON envelope a base64 ``X-PAYMENT`` header carries."""
     if not header or not isinstance(header, str):
         raise X402Error("missing payment header")
     try:
@@ -91,17 +83,14 @@ def parse_payment_header(header: str) -> Any:
 
 
 def payment_from_header(header: str, decimals: int = 18) -> ParsedPayment:
-    """The request id, payer and amount of the payment in an ``X-PAYMENT``
-    header, its amount shown in whole units of *decimals*."""
+    """The payment in an ``X-PAYMENT`` header, its amount in whole units of
+    *decimals*."""
     return _read_payment(_field(parse_payment_header(header), "payload"), decimals)
 
 
 def parse_settlement(context: Any) -> SettledPayment:
-    """Reads an x402 after-settle hook's context into what
-    :meth:`AppClient.report_payment` takes: the amount in base units, and the
-    guarantee receipt the facilitator returned. *context* is the hook's
-    ``SettleResultContext``, or a mapping with ``payment_payload`` and
-    ``result``."""
+    """*context* is an x402 after-settle hook's ``SettleResultContext``, or a
+    mapping with ``payment_payload`` and ``result``. Amounts are in base units."""
     payment_payload = _field(context, "payment_payload", "paymentPayload")
     parsed = _read_payment(_field(payment_payload, "payload"), 0)
     extra = _field(_field(context, "result"), "extra")

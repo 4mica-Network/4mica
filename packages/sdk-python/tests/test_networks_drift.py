@@ -1,10 +1,3 @@
-"""Drift check: ``fourmica_sdk.networks.NETWORKS`` against the monorepo's list.
-
-``packages/sdk/networks.json`` is the single source of truth for 4Mica's
-hosted networks. The Python SDK keeps its own copy so it has no build-time
-dependency on the monorepo; this test fails when the two disagree.
-"""
-
 import json
 from pathlib import Path
 

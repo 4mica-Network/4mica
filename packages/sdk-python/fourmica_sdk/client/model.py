@@ -1,10 +1,8 @@
-"""Client-facing models: assets, routes, receipts, positions."""
-
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, Optional, Union
+from typing import Any
 
 from ..errors import InvalidParamsError
 from ..models import ZERO_ADDRESS
@@ -13,23 +11,22 @@ from ..utils import normalize_address, parse_u256
 
 @dataclass(frozen=True)
 class Asset:
-    """Which asset an operation moves. The contract names the asset by its
-    token address, with the zero address standing for native ETH."""
+    """Named by token address; the zero address is native ETH."""
 
     address: str
 
     @classmethod
-    def native(cls) -> "Asset":
+    def native(cls) -> Asset:
         return cls(ZERO_ADDRESS)
 
     @classmethod
-    def erc20(cls, token: str) -> "Asset":
+    def erc20(cls, token: str) -> Asset:
         return cls(normalize_address(token))
 
     @classmethod
-    def coerce(cls, value: Union["Asset", str, None]) -> "Asset":
-        """Accepts an :class:`Asset`, a token address string, or ``None`` /
-        the zero address for native ETH."""
+    def coerce(cls, value: Asset | str | None) -> Asset:
+        """Accepts an :class:`Asset`, a token address, or ``None`` / the zero
+        address for native ETH."""
         if value is None:
             return cls.native()
         if isinstance(value, Asset):
@@ -41,23 +38,17 @@ class Asset:
         return self.address.lower() == ZERO_ADDRESS
 
     @property
-    def erc20_token(self) -> Optional[str]:
-        """The token address, or ``None`` for native ETH — the shape the
-        contract gateway's optional-token parameters take."""
+    def erc20_token(self) -> str | None:
+        """The token address, or ``None`` for native ETH."""
         return None if self.is_native else self.address
 
 
 class Route(str, Enum):
-    """How a contract-verified operation reached the chain."""
-
     GASLESS = "gasless"
     SELF_FUNDED = "self_funded"
 
 
 class TokenRoute(str, Enum):
-    """How a token-moving operation reached the chain. Unlike :class:`Route`,
-    the authorization scheme matters here — it decides which tokens qualify."""
-
     EIP3009 = "eip3009"
     PERMIT2 = "permit2"
     SPONSORED_PERMIT2 = "sponsored_permit2"
@@ -66,15 +57,13 @@ class TokenRoute(str, Enum):
 
 @dataclass
 class AssetPosition:
-    """The signer's standing in one asset, as the contract records it."""
-
     asset: str
     collateral: int
     withdrawal_request_amount: int
     withdrawal_request_timestamp: int
 
     @classmethod
-    def from_gateway(cls, raw: Dict[str, Any]) -> "AssetPosition":
+    def from_gateway(cls, raw: dict[str, Any]) -> AssetPosition:
         return cls(
             asset=normalize_address(raw["asset"]),
             collateral=parse_u256(raw["collateral"]),
@@ -85,8 +74,6 @@ class AssetPosition:
 
 @dataclass
 class StablecoinPosition:
-    """The signer's full position in a yield-bearing stablecoin."""
-
     asset: str
     principal: int
     guarantee_capacity: int
@@ -95,76 +82,61 @@ class StablecoinPosition:
     user_net_yield: int
     withdrawable_balance: int
     user_shares: int
-    """The signer's pool shares."""
     total_user_shares: int
     protocol_shares: int
     pool_shares: int
-    """Shares outstanding across users, the protocol and escrow."""
     pool_assets: int
-    """Underlying value backing the pool."""
     strategy: str
-    """The ERC-4626 strategy backing the pool, or the zero address while its
-    assets sit idle."""
+    """The zero address while the pool's assets sit idle."""
 
 
 @dataclass
 class DepositReceipt:
-    """Outcome of a deposit, whichever route delivered it."""
-
     tx_hash: str
     route: TokenRoute
     account: str
-    """The account credited — always whoever signed, never a facilitator."""
+    """Always whoever signed, never a facilitator."""
     asset: str
     amount: int
-    network: Optional[str] = None
-    raw: Optional[Dict[str, Any]] = field(default=None, repr=False)
+    network: str | None = None
+    raw: dict[str, Any] | None = field(default=None, repr=False)
 
 
 @dataclass
 class WithdrawReceipt:
-    """Outcome of a withdrawal request, cancellation or finalization."""
-
     tx_hash: str
     route: Route
     account: str
     asset: str
-    network: Optional[str] = None
-    raw: Optional[Dict[str, Any]] = field(default=None, repr=False)
+    network: str | None = None
+    raw: dict[str, Any] | None = field(default=None, repr=False)
 
 
 @dataclass
 class PayReceipt:
-    """Outcome of a net-debit payment. The debit always comes out of the
-    debtor's wallet, whichever route ran."""
+    """The debit always comes out of the debtor's wallet, whichever route ran."""
 
     tx_hash: str
     route: TokenRoute
     account: str
-    network: Optional[str] = None
-    raw: Optional[Dict[str, Any]] = field(default=None, repr=False)
+    network: str | None = None
+    raw: dict[str, Any] | None = field(default=None, repr=False)
 
 
 @dataclass
 class ClaimReceipt:
-    """Outcome of a net-credit claim. The payout goes to the address the
-    committed Merkle leaf names, never the submitter."""
+    """The payout goes to the address the committed leaf names, never the
+    submitter."""
 
     tx_hash: str
     route: Route
     account: str
-    network: Optional[str] = None
-    raw: Optional[Dict[str, Any]] = field(default=None, repr=False)
+    network: str | None = None
+    raw: dict[str, Any] | None = field(default=None, repr=False)
 
 
-def base_units(value: Union[int, str]) -> int:
-    """A whole number of base units, from an int or a decimal or 0x-hex
-    string. A float is refused: truncating ``1.9`` to ``1`` would move the
-    wrong amount without saying so. So is a bool, which Python counts as an
-    int: ``True`` would be one base unit."""
-    if isinstance(value, int) and not isinstance(value, bool):
-        return value
-    if isinstance(value, str):
+def base_units(value: int | str) -> int:
+    if isinstance(value, (int, str)) and not isinstance(value, bool):
         try:
             return parse_u256(value)
         except ValueError as exc:
@@ -174,11 +146,7 @@ def base_units(value: Union[int, str]) -> int:
     )
 
 
-def confirm_echoed(field_name: str, raw: Optional[str], expected: str) -> str:
-    """Checks a value a server echoed back against what was asked for, taking
-    the request's own value when the echo is omitted. An echo that disagrees —
-    or cannot be read — means the response describes something nobody asked
-    for, and is refused."""
+def confirm_echoed(field_name: str, raw: str | None, expected: str) -> str:
     if raw is None:
         return expected
     if str(raw).lower() == expected.lower():

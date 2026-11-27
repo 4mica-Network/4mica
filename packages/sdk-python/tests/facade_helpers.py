@@ -1,8 +1,4 @@
-"""Fakes for the ``FourMica`` facade tests: a ``Client`` stand-in that records
-what the facade asks of it."""
-
 from types import SimpleNamespace
-from typing import List, Optional
 from unittest.mock import AsyncMock, MagicMock
 
 from fourmica_sdk.amounts import Token
@@ -53,19 +49,15 @@ def fake_builder(route: TokenRoute = TokenRoute.EIP3009):
 
 
 class FakeClient:
-    """*totals* are successive core totals, the last one repeating; ``None``
-    means core holds nothing. *private_key* ``None`` stands for a remote
-    signer, and *gasless* ``False`` for a network with no facilitator."""
-
     def __init__(
         self,
         chain_id: int = 84532,
-        tokens: Optional[List[Token]] = None,
+        tokens: list[Token] | None = None,
         gateway=None,
         builder=None,
-        totals: Optional[List[Optional[int]]] = None,
-        positions: Optional[list] = None,
-        private_key: Optional[str] = KEY,
+        totals: list[int | None] | None = None,
+        positions: list | None = None,
+        private_key: str | None = KEY,
         gasless: bool = True,
     ) -> None:
         self.signer_address = USER
@@ -130,7 +122,7 @@ class FakeClient:
 
 
 def fake_session(
-    client: Optional[FakeClient] = None, name: str = "base-sepolia"
+    client: FakeClient | None = None, name: str = "base-sepolia"
 ) -> NetworkSession:
     info = NETWORKS[name]
     return NetworkSession(name, info.caip2, info, client or FakeClient())

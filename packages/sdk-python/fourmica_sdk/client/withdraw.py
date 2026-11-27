@@ -1,22 +1,6 @@
-"""Withdrawing collateral. A request opens a waiting period, after which it
-can be finalized — or cancelled at any point before that.
-
-Each step is an intent builder: ``request``, ``cancel`` and ``finalize``
-capture what to do, a route pin (``gasless()``, ``self_funded()``) narrows
-how, and a terminal (``send()``, ``sign()``, ``verify()``) does it. Unpinned,
-``send()`` prefers the gasless route and falls back to the user's own
-transaction. Unlike a deposit, gasless withdrawal works for ETH too:
-Core4Mica verifies the signature itself rather than leaning on what the
-asset implements.
-
-Finalization is the exception: it offers no ``sign()``, because it needs no
-signature at all — the payout goes to the user and the amount was fixed when
-they requested it. Port of ``sdk-rust/src/client/withdraw.rs``.
-"""
-
 from __future__ import annotations
 
-from typing import Any, Dict, Optional, Union
+from typing import Any
 
 from ..authorizations import (
     WithdrawalCancelAuthorization,
@@ -42,24 +26,18 @@ class WithdrawClient:
     def is_gasless_available(self) -> bool:
         return self._ctx.facilitator.is_configured()
 
-    def request(self, asset: Union[Asset, str, None], amount: int) -> "RequestBuilder":
-        """Starts a withdrawal request for *amount* of *asset*. The grace
-        period runs from the request; finalize once it elapses."""
+    def request(self, asset: Asset | str | None, amount: int) -> RequestBuilder:
+        """The grace period runs from the request; finalize once it elapses."""
         units = base_units(amount)
         if units <= 0:
             raise AmountZeroError("withdrawal amount must be positive")
         return RequestBuilder(self._ctx, Asset.coerce(asset), units)
 
-    def cancel(self, asset: Union[Asset, str, None]) -> "CancelBuilder":
-        """Starts a cancellation of the pending withdrawal request for *asset*."""
+    def cancel(self, asset: Asset | str | None) -> CancelBuilder:
         return CancelBuilder(self._ctx, Asset.coerce(asset))
 
-    def finalize(self, asset: Union[Asset, str, None]) -> "FinalizeBuilder":
-        """Starts a finalization of the elapsed withdrawal request for *asset*."""
+    def finalize(self, asset: Asset | str | None) -> FinalizeBuilder:
         return FinalizeBuilder(self._ctx, Asset.coerce(asset))
-
-
-# --- request -------------------------------------------------------------
 
 
 class RequestBuilder:
@@ -68,22 +46,18 @@ class RequestBuilder:
         self._asset = asset
         self._amount = amount
 
-    def gasless(self) -> "GaslessRequest":
-        """Pins the gasless route: the facilitator submits and pays, with no
-        self-funded fallback."""
+    def gasless(self) -> GaslessRequest:
+        """Never falls back to the user's own transaction."""
         return GaslessRequest(self._ctx, self._asset, self._amount)
 
-    def self_funded(self) -> "SelfFundedRequest":
-        """Pins the user's own transaction."""
+    def self_funded(self) -> SelfFundedRequest:
         return SelfFundedRequest(self._ctx, self._asset, self._amount)
 
     async def send(
-        self, wait_options: Optional[TxReceiptWaitOptions] = None
+        self, wait_options: TxReceiptWaitOptions | None = None
     ) -> WithdrawReceipt:
-        """Requests the withdrawal, gaslessly where possible. A rejection that
-        names the request itself is returned rather than retried, and so is an
-        unknown outcome: the facilitator may already have submitted, and
-        requesting again would overwrite it and restart the grace period."""
+        """Gasless where possible. A rejection naming the request, or an unknown
+        outcome, is not retried: requesting again restarts the grace period."""
         if not self._ctx.facilitator.is_configured():
             return await self.self_funded().send(wait_options)
         try:
@@ -101,8 +75,7 @@ class GaslessRequest:
         self._amount = amount
 
     async def sign(self) -> WithdrawalRequestAuthorization:
-        """Signs the request without submitting it. Redeem by attaching it to
-        a fresh builder:
+        """Signs without submitting. Redeem with
         ``withdraw.request(asset, amount).gasless().authorization(auth).send()``."""
         return await sig.request_withdrawal_authorization(
             self._ctx, self._asset.address, self._amount
@@ -110,13 +83,10 @@ class GaslessRequest:
 
     def authorization(
         self, authorization: WithdrawalRequestAuthorization
-    ) -> "AuthorizedRequest":
-        """Attaches a request authorization signed elsewhere."""
+    ) -> AuthorizedRequest:
         return AuthorizedRequest(self._ctx, self._asset, self._amount, authorization)
 
     async def send(self) -> WithdrawReceipt:
-        """Requests the withdrawal gaslessly. The user needs no native balance
-        and makes no transaction."""
         authorization = await sig.request_withdrawal_authorization(
             self._ctx, self._asset.address, self._amount
         )
@@ -142,8 +112,6 @@ class AuthorizedRequest:
         self._auth = auth
 
     def _checked(self) -> None:
-        """The authorization names its asset and amount, so a builder that
-        disagrees with it would submit terms the caller never stated."""
         if (
             self._auth.asset.lower() != self._asset.address.lower()
             or self._auth.amount != self._amount
@@ -154,16 +122,13 @@ class AuthorizedRequest:
             )
 
     async def verify(self) -> None:
-        """Preflight: runs every check a real submission would run, without
-        spending anyone's gas."""
+        """Runs every check a submission would, spending no gas."""
         self._checked()
         await _verify(
             self._ctx, {"action": "request", "authorization": self._auth.to_payload()}
         )
 
     async def send(self) -> WithdrawReceipt:
-        """Requests the withdrawal with the attached authorization. The
-        submitter needs no signer of their own."""
         self._checked()
         return await _submit(
             self._ctx,
@@ -180,7 +145,7 @@ class SelfFundedRequest:
         self._amount = amount
 
     async def send(
-        self, wait_options: Optional[TxReceiptWaitOptions] = None
+        self, wait_options: TxReceiptWaitOptions | None = None
     ) -> WithdrawReceipt:
         gateway = await self._ctx.gateway()
         receipt = await gateway.request_withdrawal(
@@ -189,24 +154,20 @@ class SelfFundedRequest:
         return _self_funded_receipt(self._ctx, receipt, self._asset)
 
 
-# --- cancel --------------------------------------------------------------
-
-
 class CancelBuilder:
     def __init__(self, ctx: ClientCtx, asset: Asset) -> None:
         self._ctx = ctx
         self._asset = asset
 
-    def gasless(self) -> "GaslessCancel":
+    def gasless(self) -> GaslessCancel:
         return GaslessCancel(self._ctx, self._asset)
 
-    def self_funded(self) -> "SelfFundedCancel":
+    def self_funded(self) -> SelfFundedCancel:
         return SelfFundedCancel(self._ctx, self._asset)
 
     async def send(
-        self, wait_options: Optional[TxReceiptWaitOptions] = None
+        self, wait_options: TxReceiptWaitOptions | None = None
     ) -> WithdrawReceipt:
-        """Cancels the pending withdrawal request, gaslessly where possible."""
         if not self._ctx.facilitator.is_configured():
             return await self.self_funded().send(wait_options)
         try:
@@ -223,17 +184,14 @@ class GaslessCancel:
         self._asset = asset
 
     async def sign(self) -> WithdrawalCancelAuthorization:
-        """Signs the cancellation without submitting it."""
         return await sig.cancel_withdrawal_authorization(self._ctx, self._asset.address)
 
     def authorization(
         self, authorization: WithdrawalCancelAuthorization
-    ) -> "AuthorizedCancel":
-        """Attaches a cancellation authorization signed elsewhere."""
+    ) -> AuthorizedCancel:
         return AuthorizedCancel(self._ctx, self._asset, authorization)
 
     async def send(self) -> WithdrawReceipt:
-        """Cancels the pending withdrawal request gaslessly."""
         authorization = await sig.cancel_withdrawal_authorization(
             self._ctx, self._asset.address
         )
@@ -282,7 +240,7 @@ class SelfFundedCancel:
         self._asset = asset
 
     async def send(
-        self, wait_options: Optional[TxReceiptWaitOptions] = None
+        self, wait_options: TxReceiptWaitOptions | None = None
     ) -> WithdrawReceipt:
         gateway = await self._ctx.gateway()
         receipt = await gateway.cancel_withdrawal(
@@ -291,27 +249,23 @@ class SelfFundedCancel:
         return _self_funded_receipt(self._ctx, receipt, self._asset)
 
 
-# --- finalize ------------------------------------------------------------
-
-
 class FinalizeBuilder:
-    """No ``sign()`` on any route: ``finalizeWithdrawalFor`` is permissionless
-    because it pays the user, so there is nothing to sign."""
+    """No ``sign()``: ``finalizeWithdrawalFor`` is permissionless and pays
+    the user."""
 
     def __init__(self, ctx: ClientCtx, asset: Asset) -> None:
         self._ctx = ctx
         self._asset = asset
 
-    def gasless(self) -> "GaslessFinalize":
+    def gasless(self) -> GaslessFinalize:
         return GaslessFinalize(self._ctx, self._asset)
 
-    def self_funded(self) -> "SelfFundedFinalize":
+    def self_funded(self) -> SelfFundedFinalize:
         return SelfFundedFinalize(self._ctx, self._asset)
 
     async def send(
-        self, wait_options: Optional[TxReceiptWaitOptions] = None
+        self, wait_options: TxReceiptWaitOptions | None = None
     ) -> WithdrawReceipt:
-        """Pays out the elapsed withdrawal request, gaslessly where possible."""
         if not self._ctx.facilitator.is_configured():
             return await self.self_funded().send(wait_options)
         try:
@@ -328,13 +282,11 @@ class GaslessFinalize:
         self._asset = asset
 
     async def verify(self) -> None:
-        """Preflight — worth more here than elsewhere, since finalization is
-        the one step that can be refused purely by the clock."""
+        """Runs every check a submission would, spending no gas, including the
+        grace period."""
         await _verify(self._ctx, self._finalize_request())
 
     async def send(self) -> WithdrawReceipt:
-        """Finalizes gaslessly. Takes no signature: ``finalizeWithdrawalFor``
-        pays the user whoever submits it."""
         return await _submit(
             self._ctx,
             self._finalize_request(),
@@ -342,7 +294,7 @@ class GaslessFinalize:
             self._asset.address,
         )
 
-    def _finalize_request(self) -> Dict[str, Any]:
+    def _finalize_request(self) -> dict[str, Any]:
         return {
             "action": "finalize",
             "user": self._ctx.signer_address,
@@ -356,7 +308,7 @@ class SelfFundedFinalize:
         self._asset = asset
 
     async def send(
-        self, wait_options: Optional[TxReceiptWaitOptions] = None
+        self, wait_options: TxReceiptWaitOptions | None = None
     ) -> WithdrawReceipt:
         gateway = await self._ctx.gateway()
         receipt = await gateway.finalize_withdrawal(
@@ -365,11 +317,8 @@ class SelfFundedFinalize:
         return _self_funded_receipt(self._ctx, receipt, self._asset)
 
 
-# --- shared --------------------------------------------------------------
-
-
 def _self_funded_receipt(
-    ctx: ClientCtx, receipt: Dict[str, Any], asset: Asset
+    ctx: ClientCtx, receipt: dict[str, Any], asset: Asset
 ) -> WithdrawReceipt:
     return WithdrawReceipt(
         tx_hash=receipt["transactionHash"],
@@ -381,7 +330,7 @@ def _self_funded_receipt(
 
 
 async def _submit(
-    ctx: ClientCtx, request: Dict[str, Any], user: str, asset: str
+    ctx: ClientCtx, request: dict[str, Any], user: str, asset: str
 ) -> WithdrawReceipt:
     response = await ctx.facilitator.post("withdraw", request)
     if not response.get("success"):
@@ -403,7 +352,7 @@ async def _submit(
     )
 
 
-async def _verify(ctx: ClientCtx, request: Dict[str, Any]) -> None:
+async def _verify(ctx: ClientCtx, request: dict[str, Any]) -> None:
     response = await ctx.facilitator.post("withdraw/verify", request)
     if response.get("isValid"):
         return

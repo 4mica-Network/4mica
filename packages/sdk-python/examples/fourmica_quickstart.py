@@ -1,9 +1,5 @@
-"""Deposit, pay for a request, and read the balance with ``FourMica``.
-
-Env: FOURMICA_WALLET_PRIVATE_KEY, optional FOURMICA_NETWORK (default
-base-sepolia), DEPOSIT (default "1 USDC") and PAID_URL, a 4mica-credit
-paywalled URL to fetch.
-"""
+"""Env: FOURMICA_WALLET_PRIVATE_KEY, optional FOURMICA_NETWORK, DEPOSIT
+and PAID_URL (a 4mica-credit paywalled URL)."""
 
 import asyncio
 import os

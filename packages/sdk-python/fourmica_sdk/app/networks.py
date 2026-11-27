@@ -10,8 +10,8 @@ _APP_NETWORKS = frozenset({"BASE", "BASE_SEPOLIA", "ETHEREUM_SEPOLIA"})
 
 
 def to_app_network(network: str) -> AppNetwork:
-    """The app API's name for *network* (``BASE_SEPOLIA``), from that name,
-    a shorthand (``base-sepolia``) or CAIP-2 (``eip155:84532``)."""
+    """``BASE_SEPOLIA`` from that name, a shorthand (``base-sepolia``) or
+    CAIP-2 (``eip155:84532``)."""
     value = network.strip()
     if value.upper() in _APP_NETWORKS:
         return cast(AppNetwork, value.upper())

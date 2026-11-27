@@ -1,6 +1,3 @@
-"""The seller's side: the app API client, reading a payment off its header
-or its settlement, and the network names the app API and x402 use."""
-
 import base64
 import json
 from types import SimpleNamespace
@@ -34,11 +31,8 @@ def app_with(handler) -> AppClient:
     return AppClient(" key-123 ", base_url="https://app.example/", http_client=http)
 
 
-# --- networks ---------------------------------------------------------------
-
-
 @pytest.mark.parametrize(
-    "name,app,shorthand,caip2",
+    ("name", "app", "shorthand", "caip2"),
     [
         ("base", "BASE", "base", "eip155:8453"),
         ("BASE_SEPOLIA", "BASE_SEPOLIA", "base-sepolia", "eip155:84532"),
@@ -56,9 +50,6 @@ def test_an_unknown_network_is_refused_in_every_form():
     for convert in (to_app_network, from_app_network, to_caip2):
         with pytest.raises(InvalidParamsError, match="unknown network: mars"):
             convert("mars")
-
-
-# --- payments ---------------------------------------------------------------
 
 
 def test_reads_the_payment_in_an_x_payment_header():
@@ -111,9 +102,6 @@ def test_a_payment_without_a_whole_amount_is_refused(amount):
         parse_settlement({"payment_payload": {"payload": signed}, "result": {}})
 
 
-# --- the API ------------------------------------------------------------------
-
-
 def test_an_api_key_is_required():
     with pytest.raises(ConfigError):
         AppClient("  ")
@@ -159,7 +147,7 @@ async def test_resolves_a_customer_in_the_apis_own_names():
     }
 
 
-@pytest.mark.parametrize("status,created", [(201, True), (200, False)])
+@pytest.mark.parametrize(("status", "created"), [(201, True), (200, False)])
 async def test_a_reported_payment_says_whether_it_is_new(status, created):
     sent = {}
 

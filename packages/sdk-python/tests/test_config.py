@@ -104,7 +104,6 @@ def test_an_empty_variable_counts_as_unset():
 def test_network_brings_its_hosted_facilitator():
     cfg = ConfigBuilder().network("base-sepolia").wallet_private_key(KEY).build()
     assert cfg.facilitator_url == "https://testnet.payment.4mica.io/"
-    # No facilitator is hosted for this one.
     cfg = ConfigBuilder().network("ethereum-sepolia").wallet_private_key(KEY).build()
     assert cfg.facilitator_url is None
 
@@ -132,6 +131,7 @@ def test_rpc_url_drops_the_hosted_facilitator():
 def test_secrets_stay_out_of_repr():
     cfg = ConfigBuilder().wallet_private_key(KEY).bearer_token("s3cret").build()
     shown = repr(cfg)
-    assert KEY not in shown and KEY[2:] not in shown
+    assert KEY not in shown
+    assert KEY[2:] not in shown
     assert "s3cret" not in shown
     assert cfg.rpc_url in shown

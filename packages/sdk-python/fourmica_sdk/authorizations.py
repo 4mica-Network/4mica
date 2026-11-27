@@ -1,27 +1,16 @@
-"""Gasless authorizations: signed here, redeemed on-chain by a facilitator at
-its own expense. Each binds the signer, the amount, and a deadline into the
-digest, so a submitter can alter nothing — the worst they can do is not
-submit.
-
-Wire form is camelCase with uint256/bytes32 values as 0x-prefixed hex, exactly
-as the Rust SDK serializes them (``sdk-rust/src/contract/mod.rs``). Note an
-EIP-3009 authorization carries no ``to``/``value``: the facilitator derives
-them from the request it travels in.
-"""
-
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict
+from typing import Any
 
-from .utils import normalize_address, normalize_bytes32_hex
+from .utils import SIGNATURE_LENGTH, normalize_address, normalize_bytes32_hex
 
 
 def _hex_quantity(value: int) -> str:
     return hex(int(value))
 
 
-def _hex_bytes(value) -> str:
+def _hex_bytes(value: str | bytes | bytearray) -> str:
     if isinstance(value, (bytes, bytearray)):
         return "0x" + bytes(value).hex()
     raw = str(value)
@@ -49,7 +38,7 @@ class ReceiveAuthorization:
         self.r = normalize_bytes32_hex(self.r)
         self.s = normalize_bytes32_hex(self.s)
 
-    def to_payload(self) -> Dict[str, Any]:
+    def to_payload(self) -> dict[str, Any]:
         return {
             "from": self.from_address,
             "validAfter": _hex_quantity(self.valid_after),
@@ -63,8 +52,6 @@ class ReceiveAuthorization:
 
 @dataclass
 class Permit2Authorization:
-    """Permit2 ``PermitTransferFrom`` authorization."""
-
     from_address: str
     nonce: int
     deadline: int
@@ -76,7 +63,7 @@ class Permit2Authorization:
         self.deadline = int(self.deadline)
         self.signature = _hex_bytes(self.signature)
 
-    def to_payload(self) -> Dict[str, Any]:
+    def to_payload(self) -> dict[str, Any]:
         return {
             "from": self.from_address,
             "nonce": _hex_quantity(self.nonce),
@@ -87,9 +74,8 @@ class Permit2Authorization:
 
 @dataclass
 class Eip2612Permit:
-    """An EIP-2612 permit granting Permit2 its allowance. ``owner`` and
-    ``spender`` are implied — the signer and the canonical Permit2 — so only
-    the signed values travel, as decimal strings."""
+    """``owner`` and ``spender`` are implied (the signer and Permit2); the
+    signed values travel as decimal strings."""
 
     value: int
     deadline: int
@@ -104,7 +90,7 @@ class Eip2612Permit:
         self.r = normalize_bytes32_hex(self.r)
         self.s = normalize_bytes32_hex(self.s)
 
-    def to_payload(self) -> Dict[str, Any]:
+    def to_payload(self) -> dict[str, Any]:
         return {
             "value": str(self.value),
             "deadline": str(self.deadline),
@@ -116,9 +102,6 @@ class Eip2612Permit:
 
 @dataclass
 class WithdrawalRequestAuthorization:
-    """Core4Mica's signed struct for opening a withdrawal request without
-    transacting. The asset, the amount and the window are all bound."""
-
     user: str
     asset: str
     amount: int
@@ -136,7 +119,7 @@ class WithdrawalRequestAuthorization:
         self.nonce = normalize_bytes32_hex(self.nonce)
         self.signature = _hex_bytes(self.signature)
 
-    def to_payload(self) -> Dict[str, Any]:
+    def to_payload(self) -> dict[str, Any]:
         return {
             "user": self.user,
             "asset": self.asset,
@@ -150,8 +133,7 @@ class WithdrawalRequestAuthorization:
 
 @dataclass
 class WithdrawalCancelAuthorization:
-    """Core4Mica's signed struct for cancelling a pending withdrawal request.
-    No amount: a cancellation clears whatever request is outstanding."""
+    """No amount: it clears whatever request is outstanding."""
 
     user: str
     asset: str
@@ -168,7 +150,7 @@ class WithdrawalCancelAuthorization:
         self.nonce = normalize_bytes32_hex(self.nonce)
         self.signature = _hex_bytes(self.signature)
 
-    def to_payload(self) -> Dict[str, Any]:
+    def to_payload(self) -> dict[str, Any]:
         return {
             "user": self.user,
             "asset": self.asset,
@@ -179,14 +161,12 @@ class WithdrawalCancelAuthorization:
         }
 
 
-def split_signature(signature) -> tuple:
-    """Split a 65-byte signature into ``(v, r, s)``, with ``v`` left in
-    Electrum notation (27/28) as ``ecrecover`` expects."""
+def split_signature(signature: str | bytes) -> tuple[int, str, str]:
     raw = signature
     if isinstance(raw, str):
         raw = bytes.fromhex(raw.removeprefix("0x"))
     raw = bytes(raw)
-    if len(raw) != 65:
+    if len(raw) != SIGNATURE_LENGTH:
         raise ValueError(f"expected a 65-byte signature, got {len(raw)}")
     v = raw[64]
     if v in (0, 1):

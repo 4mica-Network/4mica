@@ -1,13 +1,3 @@
-"""Guarantee flows against a live core: the checks unit tests cannot replace.
-
-A receipt issued here proves core accepts the payer's ClearingHouse-domain
-signature over a cycle-scoped payment end to end, and that its operator signs
-receipts under the GuaranteeRegistry domain this SDK verifies; the negative
-case proves core actually checks the payer's signature.
-
-See live_stack.py for environment and the required WalletRole grant.
-"""
-
 import dataclasses
 
 import pytest
@@ -21,7 +11,7 @@ from fourmica_sdk import PaymentRequest, RpcError
 
 pytestmark = [pytest.mark.integration, requires_live_stack]
 
-COLLATERAL = 10**15  # covers every guarantee this suite issues
+COLLATERAL = 10**15
 
 
 async def test_guarantee_flow_end_to_end(payer, recipient):
@@ -39,13 +29,10 @@ async def test_guarantee_flow_end_to_end(payer, recipient):
     assert verified.cycle_id == int(request.payload.cycle_id, 16)
     assert verified.timestamp == request.payload.timestamp
 
-    # Either side can check a receipt offline.
     assert payer.payment.verify_guarantee(receipt) == verified
 
 
 async def test_core_rejects_a_tampered_payment(payer, recipient):
-    """A signature over one payment must not issue a different one — the
-    recipient inflates the amount after the payer signed."""
     await ensure_collateral(payer, None, COLLATERAL)
 
     request = await signed_payment(payer, recipient)
@@ -80,8 +67,6 @@ async def test_recipient_payment_listing_is_served(recipient):
 
 
 async def test_two_guarantees_share_the_open_cycle(payer, recipient):
-    """Consecutive guarantees in one asset bind to the same settlement cycle —
-    the aggregation the netting model relies on."""
     await ensure_collateral(payer, None, COLLATERAL)
 
     verified = []
@@ -94,8 +79,6 @@ async def test_two_guarantees_share_the_open_cycle(payer, recipient):
 
 
 async def test_payer_checkpoints_what_it_owes(payer, recipient):
-    """Core accepts a checkpoint this SDK built from core's own batch, and the
-    payer's next payment is still accepted past its cutoff."""
     await ensure_collateral(payer, None, COLLATERAL)
 
     request = await signed_payment(payer, recipient)

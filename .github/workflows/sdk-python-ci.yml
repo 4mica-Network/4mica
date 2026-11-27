@@ -8,17 +8,64 @@ on:
       - ".github/workflows/sdk-python-ci.yml"
   workflow_dispatch:
 
+defaults:
+  run:
+    working-directory: packages/sdk-python
+
 jobs:
+  static:
+    name: Static analysis
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install
+        run: |
+          uv venv
+          uv pip install -e ".[dev,cdp]"
+
+      - name: Ruff format
+        run: uv run --no-sync ruff format --check .
+
+      - name: Ruff lint
+        run: uv run --no-sync ruff check --output-format=github .
+
+      - name: Mypy (strict)
+        run: uv run --no-sync mypy
+
+      - name: Dead code
+        run: uv run --no-sync vulture
+
+      - name: Dependencies
+        run: uv run --no-sync deptry .
+
+      # The package's ABIs are copies of the monorepo source of truth written
+      # by scripts/refresh-abis.sh; a hand edit on either side fails here.
+      - name: ABI drift
+        run: |
+          diff <(jq -S . ../../contracts/abi/Treasury.json) \
+               <(jq -S . fourmica_sdk/contract/abi/treasury.json)
+          diff <(jq -S . ../../contracts/abi/ClearingHouse.json) \
+               <(jq -S . fourmica_sdk/contract/abi/clearing_house.json)
+
+      - name: Build
+        run: |
+          uv build
+          unzip -l dist/*.whl | grep -q 'fourmica_sdk/py.typed'
+
   test:
     name: Python ${{ matrix.python-version }}
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: packages/sdk-python
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.10", "3.12"]
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -31,22 +78,7 @@ jobs:
       - name: Install
         run: |
           uv venv
-          uv pip install ".[dev,cdp]"
+          uv pip install -e ".[dev,cdp]"
 
-      - name: Ruff format check
-        run: uv run ruff format --check .
-
-      - name: Ruff lint
-        run: uv run ruff check .
-
-      - name: Pytest
-        run: uv run pytest -q
-
-      # The package's ABIs are copies of the monorepo source of truth written
-      # by scripts/refresh-abis.sh; a hand edit on either side fails here.
-      - name: ABI drift check
-        run: |
-          diff <(jq -S . ../../contracts/abi/Treasury.json) \
-               <(jq -S . fourmica_sdk/contract/abi/treasury.json)
-          diff <(jq -S . ../../contracts/abi/ClearingHouse.json) \
-               <(jq -S . fourmica_sdk/contract/abi/clearing_house.json)
+      - name: Pytest with coverage
+        run: uv run --no-sync pytest -q --cov --cov-report=term-missing

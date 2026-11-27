@@ -27,8 +27,6 @@ URL = "https://api.example.com/data"
 
 @pytest.fixture
 def core(monkeypatch):
-    """Stands in for ``Client.connect``: records each config and hands back a
-    fake client for its network."""
     state = SimpleNamespace(configs=[], clients=[], fail_next=None)
 
     async def connect(cfg):
@@ -44,9 +42,6 @@ def core(monkeypatch):
 
     monkeypatch.setattr(Client, "connect", connect)
     return state
-
-
-# --- connect --------------------------------------------------------------------
 
 
 async def test_connects_the_default_network_with_its_hosted_facilitator(core):
@@ -82,11 +77,9 @@ async def test_reads_the_environment_when_no_signer_is_passed(core, monkeypatch)
     assert client.network == "base"
     assert core.configs[0].wallet_private_key == KEY
 
-    # An explicit network wins over the environment's.
     other = await FourMica.connect(env=env, network="base-sepolia")
     assert core.configs[1].rpc_url == NETWORKS["base-sepolia"].rpc_url
 
-    # Without `env`, the process environment is read.
     monkeypatch.setenv("FOURMICA_WALLET_PRIVATE_KEY", KEY)
     monkeypatch.setenv("FOURMICA_NETWORK", "ethereum-sepolia")
     ambient = await FourMica.connect()
@@ -105,7 +98,7 @@ async def test_an_explicit_key_means_the_environment_is_not_read(core, monkeypat
 
 async def test_says_how_to_supply_a_signer_when_there_is_none(core):
     with pytest.raises(
-        ConfigError, match="pass private_key or signer.*FOURMICA_WALLET_PRIVATE_KEY"
+        ConfigError, match=r"pass private_key or signer.*FOURMICA_WALLET_PRIVATE_KEY"
     ):
         await FourMica.connect(env={})
     assert core.configs == []
@@ -135,9 +128,6 @@ async def test_a_remote_signer_is_used_on_every_network(core):
     assert [cfg.evm_signer for cfg in core.configs] == [signer, signer]
     assert [cfg.wallet_private_key for cfg in core.configs] == [None, None]
     await client.aclose()
-
-
-# --- sessions -------------------------------------------------------------------
 
 
 async def test_connects_another_network_once_on_first_use(core):
@@ -210,7 +200,6 @@ async def test_every_aclose_caller_sees_a_failed_cleanup(core):
     for _ in range(2):
         with pytest.raises(RuntimeError, match="socket stuck"):
             await client.aclose()
-    # The other network was still closed, once.
     core.clients[0].aclose.assert_awaited_once()
     core.clients[1].aclose.assert_awaited_once()
     assert client._http.is_closed
@@ -244,7 +233,6 @@ async def test_closes_on_leaving_the_block_even_when_it_raises(core):
 
 async def test_its_own_http_client_waits_longer_than_httpx_does_by_default(core):
     async with await FourMica.connect(private_key=KEY) as client:
-        # httpx's 5 seconds would drop the answer to a request already paid for.
         assert client._http.timeout.read == 300
 
 
@@ -283,9 +271,6 @@ async def test_settle_refuses_a_side_that_is_not_pay_or_claim(core):
             await client.settle(only="both")
 
 
-# --- balance --------------------------------------------------------------------
-
-
 async def test_reports_held_assets_in_their_own_units(core):
     async with await FourMica.connect(private_key=KEY) as client:
 
@@ -319,9 +304,6 @@ async def test_keys_a_repeated_symbol_by_address(core):
         )
         balances = await client.balance()
     assert set(balances) == {"ETH", "USDC", twin}
-
-
-# --- fetch ----------------------------------------------------------------------
 
 
 def challenge(amount: str) -> httpx.Response:

@@ -428,8 +428,13 @@ pnpm/turbo wiring — it is a plain Python project:
 ```bash
 cd packages/sdk-python
 pip install -e ".[dev,cdp]"
-ruff check . && pytest -q
+ruff format --check . && ruff check .  # lint and format
+mypy                                    # strict typing
+vulture && deptry .                     # dead code, undeclared or unused deps
+pytest -q --cov                         # tests; fails under 100% branch coverage
 ```
+
+CI runs the same checks on every pull request that touches this package.
 
 Contract ABIs under `fourmica_sdk/contract/abi/` are copies of the monorepo's
 `contracts/abi/*.json`, vendored from the `4mica-core` repo's forge artifacts

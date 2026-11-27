@@ -2,7 +2,7 @@ import asyncio
 import base64
 import io
 import json
-from typing import Callable, List, Optional
+from collections.abc import Callable
 
 import httpx
 import pytest
@@ -47,14 +47,12 @@ def is_paid(request: httpx.Request) -> bool:
 
 
 class Seller:
-    """Answers unpaid requests with *challenge* and paid ones with *answer*."""
-
     def __init__(
         self,
         challenge: Callable[[], httpx.Response],
-        answer: Optional[Callable[[], httpx.Response]] = None,
+        answer: Callable[[], httpx.Response] | None = None,
     ) -> None:
-        self.calls: List[httpx.Request] = []
+        self.calls: list[httpx.Request] = []
         self.challenge = challenge
         self.answer = answer or (lambda: httpx.Response(200, text="ok"))
         self.http = httpx.AsyncClient(transport=httpx.MockTransport(self._handle))
@@ -67,11 +65,11 @@ class Seller:
 def context(
     http: httpx.AsyncClient,
     protocols=None,
-    limiter: Optional[SpendLimiter] = None,
-    client: Optional[FakeClient] = None,
+    limiter: SpendLimiter | None = None,
+    client: FakeClient | None = None,
 ):
     session = fake_session(client or FakeClient())
-    records: List[PaymentRecord] = []
+    records: list[PaymentRecord] = []
     ctx = FetchContext(
         http=http,
         protocols=protocols or [X402],
@@ -80,9 +78,6 @@ def context(
         record=lambda response, payment: records.append(payment),
     )
     return ctx, records, session
-
-
-# --- the x402 adapter ---------------------------------------------------------
 
 
 def test_reads_4mica_credit_terms_from_a_v2_header_and_skips_other_schemes():
@@ -118,7 +113,6 @@ def test_reads_v1_bodies_with_either_amount_field_and_normalizes_shorthand_netwo
         httpx.Response(402, json={"x402Version": 1, "accepts": "none"}),
         httpx.Response(402, headers={"PAYMENT-REQUIRED": "%%%"}, json={}),
         v2_challenge([entry(amount="-1"), entry(payTo=None), "junk"]),
-        # What signing would refuse is not offered as payable either.
         v2_challenge([entry(payTo="0x123"), entry(asset="USDC")]),
         v2_challenge([entry(extra={"validation": {"validator": "0x1"}})]),
     ],
@@ -162,8 +156,6 @@ async def test_pays_v2_in_payment_signature_and_v1_in_x_payment():
 
 
 async def test_echoes_extra_as_the_seller_advertised_it():
-    """The upstream TypeScript seller matches `accepted` against what it
-    advertised, and an advertised `extra: {}` does not match a missing key."""
     client = FakeClient()
 
     async def accepted(option: dict) -> dict:
@@ -197,9 +189,6 @@ async def test_signs_a_valid_v2_option_that_sits_beside_malformed_ones():
     assert "PAYMENT-SIGNATURE" in headers
 
 
-# --- paying fetch ---------------------------------------------------------------
-
-
 async def test_passes_non_402_responses_through_without_paying():
     seller = Seller(lambda: httpx.Response(200, text="free"))
     ctx, records, session = context(seller.http)
@@ -220,7 +209,7 @@ async def test_passes_non_402_responses_through_without_paying():
 )
 async def test_passes_a_402_it_cannot_pay_through_untouched(challenge):
     seller = Seller(challenge)
-    ctx, records, session = context(seller.http)
+    ctx, _records, session = context(seller.http)
     response = await paying_fetch(ctx, "GET", URL)
     assert response.status_code == 402
     assert len(seller.calls) == 1
@@ -294,10 +283,8 @@ async def test_the_retry_of_a_streamed_body_is_framed_by_its_length_alone():
 
 
 class Site:
-    """Routes by ``METHOD url``; anything unlisted is a 404."""
-
     def __init__(self, routes: dict) -> None:
-        self.calls: List[httpx.Request] = []
+        self.calls: list[httpx.Request] = []
         self.routes = routes
         self.http = httpx.AsyncClient(transport=httpx.MockTransport(self._handle))
 
@@ -307,7 +294,7 @@ class Site:
         return route(request) if route else httpx.Response(404)
 
     @property
-    def seen(self) -> List[str]:
+    def seen(self) -> list[str]:
         return [f"{call.method} {call.url}" for call in self.calls]
 
 
@@ -355,7 +342,6 @@ async def test_pays_the_same_host_when_redirected_from_http_to_https():
     ctx, records, _ = context(site.http)
     response = await paying_fetch(ctx, "GET", plain, follow_redirects=True)
     assert response.status_code == 200
-    # The payment goes to the https URL only.
     assert [is_paid(call) for call in site.calls] == [False, False, True]
     assert site.seen == [f"GET {plain}", f"GET {URL}", f"GET {URL}"]
     assert len(records) == 1
@@ -369,7 +355,6 @@ async def test_after_a_303_pays_the_get_that_was_challenged_not_the_post():
         ctx, "POST", submit, content=b"order", follow_redirects=True
     )
     assert response.status_code == 200
-    # The POST is sent once; the paid retry is the GET, with no body.
     assert site.seen == [f"POST {submit}", f"GET {result}", f"GET {result}"]
     paid = site.calls[2]
     assert is_paid(paid)
@@ -400,14 +385,12 @@ async def test_the_paid_retry_follows_no_redirect_so_the_payment_goes_no_further
 
     site = Site({f"GET {URL}": handle})
     limiter = SpendLimiter(SpendLimits(total="1 USDC"))
-    # Following redirects is the client's own default here.
     site.http.follow_redirects = True
     ctx, records, _ = context(site.http, limiter=limiter)
     response = await paying_fetch(ctx, "GET", URL)
     assert response.status_code == 302
     assert site.seen == [f"GET {URL}", f"GET {URL}"]
     assert records == []
-    # The seller holds the payment, so it still counts.
     with pytest.raises(SpendLimitError) as raised:
         await paying_fetch(ctx, "GET", URL)
     assert raised.value.limit == "total"
@@ -459,8 +442,6 @@ async def test_never_loops_on_a_second_402_and_keeps_the_amount_reserved():
     assert len(stubborn.calls) == 2
     assert records == []
 
-    # The seller was sent a signed payment, and a 402 does not prove it
-    # cannot redeem it: a second 0.6 USDC no longer fits the 1 USDC total.
     ctx.http = Seller(challenge).http
     with pytest.raises(SpendLimitError) as raised:
         await paying_fetch(ctx, "GET", URL)
@@ -538,7 +519,6 @@ async def test_keeps_the_reservation_when_the_paid_request_fails_in_transit():
     with pytest.raises(httpx.ConnectError):
         await paying_fetch(ctx, "GET", URL)
     assert records == []
-    # The seller may hold the payment, so it still counts.
     with pytest.raises(SpendLimitError) as raised:
         await paying_fetch(ctx, "GET", URL)
     assert raised.value.limit == "total"
@@ -575,7 +555,6 @@ async def test_refuses_assets_no_limit_names_and_payees_not_allowed():
         await paying_fetch(ctx, "GET", URL)
     assert raised.value.limit == "pay_to"
 
-    # A list, or one address on its own.
     for pay_to in ([SELLER.lower()], SELLER):
         allowed = SpendLimiter(SpendLimits(pay_to=pay_to))
         ctx, _, _ = context(seller.http, limiter=allowed)
@@ -587,7 +566,7 @@ async def test_enforces_the_session_total_across_payments():
     limiter = SpendLimiter(SpendLimits(total="1 USDC"))
     ctx, records, _ = context(seller.http, limiter=limiter)
     await paying_fetch(ctx, "GET", URL)
-    with pytest.raises(SpendLimitError, match="0.6 USDC spent so far"):
+    with pytest.raises(SpendLimitError, match=r"0\.6 USDC spent so far"):
         await paying_fetch(ctx, "GET", URL)
     assert len(records) == 1
 
@@ -605,8 +584,6 @@ async def test_holds_the_session_total_when_payments_run_concurrently():
 
 
 async def test_one_total_is_one_budget_across_networks():
-    """On the second network USDC has 18 decimals: the budget is counted in
-    whole units, not in either network's base units."""
     other_usdc = "0x" + "c5" * 20
     here = fake_session(FakeClient())
     there = fake_session(
@@ -618,7 +595,7 @@ async def test_one_total_is_one_budget_across_networks():
         entry(network=there.caip2, asset=other_usdc, amount=str(6 * 10**17)),
     ]
     seller = Seller(lambda: v2_challenge([offers[0]]))
-    records: List[PaymentRecord] = []
+    records: list[PaymentRecord] = []
     ctx = FetchContext(
         http=seller.http,
         protocols=[X402],
@@ -636,7 +613,6 @@ async def test_one_total_is_one_budget_across_networks():
     assert [r.network for r in records] == [here.caip2]
     there.client.sign_payment.assert_not_awaited()
 
-    # 0.4 USDC is what is left, on either network.
     seller.challenge = lambda: v2_challenge([{**offers[1], "amount": str(4 * 10**17)}])
     assert (await paying_fetch(ctx, "GET", URL)).status_code == 200
     assert [r.network for r in records] == [here.caip2, there.caip2]
@@ -644,11 +620,9 @@ async def test_one_total_is_one_budget_across_networks():
 
 @pytest.mark.parametrize("total", ["5 USDC", "5 USCD", ["5 USDC", "5 USTD"]])
 async def test_a_total_refuses_an_asset_none_of_its_entries_names(total):
-    """per_payment allows USDT, but a total that does not name it would leave
-    it uncapped, so it is refused. A misspelled entry names nothing."""
     seller = Seller(lambda: v2_challenge([entry(asset=USDT)]))
     limiter = SpendLimiter(SpendLimits(per_payment=["1 USDC", "1 USDT"], total=total))
-    ctx, records, session = context(seller.http, limiter=limiter)
+    ctx, _records, session = context(seller.http, limiter=limiter)
     with pytest.raises(SpendLimitError) as raised:
         await paying_fetch(ctx, "GET", URL)
     assert raised.value.limit == "assets"
@@ -665,7 +639,7 @@ async def test_a_total_naming_each_asset_caps_each_on_its_own():
     seller.challenge = lambda: v2_challenge([entry(asset=USDT, amount="600000")])
     await paying_fetch(ctx, "GET", URL)
     assert [r.asset.symbol for r in records] == ["USDC", "USDT"]
-    with pytest.raises(SpendLimitError, match="0.6 USDT spent so far"):
+    with pytest.raises(SpendLimitError, match=r"0\.6 USDT spent so far"):
         await paying_fetch(ctx, "GET", URL)
 
 
@@ -678,8 +652,6 @@ async def test_allows_a_second_asset_when_per_payment_names_it():
 
 
 class OtherProtocol:
-    """A second protocol that reads the same challenge at a tenth the price."""
-
     name = "other"
 
     def terms(self, response):
@@ -704,7 +676,6 @@ async def test_prefers_protocols_in_the_given_order():
 
 
 async def test_falls_back_to_the_next_option_when_the_first_breaks_a_limit():
-    # x402 asks 2 USDC, over the limit; the other protocol asks 0.2.
     seller = Seller(lambda: v2_challenge([entry(amount="2000000")]))
     ctx, records, _ = context(seller.http, protocols=[X402, OtherProtocol()])
     await paying_fetch(ctx, "GET", URL)
@@ -716,7 +687,6 @@ def test_rejects_malformed_limits_up_front():
         SpendLimits(per_payment="1"),
         SpendLimits(total="lots of USDC"),
         SpendLimits(per_payment=["1 USDC", "-2 USDT"]),
-        # A number is refused by name, not as "int is not iterable".
         SpendLimits(per_payment=1),
     ):
         with pytest.raises(InvalidParamsError):

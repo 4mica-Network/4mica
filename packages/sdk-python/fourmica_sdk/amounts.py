@@ -1,14 +1,9 @@
-"""Amounts written the way people write them, and the assets they name.
-
-The rules match the TypeScript SDK's ``@4mica/sdk/amounts``; the monorepo's
-``packages/sdk/amounts.vectors.json`` pins them for both.
-"""
-
 from __future__ import annotations
 
 import re
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any, Mapping, Optional, Protocol, Sequence, Union
+from typing import Any, Protocol
 
 from .errors import (
     AmbiguousTokenError,
@@ -18,6 +13,8 @@ from .errors import (
 )
 from .models import ZERO_ADDRESS
 
+_MAX_DECIMALS = 255
+
 _DECIMAL = re.compile(r"(\d+)(?:\.(\d+))?", re.ASCII)
 _ADDRESS = re.compile(r"0x[0-9a-fA-F]{40}")
 
@@ -25,18 +22,15 @@ _ADDRESS = re.compile(r"0x[0-9a-fA-F]{40}")
 @dataclass(frozen=True)
 class AmountSpec:
     amount: str
-    """Decimal string in the asset's own units, e.g. ``"0.10"``."""
+    """Decimal string in the asset's units, e.g. ``"0.10"``; not base units."""
     asset: str
     """Symbol, native symbol or token address."""
 
 
-#: ``"5 USDC"``, ``{"amount": "5", "asset": "USDC"}`` or an :class:`AmountSpec`.
-AmountInput = Union[str, AmountSpec, Mapping[str, Any]]
+AmountInput = str | AmountSpec | Mapping[str, Any]
 
 
 class TokenLike(Protocol):
-    """Anything with a token's three fields, such as an entry of core's list."""
-
     @property
     def symbol(self) -> str: ...
 
@@ -49,8 +43,6 @@ class TokenLike(Protocol):
 
 @dataclass(frozen=True)
 class Token:
-    """An asset as amounts are written in it."""
-
     symbol: str
     address: str
     decimals: int
@@ -62,7 +54,6 @@ class ResolvedToken(Token):
 
 
 def parse_decimal(value: Any) -> str:
-    """A trimmed non-negative decimal string, or :class:`InvalidParamsError`."""
     if not isinstance(value, str):
         raise InvalidParamsError(
             'amount must be a decimal string such as "5" or "0.10", got '
@@ -81,27 +72,26 @@ def parse_decimal(value: Any) -> str:
 def _require_decimals(decimals: Any) -> None:
     if isinstance(decimals, bool) or not isinstance(decimals, int):
         raise InvalidParamsError(f"invalid token decimals: {decimals!r}")
-    if decimals < 0 or decimals > 255:
+    if decimals < 0 or decimals > _MAX_DECIMALS:
         raise InvalidParamsError(f"invalid token decimals: {decimals}")
 
 
 def parse_amount(value: AmountInput) -> AmountSpec:
-    """Checks the shape only; resolve the asset and decimals separately."""
     if isinstance(value, str):
-        parts = value.split()
-        if len(parts) != 2:
+        try:
+            written, symbol = value.split()
+        except ValueError:
             raise InvalidParamsError(
                 f'expected an amount and its asset, such as "5 USDC", got {value!r}'
-            )
-        return AmountSpec(amount=parse_decimal(parts[0]), asset=parts[1])
-    amount: Any
-    asset: Any
-    if isinstance(value, AmountSpec):
-        amount, asset = value.amount, value.asset
-    elif isinstance(value, Mapping):
-        amount, asset = value.get("amount"), value.get("asset")
-    else:
-        amount, asset = None, None
+            ) from None
+        return AmountSpec(amount=parse_decimal(written), asset=symbol)
+    raw: object = value
+    amount: Any = None
+    asset: Any = None
+    if isinstance(raw, AmountSpec):
+        amount, asset = raw.amount, raw.asset
+    elif isinstance(raw, Mapping):
+        amount, asset = raw.get("amount"), raw.get("asset")
     if not isinstance(asset, str) or not asset.strip():
         raise InvalidParamsError(
             f'expected "5 USDC" or {{"amount": "5", "asset": "USDC"}}, got {value!r}'
@@ -110,14 +100,14 @@ def parse_amount(value: AmountInput) -> AmountSpec:
 
 
 def to_base_units(amount: str, decimals: int) -> int:
-    """Never rounds: more decimal places than *decimals* is an error."""
     _require_decimals(decimals)
     value = parse_decimal(amount)
     whole, _, fraction = value.partition(".")
     fraction = fraction.rstrip("0")
     if len(fraction) > decimals:
         raise AmountPrecisionError(value, decimals)
-    return int(whole) * 10**decimals + int(fraction.ljust(decimals, "0") or "0")
+    scale: int = 10**decimals
+    return int(whole) * scale + int(fraction.ljust(decimals, "0") or "0")
 
 
 def format_units(raw: int, decimals: int) -> str:
@@ -139,12 +129,8 @@ def resolve_token(
     tokens: Sequence[TokenLike],
     value: str,
     native_symbol: str = "ETH",
-    network: Optional[str] = None,
+    network: str | None = None,
 ) -> ResolvedToken:
-    """Matches a symbol (ignoring case) or an address against core's token
-    list, each entry with ``symbol``, ``address`` and ``decimals``. The native
-    symbol or the zero address is the native asset, which core never lists.
-    Symbols come from the token contracts, so two can collide."""
     wanted = value.strip()
     if is_native_asset(wanted, native_symbol):
         return ResolvedToken(

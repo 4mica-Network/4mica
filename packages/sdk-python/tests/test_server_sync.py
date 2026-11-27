@@ -1,5 +1,3 @@
-"""Behaviour the facilitator, core and the TypeScript SDK expect of this one."""
-
 import asyncio
 
 import httpx
@@ -53,9 +51,6 @@ OTHER_KEY = "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d"
 DIGEST = bytes.fromhex("11" * 32)
 
 
-# --- signatures: the facilitator and core take one form only ----------------
-
-
 def signed_parts():
     signed = Account._sign_hash(DIGEST, TEST_PRIVATE_KEY)
     return signed.r, signed.s, signed.v
@@ -71,7 +66,8 @@ def recover(signature: str) -> str:
 
 def test_a_local_key_already_signs_in_the_accepted_form():
     r, s, v = signed_parts()
-    assert v in (27, 28) and s <= _SECP256K1_ORDER // 2
+    assert v in (27, 28)
+    assert s <= _SECP256K1_ORDER // 2
     canonical = assemble(r, s, v)
     assert _normalize_signature(canonical) == canonical
     assert _normalize_signature(bytes.fromhex(canonical[2:])) == canonical
@@ -97,10 +93,9 @@ def test_what_is_not_a_65_byte_signature_is_left_for_the_server_to_refuse():
 
 
 @pytest.mark.parametrize(
-    "r, s, v",
+    ("r", "s", "v"),
     [
         (1, _SECP256K1_ORDER, 27),
-        # Above the order, where rewriting s as its twin would go negative.
         (1, _SECP256K1_ORDER + 1, 27),
         (1, 2**256 - 1, 28),
         (1, 0, 27),
@@ -108,7 +103,6 @@ def test_what_is_not_a_65_byte_signature_is_left_for_the_server_to_refuse():
         (_SECP256K1_ORDER, 1, 27),
         (1, 1, 2),
         (1, 1, 29),
-        # An EIP-155 transaction v is not a message signature's.
         (1, 1, 37),
     ],
 )
@@ -129,9 +123,6 @@ async def test_a_malformed_remote_signature_fails_the_payment_as_a_signing_error
         await signer._sign(lambda: DIGEST)
 
 
-# --- x402: what a seller advertised is what it gets back ----------------------
-
-
 def test_requirements_echo_an_empty_extra_only_when_one_was_advertised():
     raw = {
         "scheme": "4mica-credit",
@@ -146,9 +137,6 @@ def test_requirements_echo_an_empty_extra_only_when_one_was_advertised():
         "extra": {},
     }
     assert PaymentRequirementsV2.from_raw({**raw, "extra": None}).to_payload() == raw
-
-
-# --- facilitator refusals ----------------------------------------------------
 
 
 @pytest.mark.parametrize("error", [httpx.ConnectTimeout, httpx.PoolTimeout])
@@ -234,9 +222,6 @@ async def test_a_withdrawal_the_facilitator_broadcast_is_not_requested_again():
     assert gateway.calls == []
 
 
-# --- core ----------------------------------------------------------------------
-
-
 async def test_health_returns_an_unhealthy_cores_report():
     calls = []
 
@@ -249,9 +234,6 @@ async def test_health_returns_an_unhealthy_cores_report():
     assert len(calls) == 1
     assert "authorization" not in calls[0].headers
     await rpc.aclose()
-
-
-# --- one account, one transaction at a time -----------------------------------
 
 
 async def test_a_key_and_a_signer_for_different_accounts_are_refused():
@@ -316,7 +298,6 @@ async def test_transactions_are_sent_one_at_a_time():
     gateway._prepare_tx, gateway._build_tx = prepare, build
     gateway._build_and_send = send
     await asyncio.gather(gateway._send("first"), gateway._send("second"))
-    # Each nonce is read only after the transaction before it has been mined.
     assert [name for name, _ in events] == ["nonce read", "mined"] * 2
     await gateway.aclose()
 
@@ -325,7 +306,6 @@ def test_base_unit_amounts_are_never_truncated():
     assert base_units(5) == 5
     assert base_units("5") == 5
     assert base_units("0xf4240") == 1_000_000
-    # A bool is an int to Python: True would deposit one base unit.
     for value in (1.9, None, "1.9", "five", True, False):
         with pytest.raises(InvalidParamsError):
             base_units(value)

@@ -1,6 +1,3 @@
-"""Open clearing positions and the guarantees a payer issued, as core reports
-them: read strictly, since each field decides what is paid and by when."""
-
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
@@ -97,7 +94,7 @@ def test_reads_a_position_in_either_spelling():
 
 
 @pytest.mark.parametrize(
-    "change,complaint",
+    ("change", "complaint"),
     [
         ({"amount": None}, "missing amount"),
         ({"gross_incoming": None}, "missing gross_incoming"),
@@ -111,7 +108,7 @@ def test_reads_a_position_in_either_spelling():
     ],
 )
 def test_refuses_a_position_it_cannot_settle_by(change, complaint):
-    raw = {key: value for key, value in {**POSITION, **change}.items()}
+    raw = dict({**POSITION, **change}.items())
     with pytest.raises(InvalidParamsError, match=complaint):
         ClearingPosition.from_rpc(raw)
 

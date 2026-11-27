@@ -1,7 +1,3 @@
-"""PaymentClient offline: receipt verification against the connected operator,
-issuance, and the checks a checkpoint batch must pass before the payer signs
-over it."""
-
 import pytest
 from eth_account import Account
 from stubs import (
@@ -47,9 +43,6 @@ def payment_client(rpc=None) -> PaymentClient:
     return PaymentClient(make_ctx(rpc=rpc))
 
 
-# --- receipts --------------------------------------------------------------
-
-
 def receipt_signed_by(key: str) -> tuple:
     guarantee = Guarantee.from_payment(payment(1_000, 1_700_000_000), CYCLE)
     domain = guarantee_registry_domain_separator(CHAIN_ID, GUARANTEE_REGISTRY_ADDRESS)
@@ -90,22 +83,17 @@ async def test_sign_request_signs_under_the_clearing_house_domain():
     )
 
 
-# --- checkpoint batches ----------------------------------------------------
-
-
 def payment(amount: int, timestamp: int, **overrides) -> PaymentRequestPayload:
-    """Request ids follow the timestamp, so payments at distinct times never
-    collide."""
-    values = dict(
-        user_address=PAYER.address,
-        recipient_address=RECIPIENT,
-        cycle_id=CYCLE,
-        req_id=timestamp,
-        amount=amount,
-        asset_address=ASSET,
-        timestamp=timestamp,
-        salt="0x" + "22" * 32,
-    )
+    values = {
+        "user_address": PAYER.address,
+        "recipient_address": RECIPIENT,
+        "cycle_id": CYCLE,
+        "req_id": timestamp,
+        "amount": amount,
+        "asset_address": ASSET,
+        "timestamp": timestamp,
+        "salt": "0x" + "22" * 32,
+    }
     values.update(overrides)
     return PaymentRequestPayload(**values)
 
@@ -132,15 +120,15 @@ def payments(*entries) -> list:
 
 
 def batch(previous=None, authorizations=(), **overrides) -> CheckpointBatchResponse:
-    values = dict(
-        cycle_id=CYCLE,
-        cycle_id_text="0x0:1700000000",
-        asset_address=ASSET,
-        payer=PAYER.address,
-        previous=previous,
-        authorizations=list(authorizations),
-        max_uncheckpointed=2,
-    )
+    values = {
+        "cycle_id": CYCLE,
+        "cycle_id_text": "0x0:1700000000",
+        "asset_address": ASSET,
+        "payer": PAYER.address,
+        "previous": previous,
+        "authorizations": list(authorizations),
+        "max_uncheckpointed": 2,
+    }
     values.update(overrides)
     return CheckpointBatchResponse(**values)
 
@@ -184,7 +172,6 @@ def test_an_empty_batch_needs_no_checkpoint():
 
 
 def test_addresses_match_whatever_their_casing():
-    """Core may spell an address in any casing; it is the same address."""
     lowered = payment(10, 1_700_000_000, user_address=PAYER.address.lower())
     payload = build(
         batch(None, [signed_by(PAYER, lowered)], payer=PAYER.address.lower())
@@ -193,10 +180,8 @@ def test_addresses_match_whatever_their_casing():
 
 
 def test_a_payment_the_payer_did_not_sign_is_refused():
-    """An operator that slips in a payment the payer never signed would
-    inflate what the payer can be charged on default."""
     forged = signed_by(Account.create(), payment(1_000_000, 1_700_000_100))
-    reason = refused(batch(None, payments((10, 1_700_000_000)) + [forged]))
+    reason = refused(batch(None, [*payments((10, 1700000000)), forged]))
     assert "not signed by the payer" in reason
 
 
@@ -241,8 +226,6 @@ def test_a_payment_the_previous_checkpoint_covers_is_refused():
 
 
 def test_a_previous_checkpoint_the_payer_did_not_sign_is_refused():
-    """The previous total is carried forward, so a forged one inflates the new
-    checkpoint just as a forged payment would."""
     reason = refused(
         batch(
             checkpoint_by(Account.create(), 1_000_000, 1_699_999_000),

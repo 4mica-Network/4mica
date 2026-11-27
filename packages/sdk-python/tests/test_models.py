@@ -105,7 +105,6 @@ def test_public_params_default_what_an_older_core_omits():
     assert params.supported_payment_payload_versions == [1]
     assert params.guarantee_signer == ""
     assert params.ethereum_http_rpc_url == ""
-    # An explicit empty list means a core that accepts nothing, not a default.
     explicit = CorePublicParameters.from_rpc(
         {
             "contract_address": "0x2222222222222222222222222222222222222222",
@@ -151,15 +150,11 @@ def test_payload_serializes_v1_tagged_hex():
 
 
 def test_payload_keeps_the_addresses_as_spelled():
-    """What travels is what the payer signed over, and a resource server may
-    compare the recipient as a string."""
     payload = PaymentRequestPayload.from_rpc(PAYLOAD_JSON).to_payload()
     assert payload["recipient_address"] == PAYLOAD_JSON["recipient_address"]
 
 
 def test_a_payload_without_a_version_tag_is_refused():
-    """The tag is what selects a layout, so a payload without one is
-    unroutable rather than defaulted."""
     raw = dict(PAYLOAD_JSON)
     del raw["version"]
     with pytest.raises(InvalidParamsError, match="version tag"):
@@ -173,8 +168,6 @@ def test_an_unknown_payload_version_is_refused():
 
 @pytest.mark.parametrize("field", ["cycle_id", "salt"])
 def test_cycle_id_and_salt_are_required(field):
-    """Both are part of what the payer signs, so a payload without them
-    cannot be verified and must not parse into something that looks whole."""
     raw = dict(PAYLOAD_JSON)
     del raw[field]
     with pytest.raises(InvalidParamsError, match=field):
@@ -182,7 +175,7 @@ def test_cycle_id_and_salt_are_required(field):
 
 
 @pytest.mark.parametrize(
-    "field,value",
+    ("field", "value"),
     [
         ("user_address", "nope"),
         ("cycle_id", "0x1234"),

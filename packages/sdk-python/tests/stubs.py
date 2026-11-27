@@ -1,32 +1,29 @@
-"""Shared offline-test stubs: canned RPC/gateway doubles and ctx factory."""
-
-from typing import Any, Callable, Dict, List, Optional
+from collections.abc import Callable
+from typing import Any
 
 import httpx
 
 import fourmica_sdk.client.ctx as ctx_module
 from fourmica_sdk import Client
-from fourmica_sdk.client.ctx import ClientCtx  # noqa: E402
-from fourmica_sdk.client.facilitator import Facilitator  # noqa: E402
+from fourmica_sdk.client.ctx import ClientCtx
+from fourmica_sdk.client.facilitator import Facilitator
 from fourmica_sdk.config import (
-    Config,  # noqa: E402
+    Config,
     ConfigBuilder,
 )
-from fourmica_sdk.models import (  # noqa: E402
+from fourmica_sdk.models import (
     CorePublicParameters,
     SupportedTokenInfo,
     SupportedTokensResponse,
 )
 from fourmica_sdk.rpc import RpcProxy
-from fourmica_sdk.signing import LocalAccountSigner  # noqa: E402
+from fourmica_sdk.signing import LocalAccountSigner
 
-# anvil key #0
 TEST_PRIVATE_KEY = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
 TEST_ADDRESS = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
 CONTRACT_ADDRESS = "0x00000000000000000000000000000000C04E4a1c"
 CLEARING_HOUSE_ADDRESS = "0x00000000000000000000000000000000C1ea4111"
 GUARANTEE_REGISTRY_ADDRESS = "0x0000000000000000000000000000000000065E61"
-# anvil key #1 stands in for the operator that signs guarantee receipts.
 OPERATOR_PRIVATE_KEY = (
     "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d"
 )
@@ -36,7 +33,7 @@ TOKEN_DOMAIN = "0x" + "ab" * 32
 FACILITATOR_URL = "https://facilitator.example/"
 
 
-def supported_tokens(domain_separator: Optional[str] = TOKEN_DOMAIN):
+def supported_tokens(domain_separator: str | None = TOKEN_DOMAIN):
     return SupportedTokensResponse(
         chain_id=84532,
         tokens=[
@@ -51,7 +48,6 @@ def supported_tokens(domain_separator: Optional[str] = TOKEN_DOMAIN):
 
 
 def attach_facilitator(ctx: ClientCtx, handler) -> None:
-    """Point the ctx's facilitator at an httpx MockTransport handler."""
     ctx.facilitator = Facilitator(
         FACILITATOR_URL,
         client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
@@ -59,11 +55,9 @@ def attach_facilitator(ctx: ClientCtx, handler) -> None:
 
 
 class FakeRpc:
-    """Canned responses for the RpcProxy surface, recording each call."""
-
     def __init__(self, **responses: Any) -> None:
         self.responses = responses
-        self.calls: List[tuple] = []
+        self.calls: list[tuple] = []
 
     def _respond(self, name: str, *args: Any) -> Any:
         self.calls.append((name, *args))
@@ -104,11 +98,9 @@ class FakeRpc:
 
 
 class FakeGateway:
-    """Records contract calls and returns canned receipts."""
-
     def __init__(self, allowance: int = 0) -> None:
         self.allowance = allowance
-        self.calls: List[tuple] = []
+        self.calls: list[tuple] = []
         self.receipt = {"transactionHash": "0x" + "ab" * 32, "status": 1}
 
     async def erc20_allowance(self, token, spender):
@@ -162,23 +154,23 @@ class FakeGateway:
 
 
 def make_public_params(**overrides: Any) -> CorePublicParameters:
-    values: Dict[str, Any] = dict(
-        contract_address=CONTRACT_ADDRESS,
-        eip712_name="4micaClearingHouse",
-        eip712_version="1",
-        chain_id=84532,
-        guarantee_signer=OPERATOR_ADDRESS,
-        guarantee_registry_address=GUARANTEE_REGISTRY_ADDRESS,
-        clearing_house_address=CLEARING_HOUSE_ADDRESS,
-    )
+    values: dict[str, Any] = {
+        "contract_address": CONTRACT_ADDRESS,
+        "eip712_name": "4micaClearingHouse",
+        "eip712_version": "1",
+        "chain_id": 84532,
+        "guarantee_signer": OPERATOR_ADDRESS,
+        "guarantee_registry_address": GUARANTEE_REGISTRY_ADDRESS,
+        "clearing_house_address": CLEARING_HOUSE_ADDRESS,
+    }
     values.update(overrides)
     return CorePublicParameters(**values)
 
 
 def make_ctx(
-    rpc: Optional[FakeRpc] = None,
-    gateway: Optional[FakeGateway] = None,
-    public_params: Optional[CorePublicParameters] = None,
+    rpc: FakeRpc | None = None,
+    gateway: FakeGateway | None = None,
+    public_params: CorePublicParameters | None = None,
 ) -> ClientCtx:
     params = public_params or make_public_params()
     ctx = ClientCtx(
@@ -193,14 +185,9 @@ def make_ctx(
         signer=LocalAccountSigner(TEST_PRIVATE_KEY),
     )
     if gateway is not None:
-        ctx._gateway = gateway  # bypass the lazy web3 construction in tests
+        ctx._gateway = gateway
     return ctx
 
-
-# --- a mock core over HTTP ------------------------------------------------
-#
-# For tests that want the real RpcProxy in the loop, so error bodies and
-# query strings are exercised exactly as in production.
 
 MOCK_CORE_CHAIN_ID = 1337
 MOCK_CORE_PUBLIC_PARAMS = {
@@ -223,14 +210,12 @@ def ok(body) -> httpx.Response:
 
 
 class MockCore:
-    """Routes ``(method, path)`` to handlers and records every request."""
-
-    def __init__(self, routes: Dict[tuple, Handler]) -> None:
+    def __init__(self, routes: dict[tuple, Handler]) -> None:
         self.routes = {
             ("GET", "/core/public-params"): lambda r: ok(MOCK_CORE_PUBLIC_PARAMS)
         }
         self.routes.update(routes)
-        self.requests: List[httpx.Request] = []
+        self.requests: list[httpx.Request] = []
 
     def __call__(self, request: httpx.Request) -> httpx.Response:
         self.requests.append(request)
@@ -249,7 +234,6 @@ class MockCore:
 
 
 async def connect(monkeypatch, core: MockCore) -> Client:
-    """A real Client whose RpcProxy talks to *core*."""
     transport = httpx.MockTransport(core)
     monkeypatch.setattr(
         ctx_module, "RpcProxy", lambda url: RpcProxy(url, transport=transport)

@@ -1,6 +1,3 @@
-"""EIP-712 authorizations a payer signs instead of transacting. Port of
-``sdk-rust/src/client/sig.rs``. Signing never touches the network."""
-
 from __future__ import annotations
 
 import secrets
@@ -22,16 +19,12 @@ from ..digest import (
     digest_for_receive_authorization,
     digest_for_request_withdrawal,
 )
+from ..utils import U256_MAX
 from .ctx import ClientCtx
 
-#: How long a signed authorization stays redeemable.
 AUTHORIZATION_TTL_SECS = 3600
 
-#: An unlimited EIP-2612 allowance, deliberately: it only lets Permit2 act,
-#: and Permit2 still requires a signed PermitTransferFrom per transfer. A
-#: tight allowance would just force another permit on the next deposit, at
-#: the submitter's expense.
-_UNLIMITED = 2**256 - 1
+# Unlimited on purpose: Permit2 still demands a signed transfer per pull.
 
 
 def _now() -> int:
@@ -52,9 +45,6 @@ async def _sign(ctx: ClientCtx, digest: bytes) -> bytes:
 async def eip3009_authorization(
     ctx: ClientCtx, token: str, amount: int
 ) -> ReceiveAuthorization:
-    """Signs an EIP-3009 ``receiveWithAuthorization`` crediting *amount* of
-    *token* to the signer via the Core4Mica contract. Only tokens implementing
-    EIP-3009 (USDC and similar) can redeem this."""
     nonce = "0x" + secrets.token_bytes(32).hex()
     return await _receive_authorization(ctx, token, ctx.contract_address, amount, nonce)
 
@@ -62,9 +52,6 @@ async def eip3009_authorization(
 async def debit_authorization(
     ctx: ClientCtx, token: str, receiver: str, amount: int, cycle_id: str
 ) -> ReceiveAuthorization:
-    """Signs an EIP-3009 authorization paying the signer's net debit to
-    *receiver* (the ClearingHouse), with the nonce pinned to the cycle id as
-    ``payNetDebitWithAuthorization`` requires."""
     return await _receive_authorization(ctx, token, receiver, amount, cycle_id)
 
 
@@ -97,9 +84,6 @@ async def _receive_authorization(
 async def permit2_authorization(
     ctx: ClientCtx, token: str, amount: int
 ) -> Permit2Authorization:
-    """Signs a Permit2 ``PermitTransferFrom`` for a deposit, with a random
-    nonce. Works for any ERC-20, but only if the signer has already approved
-    Permit2 to move that token."""
     nonce = int.from_bytes(secrets.token_bytes(32), "big")
     return await _permit2_authorization(ctx, token, ctx.contract_address, amount, nonce)
 
@@ -107,9 +91,6 @@ async def permit2_authorization(
 async def debit_permit2_authorization(
     ctx: ClientCtx, token: str, receiver: str, amount: int, cycle_id: str
 ) -> Permit2Authorization:
-    """Signs a Permit2 ``PermitTransferFrom`` paying the signer's net debit,
-    with the nonce pinned to ``uint256(cycleId)`` as
-    ``payNetDebitWithPermit2`` requires."""
     nonce = int(cycle_id, 16)
     return await _permit2_authorization(ctx, token, receiver, amount, nonce)
 
@@ -131,28 +112,23 @@ async def _permit2_authorization(
 
 
 async def eip2612_permit(ctx: ClientCtx, token: str, nonce: int) -> Eip2612Permit:
-    """Signs an EIP-2612 permit granting Permit2 an unlimited allowance for
-    *token*. *nonce* must be the owner's current one, which arrives with the
-    facilitator's ``permit2_allowance_required`` rejection."""
     deadline = _valid_before()
     domain_separator = await ctx.token_domain_separator(token)
     digest = digest_for_permit(
         domain_separator,
         ctx.signer_address,
         PERMIT2_ADDRESS,
-        _UNLIMITED,
+        U256_MAX,
         nonce,
         deadline,
     )
     v, r, s = split_signature(await _sign(ctx, digest))
-    return Eip2612Permit(value=_UNLIMITED, deadline=deadline, v=v, r=r, s=s)
+    return Eip2612Permit(value=U256_MAX, deadline=deadline, v=v, r=r, s=s)
 
 
 async def request_withdrawal_authorization(
     ctx: ClientCtx, asset: str, amount: int
 ) -> WithdrawalRequestAuthorization:
-    """Signs a ``RequestWithdrawal`` authorization for *amount* of *asset*
-    (the zero address for ETH) under Core4Mica's own domain."""
     valid_before = _valid_before()
     nonce = "0x" + secrets.token_bytes(32).hex()
     digest = digest_for_request_withdrawal(
@@ -179,8 +155,6 @@ async def request_withdrawal_authorization(
 async def cancel_withdrawal_authorization(
     ctx: ClientCtx, asset: str
 ) -> WithdrawalCancelAuthorization:
-    """Signs a ``CancelWithdrawal`` authorization for the pending request on
-    *asset*."""
     valid_before = _valid_before()
     nonce = "0x" + secrets.token_bytes(32).hex()
     digest = digest_for_cancel_withdrawal(

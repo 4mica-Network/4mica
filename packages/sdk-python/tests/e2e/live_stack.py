@@ -1,38 +1,12 @@
-"""Shared plumbing for the live-stack e2e suite.
-
-Runs against a local 4mica-core dev stack (``make dev-up`` in the 4mica-core
-repo). Skipped entirely unless SDK_LOCAL_E2E=1.
-
-Environment:
-    SDK_LOCAL_E2E=1        enable the suite
-    E2E_RPC_URL            core API           (default http://127.0.0.1:3000/)
-    E2E_ETH_RPC_URL        Ethereum RPC       (default http://127.0.0.1:8545/)
-    E2E_PAYER_KEY          funded wallet, pays and deposits
-    E2E_RECIPIENT_KEY      funded wallet, issues guarantees
-    E2E_AMOUNT             guarantee amount   (default 1000 wei)
-    E2E_CYCLE_SECS         SETTLEMENT_CYCLE_SECS of the running stack (default 600)
-    E2E_CLEARING=1         also run the slow clearing-settlement test
-    E2E_CLEARING_TIMEOUT   seconds to wait for the scheduler (default 1500)
-
-The recipient wallet needs the ``guarantee:issue`` scope in core's DB:
-
-    docker exec -i 4mica-pg psql -U postgres -d core <<'SQL'
-    INSERT INTO "WalletRole" (address, role, scopes, status) VALUES
-      ('0x<recipient-lowercase>', 'user',
-       '["payment:read","guarantee:issue"]'::jsonb, 'active')
-    ON CONFLICT (address) DO UPDATE
-      SET role = EXCLUDED.role, scopes = EXCLUDED.scopes, status = EXCLUDED.status;
-    SQL
-"""
-
 import asyncio
 import os
 import sys
 import time
 from pathlib import Path
-from typing import Optional
 
+import httpx
 import pytest
+from web3.exceptions import Web3Exception
 
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
@@ -82,7 +56,6 @@ def client_config(key_env: str):
 
 
 async def poll(fn, timeout: float = 30, interval: float = 1):
-    """Await ``fn()`` until it returns non-None, or return None on timeout."""
     deadline = time.monotonic() + timeout
     while time.monotonic() <= deadline:
         value = await fn()
@@ -93,12 +66,6 @@ async def poll(fn, timeout: float = 30, interval: float = 1):
 
 
 async def mine_blocks(blocks: int = 1) -> None:
-    """Nudge anvil to mine, mirroring 4mica-core's test harness: core's
-    confirmation mode defaults to ``finalized``, which only advances as blocks
-    are produced — and anvil only produces them on transactions, so a lone
-    deposit never confirms itself. A no-op on RPCs without ``anvil_mine``."""
-    import httpx
-
     url = os.environ.get("E2E_ETH_RPC_URL")
     if not url:
         return
@@ -113,11 +80,11 @@ async def mine_blocks(blocks: int = 1) -> None:
                     "params": [blocks],
                 },
             )
-    except Exception:
-        pass
+    except httpx.HTTPError:
+        return
 
 
-async def credited_balance(client: Client, asset: Optional[str], minimum: int = 1):
+async def credited_balance(client: Client, asset: str | None, minimum: int = 1):
     async def check():
         await mine_blocks(1)
         balance = await client.account.asset_balance(asset)
@@ -128,9 +95,7 @@ async def credited_balance(client: Client, asset: Optional[str], minimum: int = 
     return await poll(check, timeout=45)
 
 
-async def ensure_collateral(client: Client, asset: Optional[str], minimum: int) -> None:
-    """Deposit only when the API balance is below *minimum* — reruns against a
-    warm stack then skip both the transaction and the observer wait."""
+async def ensure_collateral(client: Client, asset: str | None, minimum: int) -> None:
     balance = await client.account.asset_balance(asset)
     if balance is not None and balance.total >= minimum:
         return
@@ -144,8 +109,6 @@ async def ensure_collateral(client: Client, asset: Optional[str], minimum: int) 
 
 
 async def mint_mock_erc20(client: Client, token: str, to: str, amount: int) -> None:
-    """The dev stack's MockERC20 exposes a public mint — reach through the
-    gateway's web3 handle to fund a wallet. Test-only internals access."""
     gateway = await client._ctx.gateway()
     contract = gateway.w3.eth.contract(
         address=gateway.w3.to_checksum_address(token), abi=_MINT_ABI
@@ -156,11 +119,9 @@ async def mint_mock_erc20(client: Client, token: str, to: str, amount: int) -> N
 async def signed_payment(
     payer_client: Client,
     recipient_client: Client,
-    amount: Optional[int] = None,
-    erc20_token: Optional[str] = None,
+    amount: int | None = None,
+    erc20_token: str | None = None,
 ) -> PaymentRequest:
-    """A payment from *payer_client* to *recipient_client*, scoped to the
-    cycle core reports as active and signed by the payer."""
     payload = await payer_client.payment.new_payment(
         recipient_client.signer_address,
         amount if amount is not None else guarantee_amount(),
@@ -169,10 +130,7 @@ async def signed_payment(
     return await payer_client.payment.sign_request(payload)
 
 
-def cycle_text_ids(asset: Optional[str], issued_at: int) -> list:
-    """Candidate text ids (``{asset}:{period_start}``) for the cycle open at
-    *issued_at* — the current window plus its neighbours, in case issuance
-    landed at a boundary."""
+def cycle_text_ids(asset: str | None, issued_at: int) -> list:
     cycle_secs = int(os.environ.get("E2E_CYCLE_SECS", "600"))
     address = (asset or ZERO_ADDRESS).lower()
     start = issued_at - issued_at % cycle_secs
@@ -180,17 +138,10 @@ def cycle_text_ids(asset: Optional[str], issued_at: int) -> list:
 
 
 def is_pending_cycle_error(exc: RpcError) -> bool:
-    """Errors expected while the scheduler has not yet netted and committed the
-    cycle: not found, still open/frozen, or netting not written yet."""
     return exc.status_code in (400, 404)
 
 
 async def wait_for_onchain_cycle(client: Client, action, timeout: float = 300):
-    """Core can serve a prepared clearing action before the scheduler's
-    ``commitCycle`` transaction lands, and until it does every settlement call
-    reverts ``CycleNotFound``. Poll the ClearingHouse itself — the equivalent
-    of 4mica-core's ``wait_for_payment_window`` test helper, minus its DB
-    access. Test-only internals access."""
     gateway = await client._ctx.gateway()
     contract = gateway._clearing_house(action.contract_address)
     cycle_id = bytes.fromhex(action.cycle_id.removeprefix("0x"))
@@ -199,7 +150,7 @@ async def wait_for_onchain_cycle(client: Client, action, timeout: float = 300):
         await mine_blocks(1)
         try:
             return await contract.functions.getCycle(cycle_id).call()
-        except Exception:
+        except Web3Exception:
             return None
 
     return await poll(check, timeout=timeout, interval=5)

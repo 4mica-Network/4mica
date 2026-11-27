@@ -1,6 +1,3 @@
-"""Fixtures for the live-stack e2e suite; see live_stack.py for the
-environment reference and helpers."""
-
 import pytest
 from live_stack import Client, client_config
 

@@ -1,15 +1,10 @@
-"""HTTP client for the 4Mica core operator API.
-
-Mirrors ``crates/rpc/src/proxy.rs``: the paths here are exactly the routes
-core serves (``core/src/http.rs``); anything else is another service's
-endpoint. GETs retry on 429/5xx; POSTs never do — they may have acted.
-"""
-
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Awaitable, Callable
+from http import HTTPStatus
 from importlib.metadata import PackageNotFoundError, version
-from typing import Any, Awaitable, Callable, Dict, List, Optional
+from typing import Any, cast
 
 import httpx
 
@@ -46,50 +41,48 @@ except PackageNotFoundError:
 SDK_CLIENT = f"py-sdk-4mica/{_SDK_VERSION}"
 TokenProvider = Callable[[], Awaitable[str]]
 
-_RETRYABLE_STATUS_CODES: frozenset = frozenset({429, 500, 502, 503, 504})
+_RETRYABLE_STATUS_CODES: frozenset[int] = frozenset({429, 500, 502, 503, 504})
 _MAX_RETRIES = 3
-_RETRY_BASE_DELAY = 0.5  # seconds
+_RETRY_BASE_DELAY_SECS = 0.5
 
 
 class RpcProxy:
-    """HTTP client for the core operator API."""
-
     def __init__(
-        self, endpoint: str, transport: Optional[httpx.AsyncBaseTransport] = None
+        self, endpoint: str, transport: httpx.AsyncBaseTransport | None = None
     ) -> None:
         base = endpoint if endpoint.endswith("/") else f"{endpoint}/"
         self._client = httpx.AsyncClient(
             base_url=base, timeout=20.0, transport=transport
         )
-        self._admin_api_key: Optional[str] = None
-        self._bearer_token: Optional[str] = None
-        self._token_provider: Optional[TokenProvider] = None
+        self._admin_api_key: str | None = None
+        self._bearer_token: str | None = None
+        self._token_provider: TokenProvider | None = None
 
-    def with_admin_api_key(self, admin_api_key: str) -> "RpcProxy":
+    def with_admin_api_key(self, admin_api_key: str) -> RpcProxy:
         self._admin_api_key = admin_api_key
         return self
 
-    def with_bearer_token(self, bearer_token: str) -> "RpcProxy":
+    def with_bearer_token(self, bearer_token: str) -> RpcProxy:
         self._bearer_token = bearer_token
         return self
 
-    def with_token_provider(self, provider: TokenProvider) -> "RpcProxy":
+    def with_token_provider(self, provider: TokenProvider) -> RpcProxy:
         self._token_provider = provider
         return self
 
     async def aclose(self) -> None:
         await self._client.aclose()
 
-    async def __aenter__(self) -> "RpcProxy":
+    async def __aenter__(self) -> RpcProxy:
         return self
 
-    async def __aexit__(self, exc_type, exc, tb) -> None:
+    async def __aexit__(self, *_: object) -> None:
         await self.aclose()
 
     async def _headers(
-        self, admin: bool = False, authed: bool = True
-    ) -> Dict[str, str]:
-        headers: Dict[str, str] = {
+        self, *, admin: bool = False, authed: bool = True
+    ) -> dict[str, str]:
+        headers: dict[str, str] = {
             SDK_CLIENT_HEADER: SDK_CLIENT,
             "user-agent": SDK_CLIENT,
         }
@@ -97,7 +90,7 @@ class RpcProxy:
             headers[ADMIN_API_KEY_HEADER] = self._admin_api_key
         if not authed:
             return headers
-        token: Optional[str] = None
+        token: str | None = None
         if self._token_provider is not None:
             token = await self._token_provider()
         elif self._bearer_token:
@@ -121,10 +114,8 @@ class RpcProxy:
         if response.is_success:
             return payload
 
-        # Core's error body is {"error": <message>, "code"?, "details"?};
-        # anything else is surfaced verbatim so a proxy failure reads sensibly.
         message = "unknown error"
-        code: Optional[str] = None
+        code: str | None = None
         details: Any = None
         if isinstance(payload, dict):
             message = payload.get("error") or payload.get("message") or str(payload)
@@ -142,32 +133,36 @@ class RpcProxy:
     async def _get(
         self,
         path: str,
+        *,
         admin: bool = False,
-        params: Optional[Dict[str, Any]] = None,
+        params: dict[str, Any] | None = None,
         authed: bool = True,
     ) -> Any:
-        last_exc: Optional[RpcError] = None
-        for attempt in range(_MAX_RETRIES):
-            if attempt > 0:
-                await asyncio.sleep(_RETRY_BASE_DELAY * (2 ** (attempt - 1)))
+        attempt = 0
+        while True:
             try:
                 resp = await self._client.get(
-                    path, headers=await self._headers(admin, authed), params=params
+                    path,
+                    headers=await self._headers(admin=admin, authed=authed),
+                    params=params,
                 )
             except httpx.HTTPError as exc:
                 raise RpcError(f"request to {path} failed: {exc}") from exc
             try:
                 return await self._decode(resp)
             except RpcError as exc:
-                if exc.status_code not in _RETRYABLE_STATUS_CODES:
+                attempt += 1
+                if (
+                    exc.status_code not in _RETRYABLE_STATUS_CODES
+                    or attempt == _MAX_RETRIES
+                ):
                     raise
-                last_exc = exc
-        raise last_exc  # type: ignore[misc]
+            await asyncio.sleep(_RETRY_BASE_DELAY_SECS * 2 ** (attempt - 1))
 
-    async def _post(self, path: str, body: Any, admin: bool = False) -> Any:
+    async def _post(self, path: str, body: Any, *, admin: bool = False) -> Any:
         try:
             resp = await self._client.post(
-                path, json=body, headers=await self._headers(admin)
+                path, json=body, headers=await self._headers(admin=admin)
             )
         except httpx.HTTPError as exc:
             raise RpcError(f"request to {path} failed: {exc}") from exc
@@ -189,17 +184,12 @@ class RpcProxy:
         )
 
     async def get_active_cycle(self, asset_address: str) -> ActiveCycleResponse:
-        """The settlement cycle a payment for *asset_address* must be signed
-        for right now."""
         raw = await self._get("/core/cycles/active", params={"asset": asset_address})
         return ActiveCycleResponse.from_rpc(raw)
 
     async def get_checkpoint_batch(
-        self, payer: str, asset_address: str, cycle_id: Optional[str] = None
+        self, payer: str, asset_address: str, cycle_id: str | None = None
     ) -> CheckpointBatchResponse:
-        """The previous checkpoint and the authorizations *payer*'s next one
-        must cover, in the active cycle or the one *cycle_id* names. A closed
-        cycle still answers until settlement has read what it holds."""
         params = {"asset": asset_address}
         if cycle_id is not None:
             params["cycle_id"] = normalize_bytes32_hex(cycle_id)
@@ -245,11 +235,9 @@ class RpcProxy:
 
     async def list_participant_positions(
         self, participant: str
-    ) -> List[ClearingPosition]:
-        """The positions *participant* can still settle, across every cycle
-        and asset, soonest payment deadline first: net debits that are unpaid
-        and still payable, and net credits that are unclaimed. Paid, claimed,
-        defaulted and flat positions are not listed."""
+    ) -> list[ClearingPosition]:
+        """Soonest payment deadline first. Paid, claimed, defaulted and flat
+        positions are not listed."""
         raw = await self._get(f"/core/participants/{participant}/positions")
         positions = raw.get("positions") if isinstance(raw, dict) else None
         return [
@@ -261,15 +249,13 @@ class RpcProxy:
         self,
         payer: str,
         cycle_id: str,
-        limit: Optional[int] = None,
-        after: Optional[str] = None,
+        limit: int | None = None,
+        after: str | None = None,
     ) -> PayerGuaranteesPage:
-        """One page of the guarantees *payer* issued in a cycle, whatever
-        their settlement status, in the order core stored them. *cycle_id* is
-        the cycle's on-chain bytes32 id (``cycle_id`` on a position or an
-        active cycle), not its text id. *limit* defaults to 100 and is capped
-        at 500 by core; *after* is the ``next_cursor`` of the page before."""
-        params: Dict[str, Any] = {"cycle_id": normalize_bytes32_hex(cycle_id)}
+        """*cycle_id* is the on-chain bytes32 id, not the text id. *limit*
+        defaults to 100, capped at 500 by core; *after* is the previous
+        ``next_cursor``."""
+        params: dict[str, Any] = {"cycle_id": normalize_bytes32_hex(cycle_id)}
         if limit is not None:
             params["limit"] = limit
         if after is not None:
@@ -279,19 +265,19 @@ class RpcProxy:
 
     async def list_recipient_payments(
         self, recipient_address: str
-    ) -> List[RecipientPaymentInfo]:
+    ) -> list[RecipientPaymentInfo]:
         raw = await self._get(f"/core/recipients/{recipient_address}/payments")
         return [RecipientPaymentInfo.from_rpc(item) for item in raw or []]
 
     async def get_user_asset_balance(
         self, user_address: str, asset_address: str
-    ) -> Optional[AssetBalanceInfo]:
+    ) -> AssetBalanceInfo | None:
         # Core answers JSON null (not 404) when the user holds nothing in the asset.
         raw = await self._get(f"/core/users/{user_address}/assets/{asset_address}")
         return AssetBalanceInfo.from_rpc(raw) if raw is not None else None
 
     async def update_user_suspension(
-        self, user_address: str, suspended: bool
+        self, user_address: str, *, suspended: bool
     ) -> UserSuspensionStatus:
         raw = await self._post(
             f"/core/users/{user_address}/suspension",
@@ -300,20 +286,19 @@ class RpcProxy:
         )
         return UserSuspensionStatus.from_rpc(raw)
 
-    async def health(self) -> Dict[str, Any]:
-        """Core's health report. An unhealthy core answers 503 with the same
-        report, which is returned rather than retried and raised."""
+    async def health(self) -> dict[str, Any]:
+        """An unhealthy core's 503 report is returned, not raised."""
         try:
             response = await self._client.get(
                 "/core/health", headers=await self._headers(authed=False)
             )
         except httpx.HTTPError as exc:
             raise RpcError(f"request to /core/health failed: {exc}") from exc
-        if response.status_code == 503:
+        if response.status_code == HTTPStatus.SERVICE_UNAVAILABLE:
             try:
                 report = response.json()
             except ValueError:
                 report = None
             if isinstance(report, dict):
                 return report
-        return await self._decode(response)
+        return cast(dict[str, Any], await self._decode(response))

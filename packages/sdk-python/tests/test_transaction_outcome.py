@@ -1,6 +1,3 @@
-"""A transaction the wallet sends itself whose fate is unknown is not a failure:
-the caller must check before sending it again."""
-
 import asyncio
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock

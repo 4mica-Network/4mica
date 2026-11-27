@@ -25,6 +25,7 @@ from fourmica_sdk.errors import (
     InsufficientBalanceError,
     InvalidParamsError,
     OutcomeUnknownError,
+    RpcError,
     SponsorshipTransportError,
     TokenNotSupportedError,
 )
@@ -39,7 +40,6 @@ def fast_polling(monkeypatch):
 
 
 def deposited(client: FakeClient):
-    """The (asset address, base units) of each deposit the facade started."""
     return [
         (call.args[0].address, call.args[1]) for call in client.deposit.of.mock_calls
     ]
@@ -124,7 +124,6 @@ async def test_gas_self_approves_and_sends_the_wallets_own_transaction():
 async def test_approves_and_sends_its_own_transaction_where_no_facilitator_is_hosted():
     client = FakeClient(gasless=False, totals=[0, 5_000_000])
     result = await deposit(fake_session(client), "5 USDC")
-    # The low-level send() would go out with no allowance.
     client.builder.send.assert_not_awaited()
     client.builder.self_funded_builder.approve.assert_awaited_once()
     client.builder.self_funded_builder.send.assert_awaited_once()
@@ -192,7 +191,6 @@ async def test_refuses_a_native_deposit_that_leaves_nothing_for_gas():
 
 
 async def test_wait_mined_returns_at_once_and_spendable_still_waits_for_this_deposit():
-    # 2 was there before; the deposit is counted on the third read.
     client = FakeClient(totals=[2_000_000, 2_000_000, 7_000_000])
     result = await deposit(fake_session(client), "5 USDC", wait="mined")
     assert result.status == "mined"
@@ -220,6 +218,7 @@ async def test_returns_pending_on_time_when_a_core_request_hangs():
         for total in reads:
             return type("Balance", (), {"total": total, "locked": 0})()
         await asyncio.Event().wait()
+        return None
 
     client.account.asset_balance = AsyncMock(side_effect=hangs_after_the_baseline)
     started = time.monotonic()
@@ -230,7 +229,7 @@ async def test_returns_pending_on_time_when_a_core_request_hangs():
 
 async def test_keeps_polling_through_core_errors_once_the_money_has_moved():
     client = FakeClient()
-    reads = iter([0, RuntimeError("core is down"), RuntimeError("still down")])
+    reads = iter([0, RpcError("core is down"), RpcError("still down")])
 
     async def flaky(asset):
         outcome = next(reads, 5_000_000)
@@ -244,6 +243,21 @@ async def test_keeps_polling_through_core_errors_once_the_money_has_moved():
     assert client.account.asset_balance.await_count == 4
 
 
+async def test_a_fault_that_is_not_the_sdks_stops_the_wait():
+    client = FakeClient()
+    reads = iter([0, RuntimeError("bug")])
+
+    async def broken(asset):
+        outcome = next(reads)
+        if isinstance(outcome, Exception):
+            raise outcome
+        return type("Balance", (), {"total": outcome, "locked": 0})()
+
+    client.account.asset_balance = AsyncMock(side_effect=broken)
+    with pytest.raises(RuntimeError, match="bug"):
+        await deposit(fake_session(client), "5 USDC")
+
+
 async def test_a_remote_signer_deposits_gaslessly_without_reading_the_wallet():
     client = FakeClient(private_key=None, totals=[0, 5_000_000])
     result = await deposit(fake_session(client), "5 USDC")
@@ -253,8 +267,6 @@ async def test_a_remote_signer_deposits_gaslessly_without_reading_the_wallet():
 
 
 async def test_two_deposits_at_once_are_not_both_confirmed_by_one_credit():
-    """Both would read the same total and wait for the same target, so core
-    counting either one would pass for both. Here it counts only the first."""
     core = {"total": 10_000_000, "sent": 0}
     client = FakeClient()
 
@@ -280,13 +292,11 @@ async def test_two_deposits_at_once_are_not_both_confirmed_by_one_credit():
     assert core["sent"] == 2
     assert (first.status, second.status) == ("spendable", "pending")
 
-    # Once core counts the second, waiting again says so.
     core["total"] += 5_000_000
     assert (await second.spendable()).status == "spendable"
 
 
 async def test_a_failed_deposit_does_not_hold_up_the_next():
-    # Each deposit reads the total once before sending.
     client = FakeClient(totals=[0, 0, 5_000_000])
     session = fake_session(client)
     sent = client.builder.send
@@ -302,7 +312,6 @@ async def test_deposits_of_different_assets_do_not_wait_for_each_other():
     session = fake_session(client)
     slow = asyncio.create_task(deposit(session, "5 USDC", timeout_secs=30))
     await asyncio.sleep(0.01)
-    # USDC is still waiting for core; USDT goes straight through.
     result = await asyncio.wait_for(deposit(session, "5 USDT", wait="mined"), 1)
     assert result.status == "mined"
     assert not slow.done()

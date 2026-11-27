@@ -24,6 +24,7 @@ from fourmica_sdk.x402 import (
     X402Flow,
     X402PaymentRequired,
 )
+from fourmica_sdk.x402.model import SettlementReceipt
 
 USER = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
 PAY_TO = "0x00000000000000000000000000000000000000Be"
@@ -122,8 +123,6 @@ async def test_the_native_asset_is_requested_as_native():
 
 
 async def test_the_recipient_is_echoed_as_the_server_spelled_it():
-    """A resource server that compares payTo as a string must still match;
-    the payer commits to the address either way."""
     lowered = PAY_TO.lower()
     signer = FakeFlowSigner()
     payment = await X402Flow(signer).sign_payment(reqs_v1(payTo=f" {lowered} "))
@@ -136,7 +135,7 @@ async def test_sign_payment_rejects_foreign_scheme():
 
 
 @pytest.mark.parametrize(
-    "field,value",
+    ("field", "value"),
     [("payTo", "nope"), ("asset", "0x12"), ("maxAmountRequired", "lots")],
 )
 async def test_malformed_requirements_are_refused_before_signing(field, value):
@@ -232,19 +231,12 @@ async def test_settle_sends_payload_object_not_header():
     ],
 )
 def test_a_settlement_without_a_receipt_keeps_it_raw(body):
-    """A facilitator that relays no receipt under ``extra``, or one still
-    shaped like a BLS certificate, leaves ``receipt`` empty rather than
-    misreading it."""
-    from fourmica_sdk.x402.model import SettlementReceipt
-
     settlement = SettlementReceipt.from_raw(body)
     assert settlement.receipt is None
     assert settlement.raw == body
 
 
 def test_a_refused_settlement_carries_reason_and_details():
-    from fourmica_sdk.x402.model import SettlementReceipt
-
     details = {"uncheckpointed": 64, "max_uncheckpointed": 64}
     settlement = SettlementReceipt.from_raw(
         {
@@ -272,9 +264,6 @@ async def test_settle_rejects_version_mismatch():
 
 
 async def test_a_connected_client_signs_for_the_live_cycle(monkeypatch):
-    """The Client is a FlowSigner: the payment is scoped to the cycle core
-    reports, for the advertised asset, and signed under the ClearingHouse
-    domain by the client's own key."""
     core = MockCore(
         {
             ("GET", "/core/cycles/active"): lambda r: ok(

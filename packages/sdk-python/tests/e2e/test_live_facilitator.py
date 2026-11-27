@@ -1,17 +1,3 @@
-"""Sponsored flows against a live facilitator, mirroring 4mica-core's
-``facilitator_gasless_deposit`` integration test.
-
-Runs only when a facilitator URL is provided on top of the usual live-stack
-gate. The facilitator's SIWE wallet needs the ``facilitator`` role in core's
-DB (see live_stack.py); its relayer wallet pays the gas these tests avoid
-spending.
-
-    SDK_LOCAL_E2E=1 E2E_FACILITATOR_URL=http://127.0.0.1:8080/ \
-    E2E_RPC_URL=http://127.0.0.1:3000/ E2E_ETH_RPC_URL=http://127.0.0.1:8545/ \
-    E2E_PAYER_KEY=0x... E2E_RECIPIENT_KEY=0x... \
-    pytest -m integration tests/e2e/test_live_facilitator.py
-"""
-
 import os
 
 import pytest
@@ -47,10 +33,6 @@ async def sponsored_payer():
 
 
 async def test_gasless_deposit_is_paid_by_the_facilitator(sponsored_payer):
-    """The payer signs an EIP-3009 authorization; the facilitator submits it
-    and pays gas. The dev stack's mock USDC implements EIP-3009 and core
-    relays its domain separator, so the whole flow needs no chain access from
-    the payer beyond the mint that funds the wallet."""
     payer = sponsored_payer
     tokens = await payer.tokens.supported()
     token = next(t.address for t in tokens.tokens if t.domain_separator)
@@ -66,9 +48,6 @@ async def test_gasless_deposit_is_paid_by_the_facilitator(sponsored_payer):
 
 
 async def test_gasless_withdrawal_roundtrip(sponsored_payer):
-    """Request and cancel a withdrawal without the user transacting —
-    Core4Mica verifies the authorization signatures itself, so this works for
-    any asset, native included."""
     payer = sponsored_payer
     positions = {p.asset.lower(): p for p in await payer.account.assets()}
     native = positions.get("0x0000000000000000000000000000000000000000")

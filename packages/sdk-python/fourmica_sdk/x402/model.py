@@ -1,14 +1,7 @@
-"""x402 wire models for the ``4mica-credit`` scheme.
-
-CamelCase on the wire (facilitator/resource-server convention). The v2
-challenge travels in the ``PAYMENT-REQUIRED`` header; a signed payment travels
-as ``X-PAYMENT`` (v1) or ``PAYMENT-SIGNATURE`` (v2), base64 of the envelope.
-"""
-
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from ..errors import X402Error
 from ..guarantee import GuaranteeReceipt
@@ -16,9 +9,11 @@ from ..models import PaymentRequest
 from ..utils import ValidationError, normalize_bytes32_hex
 
 SCHEME_4MICA_CREDIT = "4mica-credit"
+X402_V1 = 1
+X402_V2 = 2
 
 
-def _pick(raw: Dict[str, Any], *keys: str, default: Any = None) -> Any:
+def _pick(raw: dict[str, Any], *keys: str, default: Any = None) -> Any:
     for key in keys:
         if key in raw and raw[key] is not None:
             return raw[key]
@@ -27,19 +22,16 @@ def _pick(raw: Dict[str, Any], *keys: str, default: Any = None) -> Any:
 
 @dataclass
 class ValidationExtra:
-    """The ``extra.validation`` object a resource server sends to gate a
-    payment on a validator."""
-
     validator: str
     subject: str
     """0x-prefixed bytes32 the validator must approve."""
-    deadline: Optional[int] = None
+    deadline: int | None = None
     """Unix seconds; core tightens this to the cycle's resolution cutoff."""
-    params: Optional[str] = None
+    params: str | None = None
     """0x-prefixed validator-specific policy bytes."""
 
     @classmethod
-    def from_raw(cls, raw: Dict[str, Any]) -> "ValidationExtra":
+    def from_raw(cls, raw: dict[str, Any]) -> ValidationExtra:
         if not isinstance(raw, dict):
             raise X402Error("invalid paymentRequirements.extra.validation")
         validator = raw.get("validator")
@@ -61,13 +53,10 @@ class ValidationExtra:
 
 @dataclass
 class PaymentRequirementsExtra:
-    """Parsed ``paymentRequirements.extra``. Present ⇒ the payment is
-    validation-gated."""
-
-    validation: Optional[ValidationExtra] = None
+    validation: ValidationExtra | None = None
 
     @classmethod
-    def from_raw(cls, raw: Optional[Dict[str, Any]]) -> "PaymentRequirementsExtra":
+    def from_raw(cls, raw: dict[str, Any] | None) -> PaymentRequirementsExtra:
         raw = raw or {}
         if not isinstance(raw, dict):
             raise X402Error("invalid paymentRequirements.extra")
@@ -86,15 +75,15 @@ class PaymentRequirementsV1:
     max_amount_required: str
     pay_to: str
     asset: str
-    extra: Dict[str, Any] = field(default_factory=dict)
-    resource: Optional[str] = None
-    description: Optional[str] = None
-    mime_type: Optional[str] = None
-    output_schema: Optional[Any] = None
-    max_timeout_seconds: Optional[int] = None
+    extra: dict[str, Any] = field(default_factory=dict)
+    resource: str | None = None
+    description: str | None = None
+    mime_type: str | None = None
+    output_schema: Any | None = None
+    max_timeout_seconds: int | None = None
 
     @classmethod
-    def from_raw(cls, raw: Dict[str, Any]) -> "PaymentRequirementsV1":
+    def from_raw(cls, raw: dict[str, Any]) -> PaymentRequirementsV1:
         amount = _pick(raw, "maxAmountRequired")
         pay_to = _pick(raw, "payTo")
         asset = _pick(raw, "asset")
@@ -130,8 +119,8 @@ class PaymentRequirementsV1:
             max_timeout_seconds=_pick(raw, "maxTimeoutSeconds"),
         )
 
-    def to_payload(self) -> Dict[str, Any]:
-        payload: Dict[str, Any] = {
+    def to_payload(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {
             "scheme": self.scheme,
             "network": self.network,
             "maxAmountRequired": self.max_amount_required,
@@ -164,15 +153,14 @@ class PaymentRequirementsV2:
     asset: str
     amount: str
     pay_to: str
-    extra: Dict[str, Any] = field(default_factory=dict)
-    max_timeout_seconds: Optional[int] = None
+    extra: dict[str, Any] = field(default_factory=dict)
+    max_timeout_seconds: int | None = None
     extra_advertised: bool = field(default=False, repr=False, compare=False)
-    """Whether the seller sent an ``extra`` object at all. An empty one is
-    echoed back as ``{}``: sellers match the ``accepted`` a payer returns
-    against what they advertised, and ``{}`` does not match a missing key."""
+    """An empty ``extra`` is echoed back as ``{}``: sellers match
+    ``accepted`` against what they advertised, and ``{}`` is not a missing key."""
 
     @classmethod
-    def from_raw(cls, raw: Dict[str, Any]) -> "PaymentRequirementsV2":
+    def from_raw(cls, raw: dict[str, Any]) -> PaymentRequirementsV2:
         amount = _pick(raw, "amount")
         pay_to = _pick(raw, "payTo")
         asset = _pick(raw, "asset")
@@ -208,8 +196,8 @@ class PaymentRequirementsV2:
             extra_advertised=isinstance(raw.get("extra"), dict),
         )
 
-    def to_payload(self) -> Dict[str, Any]:
-        payload: Dict[str, Any] = {
+    def to_payload(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {
             "scheme": self.scheme,
             "network": self.network,
             "asset": self.asset,
@@ -226,11 +214,11 @@ class PaymentRequirementsV2:
 @dataclass
 class X402ResourceInfo:
     url: str
-    description: Optional[str] = None
-    mime_type: Optional[str] = None
+    description: str | None = None
+    mime_type: str | None = None
 
     @classmethod
-    def from_raw(cls, raw: Dict[str, Any]) -> "X402ResourceInfo":
+    def from_raw(cls, raw: dict[str, Any]) -> X402ResourceInfo:
         if not isinstance(raw, dict) or not raw.get("url"):
             raise X402Error("invalid resource info")
         return cls(
@@ -239,8 +227,8 @@ class X402ResourceInfo:
             mime_type=raw.get("mimeType"),
         )
 
-    def to_payload(self) -> Dict[str, Any]:
-        payload: Dict[str, Any] = {"url": self.url}
+    def to_payload(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {"url": self.url}
         if self.description is not None:
             payload["description"] = self.description
         if self.mime_type is not None:
@@ -250,16 +238,14 @@ class X402ResourceInfo:
 
 @dataclass
 class X402PaymentRequired:
-    """The v2 challenge (``PAYMENT-REQUIRED`` header, base64 JSON)."""
-
     x402_version: int
     resource: X402ResourceInfo
-    accepts: List[PaymentRequirementsV2]
-    error: Optional[str] = None
-    extensions: Optional[Dict[str, Any]] = None
+    accepts: list[PaymentRequirementsV2]
+    error: str | None = None
+    extensions: dict[str, Any] | None = None
 
     @classmethod
-    def from_raw(cls, raw: Dict[str, Any]) -> "X402PaymentRequired":
+    def from_raw(cls, raw: dict[str, Any]) -> X402PaymentRequired:
         if not isinstance(raw, dict):
             raise X402Error("invalid payment required payload")
         x402_version = raw.get("x402Version")
@@ -278,44 +264,37 @@ class X402PaymentRequired:
 
 @dataclass
 class X402SignedPayment:
-    """A signed payment in both forms: ``header`` for the HTTP request header,
-    ``envelope`` (the decoded object) for a facilitator's ``paymentPayload``."""
+    """``header`` for the HTTP request header, ``envelope`` for a
+    facilitator's ``paymentPayload``."""
 
     header: str
-    envelope: Dict[str, Any]
+    envelope: dict[str, Any]
     x402_version: int
     payload: PaymentRequest
 
 
 @dataclass
 class SettlementReceipt:
-    """The facilitator's ``/settle`` response. Failures arrive as HTTP 200
-    with ``success: false`` — read the body, not the status."""
+    """Failures arrive as HTTP 200 with ``success: false``: read the body,
+    not the status."""
 
     success: bool
-    transaction: Optional[str]
-    """The settlement transaction; ``None`` for an issued guarantee, which
-    broadcasts nothing."""
-    network: Optional[str]
-    payer: Optional[str]
-    receipt: Optional[GuaranteeReceipt]
-    """The operator's guarantee receipt, read from ``extra.receipt`` — verify
-    it with :meth:`~fourmica_sdk.client.payment.PaymentClient.verify_guarantee`.
-    Anything not shaped ``{receipt, signature}`` stays only in ``raw``."""
-    error_reason: Optional[str]
-    """A machine-readable reason, such as
-    ``invalid_4mica_credit_checkpoint_required``."""
-    error_message: Optional[str]
+    transaction: str | None
+    """``None`` for an issued guarantee, which broadcasts nothing."""
+    network: str | None
+    payer: str | None
+    receipt: GuaranteeReceipt | None
+    """Verify it with
+    :meth:`~fourmica_sdk.client.payment.PaymentClient.verify_guarantee`."""
+    error_reason: str | None
+    error_message: str | None
     retryable: bool
-    """Whether repeating the identical settlement later may succeed. Absent
-    means not retryable."""
-    details: Optional[Dict[str, Any]]
-    """What the payer needs to act on ``error_reason``, such as core's
-    checkpoint details."""
-    raw: Dict[str, Any]
+    """Absent means not retryable."""
+    details: dict[str, Any] | None
+    raw: dict[str, Any]
 
     @classmethod
-    def from_raw(cls, raw: Any) -> "SettlementReceipt":
+    def from_raw(cls, raw: Any) -> SettlementReceipt:
         if not isinstance(raw, dict):
             raw = {}
         extra = raw.get("extra")

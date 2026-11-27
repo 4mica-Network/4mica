@@ -1,32 +1,20 @@
-"""Transport for the service that submits signed authorizations and pays the
-gas for them. Port of ``sdk-rust/src/client/facilitator.rs``.
-
-The facilitator reports rejections in the body with a 200, so a non-success
-status is a transport or routing problem rather than a refused request; a
-request that provably never arrived is a :class:`SponsorshipTransportError`,
-while anything that may have been acted on is an :class:`OutcomeUnknownError`
-— retrying those blindly risks paying twice.
-"""
-
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Any
 
 import httpx
 
 from ..errors import (
     FacilitatorNotConfiguredError,
     FacilitatorRejectedError,
-    FourMicaError,
+    MissingTokenDomainSeparatorError,
     OutcomeUnknownError,
     Permit2AllowanceRequiredError,
     SponsorshipError,
     SponsorshipTransportError,
 )
+from ..utils import refused_status
 
-# Rejections that describe the request itself rather than the facilitator's
-# willingness to pay. The caller's own transaction would fail for the same
-# reason, so falling back to self-funding just burns their gas on a revert.
 NAMES_THE_REQUEST = frozenset(
     {
         "invalid_payload",
@@ -38,10 +26,7 @@ NAMES_THE_REQUEST = frozenset(
     }
 )
 
-# The facilitator has broadcast, or is broadcasting, a transaction for this
-# request. Sending another from the caller's own wallet would race it or run
-# after it: a second withdrawal request restarts the grace period, and a
-# second claim or payment reverts.
+# Already broadcast: a self-funded resend would race it or run after it.
 ALREADY_SUBMITTED = frozenset(
     {
         "settlement_pending",
@@ -50,8 +35,6 @@ ALREADY_SUBMITTED = frozenset(
     }
 )
 
-# Additional claim-shaped rejections: the self-funded path resolves the same
-# terms from the same core and submits to the same contract.
 NAMES_THE_CLAIM = frozenset(
     {
         "invalid_payload",
@@ -63,9 +46,6 @@ NAMES_THE_CLAIM = frozenset(
     }
 )
 
-# Beyond the claim codes, the debtor's side of the bargain: a refused
-# signature means this SDK signed over the wrong terms, and an insufficient
-# balance fails the self-funded route just the same.
 NAMES_THE_PAYMENT = NAMES_THE_CLAIM | frozenset(
     {
         "invalid_signature",
@@ -80,11 +60,9 @@ NAMES_THE_PAYMENT = NAMES_THE_CLAIM | frozenset(
 class Facilitator:
     def __init__(
         self,
-        base_url: Optional[str],
-        client: Optional[httpx.AsyncClient] = None,
+        base_url: str | None,
+        client: httpx.AsyncClient | None = None,
     ) -> None:
-        # None when none was configured; every call then fails with
-        # FacilitatorNotConfiguredError rather than silently doing nothing.
         self._base_url = base_url
         self._client = client or httpx.AsyncClient(timeout=30.0)
 
@@ -94,7 +72,7 @@ class Facilitator:
     async def aclose(self) -> None:
         await self._client.aclose()
 
-    async def post(self, path: str, body: Dict[str, Any]) -> Dict[str, Any]:
+    async def post(self, path: str, body: dict[str, Any]) -> dict[str, Any]:
         if self._base_url is None:
             raise FacilitatorNotConfiguredError()
         base = self._base_url if self._base_url.endswith("/") else self._base_url + "/"
@@ -103,7 +81,6 @@ class Facilitator:
             response = await self._client.post(base + path, json=body)
         except (
             httpx.ConnectError,
-            # Timed out before a connection existed: nothing was sent.
             httpx.ConnectTimeout,
             httpx.PoolTimeout,
             httpx.InvalidURL,
@@ -113,12 +90,11 @@ class Facilitator:
                 f"facilitator request failed: {exc}"
             ) from exc
         except httpx.HTTPError as exc:
-            # The request may have gone out; whether it was acted on is unknown.
             raise OutcomeUnknownError(f"facilitator request failed: {exc}") from exc
 
         if not response.is_success:
             message = f"facilitator returned {response.status_code}: {response.text}"
-            if 400 <= response.status_code < 500 and response.status_code != 408:
+            if refused_status(response.status_code):
                 raise SponsorshipTransportError(message)
             raise OutcomeUnknownError(message)
 
@@ -131,11 +107,7 @@ class Facilitator:
         return payload
 
 
-def confirm_facilitator_echo(field: str, raw: Optional[str], expected: str) -> str:
-    """Checks a value the facilitator echoed back against what was asked for,
-    taking the request's own value when the echo is omitted. One that
-    disagrees — or cannot be read — means the receipt would describe a
-    transaction nobody asked for, and is refused as an unknown outcome."""
+def confirm_facilitator_echo(field: str, raw: str | None, expected: str) -> str:
     if raw is None:
         return expected
     if str(raw).lower() == str(expected).lower():
@@ -143,17 +115,12 @@ def confirm_facilitator_echo(field: str, raw: Optional[str], expected: str) -> s
     raise OutcomeUnknownError(f"facilitator echoed {field} {raw}, expected {expected}")
 
 
-def _extra(payload: Dict[str, Any]) -> Dict[str, Any]:
-    """What the facilitator adds to a failure, under ``extra``: ``retryable``
-    and ``details``. The reason and message travel beside it, under the names
-    the response uses."""
+def _extra(payload: dict[str, Any]) -> dict[str, Any]:
     extra = payload.get("extra")
     return extra if isinstance(extra, dict) else {}
 
 
-def eip2612_nonce(payload: Dict[str, Any]) -> Optional[int]:
-    """The EIP-2612 nonce attached to a ``permit2_allowance_required``
-    rejection — the one value a client with no chain access cannot compute."""
+def eip2612_nonce(payload: dict[str, Any]) -> int | None:
     details = _extra(payload).get("details")
     if not isinstance(details, dict):
         return None
@@ -167,14 +134,8 @@ def eip2612_nonce(payload: Dict[str, Any]) -> Optional[int]:
 
 
 def rejection_error(
-    payload: Dict[str, Any], reason: Optional[str], message: Optional[str]
+    payload: dict[str, Any], reason: str | None, message: str | None
 ) -> SponsorshipError:
-    """The typed rejection for a ``success: false`` / ``isValid: false`` body.
-    ``reason`` is ``errorReason`` on a submit and ``invalidReason`` on a
-    verify, ``message`` the matching ``errorMessage`` / ``invalidMessage``.
-    The reason is carried verbatim so a caller can branch on a code this SDK
-    predates; absent ``extra.retryable`` means "not retryable" — a facilitator
-    that omits it is not promising anything."""
     code = reason or "unknown"
     text = message or "facilitator gave no reason"
     if code == "permit2_allowance_required":
@@ -193,12 +154,7 @@ def rejection_error(
     )
 
 
-def sponsorship_unavailable(exc: FourMicaError, names_the_request: frozenset) -> bool:
-    """Whether an error means "nobody sponsored this", as opposed to "this
-    request is bad" or "we do not know what happened". Only the first is worth
-    paying for a self-funded retry: a rejection naming the request would
-    revert the caller's own transaction too, and an unknown outcome may mean
-    the facilitator already submitted."""
+def sponsorship_unavailable(exc: Exception, names_the_request: frozenset[str]) -> bool:
     if isinstance(exc, OutcomeUnknownError):
         return False
     if isinstance(exc, Permit2AllowanceRequiredError):
@@ -208,15 +164,7 @@ def sponsorship_unavailable(exc: FourMicaError, names_the_request: frozenset) ->
     return isinstance(exc, SponsorshipError)
 
 
-def refuses_the_authorization(exc: FourMicaError) -> bool:
-    """Whether a rejection means "this token cannot take an EIP-3009
-    authorization" rather than "this request is bad". A token without
-    ``receiveWithAuthorization`` reverts opaquely, reported as a failed
-    simulation — retrying over Permit2 is a guess, but a cheap one: the
-    simulation spent no gas, and a genuinely bad request fails the second
-    route with its own error."""
-    from ..errors import MissingTokenDomainSeparatorError
-
+def refuses_the_authorization(exc: Exception) -> bool:
     if isinstance(exc, MissingTokenDomainSeparatorError):
         return True
     return isinstance(exc, FacilitatorRejectedError) and exc.code in (

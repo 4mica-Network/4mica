@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import List, Optional
 
 from ..amounts import Token, format_units
 from ..client.model import PayReceipt
-from ..errors import Erc20AllowanceRequiredError, GasRequiredError, OutcomeUnknownError
+from ..errors import (
+    Erc20AllowanceRequiredError,
+    FourMicaError,
+    GasRequiredError,
+    OutcomeUnknownError,
+)
 from ..models import ClearingParticipantRole, ClearingPosition
 from .models import Position, SettleAction, SettleResult
 from .session import NetworkSession, asset_ref
@@ -50,7 +54,7 @@ async def _to_position(session: NetworkSession, position: ClearingPosition) -> P
     )
 
 
-async def open_positions(session: NetworkSession) -> List[Position]:
+async def open_positions(session: NetworkSession) -> list[Position]:
     positions = await session.client.settlement.positions()
     return [await _to_position(session, p) for p in positions]
 
@@ -60,7 +64,6 @@ async def _pay_debit(session: NetworkSession, position: Position) -> PayReceipt:
     try:
         return await pay.send()
     except Erc20AllowanceRequiredError:
-        # The wallet pays its own way here: approve the exact debit, then pay.
         gateway = await session.chain()
         if gateway is None:
             raise
@@ -76,10 +79,10 @@ async def _pay_debit(session: NetworkSession, position: Position) -> PayReceipt:
 
 
 async def settle_all(
-    session: NetworkSession, only: Optional[SettleAction]
-) -> List[SettleResult]:
+    session: NetworkSession, only: SettleAction | None
+) -> list[SettleResult]:
     settlement = session.client.settlement
-    results: List[SettleResult] = []
+    results: list[SettleResult] = []
     for position in await open_positions(session):
         action: SettleAction = "pay" if position.role == "debtor" else "claim"
         if only is not None and only != action:
@@ -101,7 +104,7 @@ async def settle_all(
                 if action == "pay"
                 else await settlement.claim(position.cycle).send()
             )
-        except Exception as error:
+        except FourMicaError as error:
             results.append(
                 SettleResult(
                     position=position,

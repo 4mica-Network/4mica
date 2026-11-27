@@ -1,12 +1,9 @@
-"""Payment guarantees: the payer signs a request, the recipient redeems it for
-a receipt the operator signed, and either side can verify that receipt
-offline. Port of ``sdk-rust/src/client/payment.rs``."""
-
 from __future__ import annotations
 
 import asyncio
 import secrets
-from typing import List, Optional, Union
+from collections.abc import Callable
+from typing import Any
 
 from ..errors import (
     CheckpointMismatchError,
@@ -43,32 +40,41 @@ from ..models import (
     TimestampNotPastCutoffDetails,
     parse_refusal_details,
 )
-from ..utils import ValidationError, normalize_bytes32_hex, parse_address
+from ..utils import U256_MAX, ValidationError, normalize_bytes32_hex, parse_address
 from .ctx import ClientCtx
 from .model import Asset
 
-AssetLike = Union[Asset, str, None]
+AssetLike = Asset | str | None
 
-_U256_MAX = 2**256 - 1
+
+_TIMED_DETAILS = (
+    CycleMismatchDetails,
+    FutureTimestampDetails,
+    StaleTimestampDetails,
+    TimestampNotPastCutoffDetails,
+)
+_REFUSALS: dict[str, tuple[type[Any], Callable[..., RpcError]]] = {
+    "CYCLE_MISMATCH": (CycleMismatchDetails, CycleMismatchError),
+    "FUTURE_TIMESTAMP": (FutureTimestampDetails, FutureTimestampError),
+    "STALE_TIMESTAMP": (StaleTimestampDetails, StaleTimestampError),
+    "TIMESTAMP_NOT_PAST_CUTOFF": (
+        TimestampNotPastCutoffDetails,
+        TimestampNotPastCutoffError,
+    ),
+    "CHECKPOINT_REQUIRED": (CheckpointRequiredDetails, CheckpointRequiredError),
+    "CHECKPOINT_MISMATCH": (CheckpointMismatchDetails, CheckpointMismatchError),
+}
 
 
 class PaymentClient:
     def __init__(self, ctx: ClientCtx) -> None:
         self._ctx = ctx
 
-    # --- payer -----------------------------------------------------------
-
     async def new_payment(
         self, recipient: str, amount: int, asset: AssetLike = None
     ) -> PaymentRequestPayload:
-        """A payment payload for the signer, scoped to the asset's active
-        settlement cycle.
-
-        Stamped by core's clock as last reported, not this machine's, since
-        core refuses a payment stamped later than its own clock. Waits out the
-        rest of the current second when the payer's last checkpoint covers it,
-        since a payment must be stamped strictly after what the checkpoint
-        already accounts for."""
+        """Scoped to *asset*'s active cycle and stamped by core's clock. May
+        wait out the current second when the last checkpoint covers it."""
         asset_address = Asset.coerce(asset).address
         cycle = await self._ctx.active_cycle(asset_address)
         timestamp = max(
@@ -85,43 +91,33 @@ class PaymentClient:
         )
 
     async def sign_request(self, payload: PaymentRequestPayload) -> PaymentRequest:
-        """Signs a payment as the payer. Hand the result to the recipient, who
-        redeems it with :meth:`issue_guarantee`."""
         return await self._ctx.payer_signer.sign_payment_request(
             self._ctx.clearing_house_domain_separator, payload
         )
 
     async def checkpoint_active_cycle(
         self, asset: AssetLike = None
-    ) -> Optional[CheckpointAcceptedResponse]:
-        """Signs and submits a checkpoint covering the payer's outstanding
-        payments in *asset*'s active cycle. ``None`` when there is nothing to
-        cover."""
+    ) -> CheckpointAcceptedResponse | None:
+        """``None`` when there is nothing to cover."""
         asset_address = Asset.coerce(asset).address
         cycle = await self._ctx.active_cycle(asset_address)
         return await self.checkpoint_cycle(asset_address, cycle.id)
 
     async def checkpoint_cycle(
         self, asset: AssetLike, cycle_id: str
-    ) -> Optional[CheckpointAcceptedResponse]:
-        """Signs and submits a checkpoint covering the payer's outstanding
-        payments in *cycle_id* — such as the cycle a ``CHECKPOINT_REQUIRED``
-        refusal names. ``None`` when there is nothing to cover.
-
-        Core's batch is checked before it is signed: every payment must be one
-        the payer signed, in this cycle and asset, past the previous
-        checkpoint, and counted once."""
+    ) -> CheckpointAcceptedResponse | None:
+        """``None`` when there is nothing to cover. Raises
+        UntrustedCheckpointBatchError rather than sign a batch that does not add up."""
         asset_address = Asset.coerce(asset).address
         try:
             return await self._sign_and_submit_checkpoint(asset_address, cycle_id)
         except CheckpointMismatchError:
-            # Only once: a payer paid faster than a round trip would chase the
-            # batch forever.
+            # Only once: a payer paying faster than a round trip would loop forever.
             return await self._sign_and_submit_checkpoint(asset_address, cycle_id)
 
     async def _sign_and_submit_checkpoint(
         self, asset: str, cycle_id: str
-    ) -> Optional[CheckpointAcceptedResponse]:
+    ) -> CheckpointAcceptedResponse | None:
         batch = await self.checkpoint_batch_for_cycle(asset, cycle_id)
         payload = checkpoint_payload(
             self._ctx.signer_address,
@@ -138,8 +134,6 @@ class PaymentClient:
         return await self.submit_checkpoint(signed)
 
     async def _next_payment_timestamp(self, asset: str) -> int:
-        """The timestamp to stamp a payment with, never at or before what a
-        checkpoint already covers."""
         cutoff = self._ctx.payment_cutoff(asset)
         if cutoff is None:
             return self._ctx.core_now()
@@ -150,49 +144,38 @@ class PaymentClient:
                 return now_ms // 1000
             await asyncio.sleep((past_cutoff_ms - now_ms) / 1000)
 
-    # --- recipient -------------------------------------------------------
-
     async def issue_guarantee(self, request: PaymentRequest) -> GuaranteeReceipt:
-        """Redeems a payer's signed request for the operator's guarantee
-        receipt, as the recipient."""
         try:
             return await self._ctx.rpc.issue_guarantee(request)
         except RpcError as exc:
             raise self._classify(exc, request.payload.asset_address) from exc
 
     def verify_guarantee(self, receipt: GuaranteeReceipt) -> Guarantee:
-        """Checks that *receipt* was issued by the operator this client
-        trusts, returning the guarantee it attests. Offline."""
+        """Offline check that the trusted operator issued *receipt*; returns
+        the guarantee it attests."""
         return verify_guarantee_receipt(
             receipt,
             self._ctx.guarantee_domain_separator,
             self._ctx.guarantee_signer,
         )
 
-    async def list_received(self) -> List[RecipientPaymentInfo]:
-        """Payments guaranteed to the signer as a recipient."""
+    async def list_received(self) -> list[RecipientPaymentInfo]:
         return await self._ctx.rpc.list_recipient_payments(self._ctx.signer_address)
 
     async def list_issued(
         self,
         cycle_id: str,
-        limit: Optional[int] = None,
-        after: Optional[str] = None,
+        limit: int | None = None,
+        after: str | None = None,
     ) -> PayerGuaranteesPage:
-        """One page of the guarantees the signer issued, as a payer, in a
-        cycle: whom each pays, for which request, how much, and where it
-        stands. *cycle_id* is the cycle's on-chain bytes32 id, as ``cycle_id``
-        on a position or on :meth:`active_cycle`'s answer. Pass a page's
-        ``next_cursor`` back as *after* for the next."""
+        """*cycle_id* is the on-chain bytes32 id. Pass a page's ``next_cursor``
+        back as *after*."""
         return await self._ctx.rpc.list_payer_guarantees(
             self._ctx.signer_address, cycle_id, limit=limit, after=after
         )
 
-    # --- core's view -----------------------------------------------------
-
     async def active_cycle(self, asset: AssetLike = None) -> ActiveCycleResponse:
-        """The cycle payments for *asset* must be signed for right now, read
-        fresh from core."""
+        """Read fresh from core."""
         cycle = await self._ctx.rpc.get_active_cycle(Asset.coerce(asset).address)
         self._ctx.record_core_time(cycle.server_time)
         return cycle
@@ -200,8 +183,6 @@ class PaymentClient:
     async def checkpoint_batch(
         self, asset: AssetLike = None
     ) -> CheckpointBatchResponse:
-        """The payer's latest checkpoint in *asset*'s active cycle and the
-        payments it does not cover yet."""
         return await self._ctx.rpc.get_checkpoint_batch(
             self._ctx.signer_address, Asset.coerce(asset).address
         )
@@ -209,8 +190,6 @@ class PaymentClient:
     async def checkpoint_batch_for_cycle(
         self, asset: AssetLike, cycle_id: str
     ) -> CheckpointBatchResponse:
-        """The payer's latest checkpoint in *cycle_id* and the payments it does
-        not cover yet."""
         return await self._ctx.rpc.get_checkpoint_batch(
             self._ctx.signer_address, Asset.coerce(asset).address, cycle_id
         )
@@ -218,8 +197,7 @@ class PaymentClient:
     async def submit_checkpoint(
         self, signed: SignedCheckpoint
     ) -> CheckpointAcceptedResponse:
-        """Submits a checkpoint the payer has already signed. Resubmitting one
-        core already accepted succeeds and covers nothing."""
+        """Resubmitting one core already accepted succeeds and covers nothing."""
         asset = signed.payload.asset_address
         try:
             accepted = await self._ctx.rpc.submit_checkpoint(signed)
@@ -229,67 +207,34 @@ class PaymentClient:
         return accepted
 
     def _classify(self, err: RpcError, asset: str) -> RpcError:
-        """Turns core's coded refusals into typed errors, and refreshes what
-        they prove stale. A refusal whose details do not decode stays the
-        plain RPC error."""
-        status = {"status_code": err.status_code, "code": err.code}
         if err.code == "CYCLE_MISMATCH":
             self._ctx.forget_active_cycle(asset)
-            details = parse_refusal_details(CycleMismatchDetails, err.details)
-            if details is None:
-                return err
+        refusal = _REFUSALS.get(err.code or "")
+        if refusal is None:
+            return err
+        details = parse_refusal_details(refusal[0], err.details)
+        if details is None:
+            return err
+        if isinstance(details, _TIMED_DETAILS):
             self._ctx.record_core_time(details.server_time)
-            return CycleMismatchError(details, **status)
-        if err.code == "FUTURE_TIMESTAMP":
-            details = parse_refusal_details(FutureTimestampDetails, err.details)
-            if details is None:
-                return err
-            self._ctx.record_core_time(details.server_time)
-            return FutureTimestampError(details, **status)
-        if err.code == "STALE_TIMESTAMP":
-            details = parse_refusal_details(StaleTimestampDetails, err.details)
-            if details is None:
-                return err
-            self._ctx.record_core_time(details.server_time)
-            return StaleTimestampError(details, **status)
-        if err.code == "TIMESTAMP_NOT_PAST_CUTOFF":
-            details = parse_refusal_details(TimestampNotPastCutoffDetails, err.details)
-            if details is None:
-                return err
-            self._ctx.record_core_time(details.server_time)
-            # A cutoff belongs to the payer it names. Issuance is the
-            # recipient's call, so the refusal often describes someone else,
-            # and holding back this client's own payments for a stranger's
-            # cutoff would be nothing but a delay.
-            if _same_address(details.payer, self._ctx.signer_address):
-                self._ctx.record_payment_cutoff(asset, details.timestamp_cutoff)
-            return TimestampNotPastCutoffError(details, **status)
-        if err.code == "CHECKPOINT_REQUIRED":
-            details = parse_refusal_details(CheckpointRequiredDetails, err.details)
-            if details is None:
-                return err
-            return CheckpointRequiredError(details, **status)
-        if err.code == "CHECKPOINT_MISMATCH":
-            details = parse_refusal_details(CheckpointMismatchDetails, err.details)
-            if details is None:
-                return err
+        if isinstance(details, TimestampNotPastCutoffDetails) and _same_address(
+            details.payer, self._ctx.signer_address
+        ):
+            self._ctx.record_payment_cutoff(asset, details.timestamp_cutoff)
+        status = {"status_code": err.status_code, "code": err.code}
+        if isinstance(details, CheckpointMismatchDetails):
             reason = str(err).split(": ", 1)[-1]
             return CheckpointMismatchError(details, reason, **status)
-        return err
+        return refusal[1](details, **status)
 
 
 def checkpoint_payload(
     payer: str,
     asset: str,
     cycle_id: str,
-    domain_separator: Union[str, bytes],
+    domain_separator: str | bytes,
     batch: CheckpointBatchResponse,
-) -> Optional[CheckpointPayload]:
-    """The checkpoint that covers *batch*, or ``None`` when it covers nothing
-    new. Raises :class:`~fourmica_sdk.errors.UntrustedCheckpointBatchError`
-    rather than sign over a batch that does not add up: an operator that
-    slipped in a payment the payer never signed, or a forged previous total,
-    would inflate what the payer can be charged on default."""
+) -> CheckpointPayload | None:
     if not batch.authorizations:
         return None
 
@@ -318,7 +263,7 @@ def checkpoint_payload(
                 "previous checkpoint is for another payer, cycle or asset"
             )
         digest = _digest_or_untrusted(
-            "previous checkpoint", lambda: previous.signing_digest(domain_separator)
+            "previous checkpoint", previous.signing_digest, domain_separator
         )
         if recover_signer(digest, batch.previous.signature) != payer:
             raise UntrustedCheckpointBatchError(
@@ -341,8 +286,7 @@ def checkpoint_payload(
                 f"authorization {req_id} is for another payer, cycle or asset"
             )
         digest = _digest_or_untrusted(
-            f"authorization {req_id}",
-            lambda: payment.signing_digest(domain_separator),
+            f"authorization {req_id}", payment.signing_digest, domain_separator
         )
         if recover_signer(digest, authorization.signature) != payer:
             raise UntrustedCheckpointBatchError(
@@ -357,7 +301,7 @@ def checkpoint_payload(
         req_ids.add(req_id)
 
         cumulative_gross += payment.amount
-        if cumulative_gross > _U256_MAX:
+        if cumulative_gross > U256_MAX:
             raise InvalidParamsError("cumulative gross overflows")
         timestamp_cutoff = max(timestamp_cutoff, payment.timestamp)
 
@@ -370,9 +314,13 @@ def checkpoint_payload(
     )
 
 
-def _digest_or_untrusted(what: str, digest) -> bytes:
+def _digest_or_untrusted(
+    what: str,
+    digest: Callable[[str | bytes], bytes],
+    domain_separator: str | bytes,
+) -> bytes:
     try:
-        return digest()
+        return digest(domain_separator)
     except (InvalidParamsError, ValidationError, ValueError) as exc:
         raise UntrustedCheckpointBatchError(f"{what}: {exc}") from exc
 

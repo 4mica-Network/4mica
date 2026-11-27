@@ -1,7 +1,3 @@
-"""The facade over a real ``Client``: core is mocked at the HTTP layer and the
-facilitator and chain behind it are stubbed, so every call the facade makes on
-``Client`` is the real one."""
-
 import base64
 import json
 import time
@@ -69,7 +65,6 @@ class Stack:
                         "updated_at": 0,
                     }
                 ),
-                # Core answers null for an asset the user holds nothing in.
                 ("GET", NATIVE_BALANCE_PATH): lambda r: httpx.Response(
                     200, content=b"null"
                 ),
@@ -106,7 +101,6 @@ class Stack:
 
     def facilitator(self, request: httpx.Request) -> httpx.Response:
         self.facilitator_calls.append((request.url.path, json.loads(request.content)))
-        # The facilitator's transaction lands, and core counts it.
         if request.url.path == "/deposit":
             self.total += 5_000_000
         return httpx.Response(200, json={"success": True, "transaction": TX_HASH})
@@ -148,7 +142,6 @@ async def test_reads_a_balance_from_core(stack):
         balance = await client.balance("USDC")
         assert (balance.total, balance.locked, balance.available) == ("2", "0.5", "1.5")
         assert stack.core.count("GET", "/core/tokens") == 1
-        # Native ETH is not held, and the token list is not fetched again.
         assert set(await client.balance()) == {"USDC"}
         assert stack.core.count("GET", "/core/tokens") == 1
 
@@ -239,11 +232,13 @@ async def test_pays_a_402_with_a_payment_signed_by_the_wallet(stack):
         encoded = base64.b64encode(json.dumps(required).encode()).decode()
         return httpx.Response(402, headers={"PAYMENT-REQUIRED": encoded})
 
-    async with httpx.AsyncClient(transport=httpx.MockTransport(seller)) as http:
-        async with await connect(stack, http) as client:
-            response = await client.fetch(URL)
-            assert response.text == "data"
-            assert client.payment_for(response).amount == "0.01"
+    async with (
+        httpx.AsyncClient(transport=httpx.MockTransport(seller)) as http,
+        await connect(stack, http) as client,
+    ):
+        response = await client.fetch(URL)
+        assert response.text == "data"
+        assert client.payment_for(response).amount == "0.01"
 
     (envelope,) = paid
     signed = PaymentRequest.from_rpc(envelope["payload"])

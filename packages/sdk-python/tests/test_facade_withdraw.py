@@ -89,14 +89,13 @@ async def test_lists_pending_requests_with_when_they_become_ready():
     assert waiting.ready is False
     assert waiting.ready_at == datetime.fromtimestamp(now - 60 + GRACE, timezone.utc)
     assert waiting.network == "eip155:84532"
-    # A delisted asset is reported in base units, under its address.
     assert (unknown.amount, unknown.asset.decimals) == ("42", 0)
 
 
 async def test_says_when_an_early_finalize_will_be_possible():
     now = int(time.time())
     client = FakeClient(positions=[position(USDC, 2_500_000, now - 60)])
-    with pytest.raises(GracePeriodNotElapsedError, match="2.5 USDC can be finalized"):
+    with pytest.raises(GracePeriodNotElapsedError, match=r"2\.5 USDC can be finalized"):
         await finalize_withdrawal(fake_session(client), "USDC")
     client.withdraw.finalize.assert_not_called()
 
@@ -117,8 +116,6 @@ async def test_finalizes_once_the_grace_period_has_ended():
 
 
 async def test_a_delisted_asset_is_cancelled_and_finalized_by_its_address():
-    """What `withdrawals()` reports can be acted on: core no longer lists the
-    asset, so its address stands in for it."""
     now = int(time.time())
     delisted = "0x" + "9a" * 20
     client = FakeClient(positions=[position(delisted, 42, now - GRACE - 1)])
@@ -142,7 +139,7 @@ async def test_a_delisted_asset_still_waits_out_the_grace_period():
     now = int(time.time())
     delisted = "0x" + "9a" * 20
     client = FakeClient(positions=[position(delisted, 42, now - 60)])
-    with pytest.raises(GracePeriodNotElapsedError, match="(?i)42 0x9a9a"):
+    with pytest.raises(GracePeriodNotElapsedError, match=r"(?i)42 0x9a9a"):
         await finalize_withdrawal(fake_session(client), delisted)
     client.withdraw.finalize.assert_not_called()
 
@@ -164,6 +161,5 @@ async def test_a_remote_signer_finalizes_without_the_chain_check():
     session = fake_session(client)
     await finalize_withdrawal(session, "USDC")
     assert asked(client.withdraw.finalize) == [(USDC,)]
-    # Listing needs the chain, and says so.
     with pytest.raises(ClientError, match="no local key"):
         await pending_withdrawals(session)

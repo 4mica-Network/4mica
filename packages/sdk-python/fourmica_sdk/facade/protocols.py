@@ -1,12 +1,9 @@
-"""Payment protocols ``FourMica.fetch`` can pay a 402 with. x402 is the only
-one so far."""
-
 from __future__ import annotations
 
 import base64
 import json
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Protocol
+from typing import Any, Protocol
 
 import httpx
 
@@ -16,6 +13,7 @@ from ..networks import resolve_network
 from ..utils import parse_address, parse_u256
 from ..x402 import (
     SCHEME_4MICA_CREDIT,
+    X402_V2,
     PaymentRequirementsExtra,
     PaymentRequirementsV1,
     PaymentRequirementsV2,
@@ -28,9 +26,6 @@ from ..x402 import (
 
 @dataclass(frozen=True)
 class PaymentTerms:
-    """One payment option from a 402, independent of the protocol's wire
-    format."""
-
     protocol: str
     network: str
     """CAIP-2 id."""
@@ -44,18 +39,18 @@ class PaymentTerms:
 class PaymentProtocol(Protocol):
     name: str
 
-    def terms(self, response: httpx.Response) -> List[PaymentTerms]:
+    def terms(self, response: httpx.Response) -> list[PaymentTerms]:
         """Empty when the 402 is not this protocol's."""
         ...
 
     async def pay(
         self, terms: PaymentTerms, client: Client, http: httpx.AsyncClient
-    ) -> Dict[str, str]:
+    ) -> dict[str, str]:
         """Headers to retry with."""
         ...
 
-    def settled(self, response: httpx.Response) -> Optional[bool]:
-        """Whether the seller took the payment; ``None`` when it does not say."""
+    def settled(self, response: httpx.Response) -> bool | None:
+        """``None`` when the response does not say."""
         ...
 
 
@@ -65,8 +60,7 @@ def _decode_json_header(value: str) -> Any:
     return json.loads(base64.b64decode(text + "=" * (-len(text) % 4)))
 
 
-def _read_required(response: httpx.Response) -> Optional[Dict[str, Any]]:
-    """v2 sends requirements in the ``PAYMENT-REQUIRED`` header, v1 in the body."""
+def _read_required(response: httpx.Response) -> dict[str, Any] | None:
     header = response.headers.get("PAYMENT-REQUIRED")
     try:
         raw = _decode_json_header(header) if header else json.loads(response.text)
@@ -75,10 +69,9 @@ def _read_required(response: httpx.Response) -> Optional[Dict[str, Any]]:
     return raw if isinstance(raw, dict) else None
 
 
-def _requirements_of(version: int, entry: Dict[str, Any]) -> Requirements:
-    if version == 2:
+def _requirements_of(version: int, entry: dict[str, Any]) -> Requirements:
+    if version == X402_V2:
         return PaymentRequirementsV2.from_raw(entry)
-    # The SDK's own paywall answers v1 with v2-shaped (``amount``) entries.
     return PaymentRequirementsV1.from_raw(
         {
             **entry,
@@ -87,8 +80,7 @@ def _requirements_of(version: int, entry: Dict[str, Any]) -> Requirements:
     )
 
 
-def _version(required: Dict[str, Any]) -> Optional[int]:
-    """1 or 2, as a number or its string; ``None`` for anything else."""
+def _version(required: dict[str, Any]) -> int | None:
     raw = required.get("x402Version")
     if isinstance(raw, str) and raw.strip() in ("1", "2"):
         return int(raw)
@@ -98,12 +90,8 @@ def _version(required: Dict[str, Any]) -> Optional[int]:
 
 
 def _signable(
-    version: int, required: Dict[str, Any], requirements: Requirements
-) -> Optional[X402PaymentRequired]:
-    """Checks everything ``pay`` needs beyond the amount, so an option it
-    could not sign is skipped while reading the 402. For v2, the challenge
-    cut down to this one option: a malformed sibling must not stop it being
-    signed."""
+    required: dict[str, Any], requirements: Requirements
+) -> X402PaymentRequired | None:
     parse_address(requirements.pay_to, "payTo")
     parse_address(requirements.asset, "asset")
     PaymentRequirementsExtra.from_raw(requirements.extra)
@@ -113,8 +101,7 @@ def _signable(
     extensions = required.get("extensions")
     return X402PaymentRequired(
         x402_version=2,
-        # Signed with an empty one when the seller names none, as both x402
-        # packages' own buyers do.
+        # Empty when the seller names none, as both x402 packages' buyers do.
         resource=X402ResourceInfo.from_raw(resource)
         if isinstance(resource, dict) and resource.get("url")
         else X402ResourceInfo(url=""),
@@ -126,21 +113,20 @@ def _signable(
 class X402Protocol:
     name = "x402"
 
-    def terms(self, response: httpx.Response) -> List[PaymentTerms]:
+    def terms(self, response: httpx.Response) -> list[PaymentTerms]:
         required = _read_required(response)
         version = _version(required) if required else None
         if required is None or version is None:
             return []
         accepts = required.get("accepts")
 
-        terms: List[PaymentTerms] = []
+        terms: list[PaymentTerms] = []
         for entry in accepts if isinstance(accepts, list) else []:
             if (
                 not isinstance(entry, dict)
                 or entry.get("scheme") != SCHEME_4MICA_CREDIT
             ):
                 continue
-            # A malformed option is skipped, not fatal: a sibling may be fine.
             try:
                 requirements = _requirements_of(version, entry)
                 resolved = resolve_network(requirements.network)
@@ -152,7 +138,7 @@ class X402Protocol:
                         amount=parse_u256(requirements.amount),
                         pay_to=requirements.pay_to.strip(),
                         offer=(
-                            _signable(version, required, requirements),
+                            _signable(required, requirements),
                             requirements,
                         ),
                     )
@@ -163,7 +149,7 @@ class X402Protocol:
 
     async def pay(
         self, terms: PaymentTerms, client: Client, http: httpx.AsyncClient
-    ) -> Dict[str, str]:
+    ) -> dict[str, str]:
         payment_required, requirements = terms.offer
         flow = X402Flow(client, http)
         if payment_required is not None:
@@ -172,8 +158,7 @@ class X402Protocol:
         signed = await flow.sign_payment(requirements)
         return {"X-PAYMENT": signed.header}
 
-    def settled(self, response: httpx.Response) -> Optional[bool]:
-        """v2 answers in ``PAYMENT-RESPONSE``, v1 in ``X-PAYMENT-RESPONSE``."""
+    def settled(self, response: httpx.Response) -> bool | None:
         header = response.headers.get("PAYMENT-RESPONSE") or response.headers.get(
             "X-PAYMENT-RESPONSE"
         )
@@ -186,4 +171,4 @@ class X402Protocol:
         return raw.get("success") is True if isinstance(raw, dict) else None
 
 
-PROTOCOLS: Dict[str, PaymentProtocol] = {"x402": X402Protocol()}
+PROTOCOLS: dict[str, PaymentProtocol] = {"x402": X402Protocol()}

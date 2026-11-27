@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, List, Optional, Tuple, cast
+from http import HTTPStatus
+from typing import Any, cast
 
 import httpx
 
@@ -21,26 +22,24 @@ DEFAULT_APP_BASE_URL = "https://api.app.4mica.io"
 
 
 class AppError(FourMicaError):
-    """The app API refused a request, or could not be reached. ``status`` is
-    the HTTP status, ``code`` the API's error code, ``issues`` what failed
-    validation, and ``body`` the answer as it came."""
+    """The app API refused a request, or could not be reached."""
 
     def __init__(
         self,
         message: str,
-        status: Optional[int] = None,
-        code: Optional[str] = None,
-        issues: Optional[List[AppIssue]] = None,
+        status: int | None = None,
+        code: str | None = None,
+        issues: list[AppIssue] | None = None,
         body: Any = None,
     ) -> None:
         super().__init__(message)
         self.status = status
         self.code = code
-        self.issues: List[AppIssue] = issues or []
+        self.issues: list[AppIssue] = issues or []
         self.body = body
 
 
-def _issues(value: Any) -> List[AppIssue]:
+def _issues(value: Any) -> list[AppIssue]:
     if not isinstance(value, list):
         return []
     return [
@@ -52,21 +51,20 @@ def _issues(value: Any) -> List[AppIssue]:
     ]
 
 
-def _without_none(fields: Dict[str, Any]) -> Dict[str, Any]:
+def _without_none(fields: dict[str, Any]) -> dict[str, Any]:
     return {key: value for key, value in fields.items() if value is not None}
 
 
 class AppClient:
-    """A seller's client for the 4Mica app API, authenticated by the API key
-    of one listing or agent. Pass *http_client* to send through your own; it
-    stays yours to close."""
+    """Authenticated by one listing's or agent's API key. A passed
+    *http_client* stays yours to close."""
 
     def __init__(
         self,
         api_key: str,
         *,
         base_url: str = DEFAULT_APP_BASE_URL,
-        http_client: Optional[httpx.AsyncClient] = None,
+        http_client: httpx.AsyncClient | None = None,
     ) -> None:
         key = (api_key or "").strip()
         if not key:
@@ -80,14 +78,14 @@ class AppClient:
         if self._owns_http:
             await self._http.aclose()
 
-    async def __aenter__(self) -> "AppClient":
+    async def __aenter__(self) -> AppClient:
         return self
 
     async def __aexit__(self, *_: Any) -> None:
         await self.aclose()
 
     async def resource(self) -> ResourceContext:
-        """The listing or agent the API key belongs to, with its policy and FAQs."""
+        """The listing or agent the API key belongs to."""
         _, body = await self._request("GET", "/v1/resource")
         return cast(ResourceContext, body)
 
@@ -97,11 +95,10 @@ class AppClient:
         payer_address: str,
         network: str,
         amount: str,
-        coupon_code: Optional[str] = None,
+        coupon_code: str | None = None,
     ) -> CustomerResolution:
         """Whether *payer_address* may pay *amount*, and what it pays after
-        quotas, coupons, discounts and credit. *network* takes any form of
-        the network's name."""
+        quotas, coupons, discounts and credit. *network* takes any form of its name."""
         _, body = await self._request(
             "POST",
             "/v1/customers/resolve",
@@ -124,23 +121,22 @@ class AppClient:
         recipient_address: str,
         network: str,
         amount: str,
-        asset_address: Optional[str] = None,
-        status: Optional[AppPaymentStatus] = None,
-        failure_reason: Optional[str] = None,
-        listing_slug: Optional[str] = None,
-        agent_slug: Optional[str] = None,
-        resource: Optional[str] = None,
-        description: Optional[str] = None,
-        guarantee_claims: Optional[str] = None,
-        guarantee_signature: Optional[str] = None,
-        tx_hash: Optional[str] = None,
-        settled_at: Optional[str] = None,
-        coupon_code: Optional[str] = None,
-        credit_applied: Optional[str] = None,
+        asset_address: str | None = None,
+        status: AppPaymentStatus | None = None,
+        failure_reason: str | None = None,
+        listing_slug: str | None = None,
+        agent_slug: str | None = None,
+        resource: str | None = None,
+        description: str | None = None,
+        guarantee_claims: str | None = None,
+        guarantee_signature: str | None = None,
+        tx_hash: str | None = None,
+        settled_at: str | None = None,
+        coupon_code: str | None = None,
+        credit_applied: str | None = None,
     ) -> ReportedPayment:
-        """Records a payment the seller took. Reporting the same *req_id*
-        again returns the payment already recorded, with ``created`` false.
-        :func:`parse_settlement` reads most of these off an x402 settlement."""
+        """Idempotent per *req_id*: a repeat returns the payment already
+        recorded, with ``created`` false."""
         code, body = await self._request(
             "POST",
             "/v1/payments",
@@ -167,11 +163,13 @@ class AppClient:
                 }
             ),
         )
-        return ReportedPayment(payment=cast(AppPayment, body), created=code == 201)
+        return ReportedPayment(
+            payment=cast(AppPayment, body), created=code == HTTPStatus.CREATED
+        )
 
     async def _request(
-        self, method: str, path: str, payload: Optional[Dict[str, Any]] = None
-    ) -> Tuple[int, Any]:
+        self, method: str, path: str, payload: dict[str, Any] | None = None
+    ) -> tuple[int, Any]:
         headers = {
             "authorization": f"Bearer {self._api_key}",
             SDK_CLIENT_HEADER: SDK_CLIENT,
