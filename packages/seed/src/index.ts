@@ -447,6 +447,21 @@ const TEAM_GOVERNANCE = {
   governedActions: ["spending_policy.change", "api_key.create_production"],
 } as const;
 
+const TEAM_ENTERPRISE = {
+  domain: "labs.4mica.example",
+  verificationToken: "seed-labs-domain-verification",
+  customRole: {
+    name: "Auditor",
+    description: "Reads payments, finance and compliance; changes nothing.",
+    permissions: [
+      "resources.read",
+      "payments.read",
+      "finance.read",
+      "compliance.read",
+    ],
+  },
+} as const;
+
 const TEAM_APPROVAL = {
   id: "019a0000-5eed-7000-8000-00000000a001",
   action: "spending_policy.change",
@@ -1417,6 +1432,52 @@ const seed = async (): Promise<void> => {
     where: { id: TEAM_APPROVAL.id },
     update: approvalFields,
     create: { id: TEAM_APPROVAL.id, ...approvalFields },
+  });
+
+  await prisma.organizationDomain.upsert({
+    where: {
+      organizationId_domain: {
+        organizationId: team.id,
+        domain: TEAM_ENTERPRISE.domain,
+      },
+    },
+    update: { verifiedAt: new Date(), autoJoin: false },
+    create: {
+      organizationId: team.id,
+      domain: TEAM_ENTERPRISE.domain,
+      verificationToken: TEAM_ENTERPRISE.verificationToken,
+      verifiedAt: new Date(),
+      createdById: owner.id,
+    },
+  });
+
+  await prisma.customRole.upsert({
+    where: {
+      organizationId_name: {
+        organizationId: team.id,
+        name: TEAM_ENTERPRISE.customRole.name,
+      },
+    },
+    update: {
+      description: TEAM_ENTERPRISE.customRole.description,
+      permissions: [...TEAM_ENTERPRISE.customRole.permissions],
+      projectRole: "VIEWER",
+      deletedAt: null,
+    },
+    create: {
+      organizationId: team.id,
+      name: TEAM_ENTERPRISE.customRole.name,
+      description: TEAM_ENTERPRISE.customRole.description,
+      permissions: [...TEAM_ENTERPRISE.customRole.permissions],
+      projectRole: "VIEWER",
+      createdById: owner.id,
+    },
+  });
+
+  await prisma.securitySettings.upsert({
+    where: { organizationId: team.id },
+    update: { reauthWindowMinutes: 15 },
+    create: { organizationId: team.id, reauthWindowMinutes: 15 },
   });
 
   await prisma.approvalDecision.deleteMany({
