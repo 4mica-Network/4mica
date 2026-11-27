@@ -1,7 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { PublicAgent } from "@/schema/agent";
 import type { PublicApiListing } from "@/schema/api-listing";
 import { agentGaps, listingGaps } from "./payable";
+
+vi.mock("server-only", () => ({}));
+
+const { PAYABLE_AGENT, PAYABLE_LISTING } = await import("@/services/payable");
 
 const listing = (over: Partial<PublicApiListing> = {}): PublicApiListing => ({
   id: "listing-1",
@@ -83,5 +87,28 @@ describe("agentGaps", () => {
         agent({ priceAmount: null, endpointUrl: null, payToAddress: null }),
       ),
     ).toEqual(["wallet", "endpoint", "price"]);
+  });
+});
+
+const nullableFields = <T extends object>(row: T): (keyof T & string)[] =>
+  (Object.keys(row) as (keyof T & string)[]).filter(
+    (key) => row[key] !== null && typeof row[key] !== "object",
+  );
+
+describe("the database filter matches the in-memory rule", () => {
+  it.each(
+    nullableFields(listing()),
+  )("listing.%s is required by both or by neither", (field) => {
+    const blanked = listing({ [field]: null } as Partial<PublicApiListing>);
+
+    expect(listingGaps(blanked).length > 0).toBe(field in PAYABLE_LISTING);
+  });
+
+  it.each(
+    nullableFields(agent()),
+  )("agent.%s is required by both or by neither", (field) => {
+    const blanked = agent({ [field]: null } as Partial<PublicAgent>);
+
+    expect(agentGaps(blanked).length > 0).toBe(field in PAYABLE_AGENT);
   });
 });
