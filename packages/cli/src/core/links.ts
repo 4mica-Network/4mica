@@ -11,6 +11,8 @@
  */
 export const DASHBOARD_URL = "https://app.4mica.io";
 
+export const API_URL = "https://api.app.4mica.io";
+
 export const DOCS_URL = "https://docs.4mica.io";
 
 /** The CLI's own page in the docs. */

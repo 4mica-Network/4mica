@@ -1230,3 +1230,98 @@ export const configResponseSchema = {
     supportPriorities: strList,
   },
 } as const;
+
+const cliScopes = { type: "array", items: str } as const;
+
+export const cliSessionResponseSchema = {
+  type: "object",
+  required: ["id", "kind", "name", "scopes", "expiresAt", "createdAt"],
+  properties: {
+    id: str,
+    kind: { type: "string", enum: ["DEVICE", "TOKEN"] },
+    name: str,
+    prefix: str,
+    last4: str,
+    scopes: cliScopes,
+    lastUsedAt: nullDate,
+    expiresAt: date,
+    createdAt: date,
+  },
+} as const;
+
+export const createdCliTokenResponseSchema = {
+  type: "object",
+  required: ["session", "plaintext"],
+  properties: {
+    session: cliSessionResponseSchema,
+    plaintext: str,
+  },
+} as const;
+
+export const cliDeviceCodeResponseSchema = {
+  type: "object",
+  required: [
+    "device_code",
+    "user_code",
+    "verification_uri",
+    "verification_uri_complete",
+    "expires_in",
+    "interval",
+  ],
+  properties: {
+    device_code: str,
+    user_code: str,
+    verification_uri: str,
+    verification_uri_complete: str,
+    expires_in: int,
+    interval: int,
+  },
+} as const;
+
+export const cliDeviceTokenResponseSchema = {
+  type: "object",
+  required: ["access_token", "token_type", "expires_in", "scope"],
+  properties: {
+    access_token: str,
+    token_type: str,
+    expires_in: int,
+    scope: str,
+  },
+} as const;
+
+export const cliDeviceRequestResponseSchema = {
+  type: "object",
+  required: ["userCode", "clientName", "scopes", "createdAt", "expiresAt"],
+  properties: {
+    userCode: str,
+    clientName: str,
+    scopes: cliScopes,
+    requestIp: nullStr,
+    createdAt: date,
+    expiresAt: date,
+  },
+} as const;
+
+export const cliCurrentSessionResponseSchema = {
+  type: "object",
+  required: ["user", "session"],
+  properties: {
+    user: {
+      type: "object",
+      required: ["id"],
+      properties: { id: str, email: nullStr, name: str, username: nullStr },
+    },
+    session: {
+      type: "object",
+      required: ["id", "kind", "name", "scopes", "expiresAt", "createdAt"],
+      properties: {
+        id: str,
+        kind: { type: "string", enum: ["DEVICE", "TOKEN"] },
+        name: str,
+        scopes: cliScopes,
+        expiresAt: date,
+        createdAt: date,
+      },
+    },
+  },
+} as const;

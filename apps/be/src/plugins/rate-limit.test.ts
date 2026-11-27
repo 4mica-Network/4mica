@@ -78,7 +78,7 @@ const loadApp = async (limits: Record<string, string>) => {
     { initApp },
     { healthRoutes },
     { guards },
-    { apiKeyRateLimit, sensitiveRateLimit },
+    { apiKeyRateLimit, publicSensitiveRateLimit, sensitiveRateLimit },
     { authenticateApiKey },
   ] = await Promise.all([
     import("@/server"),
@@ -107,6 +107,11 @@ const loadApp = async (limits: Record<string, string>) => {
         onRequest: base.onRequest,
         preHandler: [...base.preHandler, sensitiveRateLimit(app)],
       },
+      async () => ({ ok: true }),
+    );
+    app.post(
+      "/public-sensitive",
+      { preHandler: [publicSensitiveRateLimit(app)] },
       async () => ({ ok: true }),
     );
     app.post(
@@ -253,6 +258,20 @@ describe("rate limiting", () => {
     await app.close();
   });
 
+  it("holds a public sensitive route to the sensitive budget, by IP", async () => {
+    const app = await loadApp({ ip: "50", sensitive: "2" });
+
+    const from = (remoteAddress: string) =>
+      app.inject({ method: "POST", url: "/public-sensitive", remoteAddress });
+
+    expect((await from("203.0.113.1")).statusCode).toBe(200);
+    expect((await from("203.0.113.1")).statusCode).toBe(200);
+    expect((await from("203.0.113.1")).statusCode).toBe(429);
+    expect((await from("203.0.113.2")).statusCode).toBe(200);
+
+    await app.close();
+  });
+
   it("shares one sensitive budget across every sensitive route", async () => {
     const app = await loadApp({ user: "50", sensitive: "1" });
 
@@ -347,5 +366,32 @@ describe("rate limiting", () => {
     const { config } = await import("@config/index");
 
     expect(config.rateLimit.enabled).toBe(false);
+  });
+});
+
+describe("the per-user budget key", () => {
+  it("is the account, whichever credential the request carries", async () => {
+    const { userKey } = await import("./rate-limit");
+    const account = { clerkUserId: "user_a" };
+    const byCli = (sessionId: string) =>
+      userKey({
+        auth: null,
+        user: account,
+        cliSession: { id: sessionId },
+        ip: "203.0.113.1",
+      } as never);
+
+    expect(byCli("cli_1")).toBe("user_a");
+    expect(byCli("cli_2")).toBe("user_a");
+    expect(
+      userKey({
+        auth: { clerkUserId: "user_a" },
+        user: account,
+        ip: "203.0.113.9",
+      } as never),
+    ).toBe("user_a");
+    expect(
+      userKey({ auth: null, user: null, ip: "203.0.113.1" } as never),
+    ).toBe("203.0.113.1");
   });
 });

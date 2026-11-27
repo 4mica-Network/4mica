@@ -2,15 +2,22 @@ import { describe, expect, it } from "vitest";
 import {
   createApiKey,
   createApiKeySucceeded,
+  createCliTokenSucceeded,
   deleteApiKeySucceeded,
   developerActionFailed,
+  fetchCliSessionsFailed,
+  fetchCliSessionsPending,
+  fetchCliSessionsSucceeded,
+  fetchDeveloperSucceeded,
   revokeApiKey,
   revokeApiKeySucceeded,
+  revokeCliSession,
+  revokeCliSessionSucceeded,
   updateWebhook,
   updateWebhookSucceeded,
 } from "./actions";
 import reducer, { INITIAL_STATE } from "./reducer";
-import type { ApiKey, DeveloperState, Webhook } from "./type";
+import type { ApiKey, CliSession, DeveloperState, Webhook } from "./type";
 
 const key = (over: Partial<ApiKey> = {}): ApiKey => ({
   id: "key_1",
@@ -127,5 +134,106 @@ describe("developer reducer", () => {
     expect(state.pending).toEqual({});
     expect(state.error).toBe("bad url");
     expect(state.validationIssues).toEqual({ url: "must be https" });
+  });
+});
+
+const cliSession = (over: Partial<CliSession> = {}): CliSession => ({
+  id: "cli_1",
+  kind: "DEVICE",
+  name: "ada-laptop",
+  prefix: "4mica_cli_ab12",
+  last4: "wxyz",
+  scopes: ["account:read"],
+  lastUsedAt: null,
+  expiresAt: "2026-11-05T00:00:00.000Z",
+  createdAt: "2026-08-05T00:00:00.000Z",
+  ...over,
+});
+
+describe("cli sessions", () => {
+  it("puts a new token first in the list", () => {
+    const state = reducer(
+      { ...INITIAL_STATE, cliSessions: [cliSession()] },
+      createCliTokenSucceeded(cliSession({ id: "cli_2", kind: "TOKEN" }), {
+        pendingKey: "createCliToken",
+      }),
+    );
+
+    expect(state.cliSessions.map((session) => session.id)).toEqual([
+      "cli_2",
+      "cli_1",
+    ]);
+  });
+
+  it("drops a revoked session, and only that one", () => {
+    const requested = revokeCliSession({ id: "cli_1" });
+    const pending = reducer(
+      {
+        ...INITIAL_STATE,
+        cliSessions: [cliSession(), cliSession({ id: "cli_2" })],
+      },
+      requested,
+    );
+    expect(pending.pending["cliSession:cli_1"]).toBe(true);
+
+    const state = reducer(
+      pending,
+      revokeCliSessionSucceeded("cli_1", requested.meta),
+    );
+
+    expect(state.cliSessions.map((session) => session.id)).toEqual(["cli_2"]);
+    expect(state.pending["cliSession:cli_1"]).toBeUndefined();
+  });
+
+  it("fails on its own, leaving keys and webhooks loaded", () => {
+    const loaded = reducer(
+      INITIAL_STATE,
+      fetchDeveloperSucceeded({
+        apiKeys: [key()],
+        webhooks: [hook()],
+        events: [],
+      }),
+    );
+    const state = reducer(
+      reducer(loaded, fetchCliSessionsPending()),
+      fetchCliSessionsFailed("CLI sessions are unavailable"),
+    );
+
+    expect(state.hasLoaded).toBe(true);
+    expect(state.error).toBeNull();
+    expect(state.apiKeys).toHaveLength(1);
+    expect(state.webhooks).toHaveLength(1);
+    expect(state.cliSessionsError).toBe("CLI sessions are unavailable");
+    expect(state.cliSessionsLoaded).toBe(false);
+  });
+
+  it("drops a list fetched before a revoke, so the session stays gone", () => {
+    const listed = reducer(
+      INITIAL_STATE,
+      fetchCliSessionsSucceeded([cliSession(), cliSession({ id: "cli_2" })], 0),
+    );
+    const requested = revokeCliSession({ id: "cli_1" });
+    const revoked = reducer(
+      listed,
+      revokeCliSessionSucceeded("cli_1", requested.meta),
+    );
+    const stale = reducer(
+      revoked,
+      fetchCliSessionsSucceeded([cliSession(), cliSession({ id: "cli_2" })], 0),
+    );
+
+    expect(stale.cliSessions.map((session) => session.id)).toEqual(["cli_2"]);
+  });
+
+  it("drops a list fetched before a token was made, so it stays listed", () => {
+    const made = reducer(
+      INITIAL_STATE,
+      createCliTokenSucceeded(cliSession({ id: "cli_new" }), {
+        pendingKey: "createCliToken",
+      }),
+    );
+    const stale = reducer(made, fetchCliSessionsSucceeded([], 0));
+
+    expect(stale.cliSessions.map((session) => session.id)).toEqual(["cli_new"]);
   });
 });

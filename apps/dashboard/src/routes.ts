@@ -35,6 +35,9 @@ const Apis = lazyPage("pages/apis", () =>
 const BusinessSettings = lazyPage("pages/business", () =>
   import("@/pages/business").then((page) => page.BusinessSettings),
 );
+const CliAuthorize = lazyPage("pages/cli-authorize", () =>
+  import("@/pages/cli-authorize").then((page) => page.CliAuthorize),
+);
 const ComplianceSettings = lazyPage("pages/compliance", () =>
   import("@/pages/compliance").then((page) => page.ComplianceSettings),
 );
@@ -102,6 +105,10 @@ export const APP_PAGES: RouteMeta[] = [
   { path: "apis/:id", component: ApiDetail },
   { path: "help", component: Help },
   { path: "help/requests/:id", component: HelpRequestDetail },
+];
+
+export const STANDALONE_PAGES: RouteMeta[] = [
+  { path: "cli/authorize", component: CliAuthorize },
 ];
 
 export interface SettingsRouteMeta {

@@ -1,11 +1,26 @@
 import type { RootState } from "@stores/index";
-import type { ApiKey, DeveloperState, Webhook, WebhookEvent } from "./type";
+import type {
+  ApiKey,
+  CliSession,
+  DeveloperState,
+  Webhook,
+  WebhookEvent,
+} from "./type";
 
 export const selectDeveloper = (state: RootState): DeveloperState =>
   state.developer;
 
 export const selectApiKeys = (state: RootState): ApiKey[] =>
   state.developer.apiKeys;
+
+export const selectCliSessions = (state: RootState): CliSession[] =>
+  state.developer.cliSessions;
+
+export const selectCliSessionsState = (state: RootState) => ({
+  isLoading: state.developer.cliSessionsLoading,
+  hasLoaded: state.developer.cliSessionsLoaded,
+  error: state.developer.cliSessionsError,
+});
 
 export const selectWebhooks = (state: RootState): Webhook[] =>
   state.developer.webhooks;

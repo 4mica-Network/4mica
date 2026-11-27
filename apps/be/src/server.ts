@@ -167,6 +167,10 @@ export const initApp = async (
             description: "Counterparties that spend through this account",
           },
           {
+            name: "cli",
+            description: "Signing the 4mica CLI in to an account",
+          },
+          {
             name: "support",
             description: "Help requests the account has opened with 4Mica",
           },
@@ -177,6 +181,13 @@ export const initApp = async (
               type: "http",
               scheme: "bearer",
               bearerFormat: "JWT",
+            },
+            cliTokenAuth: {
+              type: "http",
+              scheme: "bearer",
+              bearerFormat: "4mica_cli_…",
+              description:
+                "A token held by the 4mica CLI, from `4mica auth login` or Settings → Developer.",
             },
             apiKeyAuth: {
               type: "http",

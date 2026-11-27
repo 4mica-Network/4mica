@@ -73,12 +73,19 @@ const PUBLIC = new Set([
   "GET /verify-email",
   "GET /unsubscribe",
   "POST /unsubscribe",
+  "POST /v1/cli/device/code",
+  "POST /v1/cli/device/token",
 ]);
 
 const API_KEY_ROUTES = new Set([
   "POST /v1/payments",
   "POST /v1/customers/resolve",
   "GET /v1/resource",
+]);
+
+const CLI_TOKEN_ROUTES = new Set([
+  "GET /v1/cli/session",
+  "DELETE /v1/cli/session",
 ]);
 
 const ID = "019fce62-0000-7000-8000-00000000beef";
@@ -160,7 +167,9 @@ beforeAll(async () => {
 
 const protectedRoutes = () => routes.filter((r) => !PUBLIC.has(keyOf(r)));
 const sessionRoutes = () =>
-  protectedRoutes().filter((r) => !API_KEY_ROUTES.has(keyOf(r)));
+  protectedRoutes().filter(
+    (r) => !API_KEY_ROUTES.has(keyOf(r)) && !CLI_TOKEN_ROUTES.has(keyOf(r)),
+  );
 
 describe("route inventory", () => {
   it("registers every route the audit expects, and no surprises", () => {
@@ -169,7 +178,11 @@ describe("route inventory", () => {
     expect(keys.length).toBeGreaterThanOrEqual(80);
     expect(new Set(keys).size).toBe(keys.length);
 
-    for (const expected of [...PUBLIC, ...API_KEY_ROUTES]) {
+    for (const expected of [
+      ...PUBLIC,
+      ...API_KEY_ROUTES,
+      ...CLI_TOKEN_ROUTES,
+    ]) {
       expect(keys).toContain(expected);
     }
     expect(
@@ -261,6 +274,43 @@ describe("authentication matrix", () => {
       });
       expect(statusCode, keyOf(route)).toBe(401);
     }
+  });
+
+  it("does not accept a valid Clerk session on CLI-token routes", async () => {
+    authenticateRequest.mockResolvedValue(signedIn());
+
+    for (const route of routes.filter((r) => CLI_TOKEN_ROUTES.has(keyOf(r)))) {
+      const { statusCode } = await inject(route, {
+        authorization: "Bearer a-valid-session-token",
+      });
+      expect(statusCode, keyOf(route)).toBe(401);
+    }
+    expect([...touched]).toEqual([]);
+  });
+
+  it("looks a CLI token up only on the routes that opted in", async () => {
+    authenticateRequest.mockResolvedValue(signedOut("token-invalid"));
+    const lookedUp: string[] = [];
+
+    for (const route of protectedRoutes()) {
+      touched.clear();
+      const { statusCode } = await inject(route, {
+        authorization: "Bearer 4mica_cli_not-a-real-token",
+      });
+      expect(statusCode, keyOf(route)).toBe(401);
+      if (touched.has("cliSession")) {
+        lookedUp.push(keyOf(route));
+      }
+    }
+
+    expect(lookedUp.sort()).toEqual([
+      "DELETE /me/wallets/:id",
+      "DELETE /v1/cli/session",
+      "GET /me/wallets",
+      "GET /v1/cli/session",
+      "POST /me/wallets",
+      "POST /me/wallets/siwe-nonce",
+    ]);
   });
 
   it("lets a disabled account reach no data on any session route", async () => {

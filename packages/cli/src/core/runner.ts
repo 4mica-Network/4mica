@@ -68,8 +68,15 @@ export async function openBrowser(url: string): Promise<void> {
       : process.platform === "win32"
         ? ["cmd", ["/c", "start", '""', url]]
         : ["xdg-open", [url]];
+  // Not awaited: with no desktop session, xdg-open runs $BROWSER in the
+  // foreground and returns only when the browser closes, which would stall
+  // `auth login` until its code had expired.
   try {
-    await execa(cmd, args, { stdio: "ignore", detached: true });
+    const child = execa(cmd, args, { stdio: "ignore", detached: true });
+    child.catch(() => {
+      // headless / no browser — ignore.
+    });
+    child.unref();
   } catch {
     // headless / no browser — ignore.
   }

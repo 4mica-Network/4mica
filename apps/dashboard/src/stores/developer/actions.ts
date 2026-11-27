@@ -2,6 +2,8 @@ import type { PendingMeta } from "@stores/utils";
 import actionTypes from "./actionTypes";
 import type {
   ApiKey,
+  CliSession,
+  NewCliToken,
   RevealSecret,
   Webhook,
   WebhookEvent,
@@ -11,6 +13,7 @@ import type {
 export const developerPendingKeys = {
   apiKey: (id: string) => `apiKey:${id}`,
   webhook: (id: string) => `webhook:${id}`,
+  cliSession: (id: string) => `cliSession:${id}`,
 } as const;
 
 export const fetchDeveloper = () => ({
@@ -160,6 +163,58 @@ export const deleteWebhook = (payload: { id: string }) => ({
 
 export const deleteWebhookSucceeded = (id: string, meta: PendingMeta) => ({
   type: actionTypes.DELETE_WEBHOOK_SUCCEEDED,
+  payload: { id },
+  meta,
+});
+
+export const fetchCliSessions = () => ({
+  type: actionTypes.FETCH_CLI_SESSIONS_REQUESTED,
+});
+
+export const fetchCliSessionsPending = () => ({
+  type: actionTypes.FETCH_CLI_SESSIONS_PENDING,
+});
+
+export const fetchCliSessionsSucceeded = (
+  sessions: CliSession[],
+  version: number,
+) => ({
+  type: actionTypes.FETCH_CLI_SESSIONS_SUCCEEDED,
+  payload: { sessions, version },
+});
+
+export const fetchCliSessionsFailed = (message: string) => ({
+  type: actionTypes.FETCH_CLI_SESSIONS_FAILED,
+  payload: { message },
+});
+
+export const createCliToken = (
+  payload: NewCliToken,
+  onReveal?: RevealSecret,
+) => ({
+  type: actionTypes.CREATE_CLI_TOKEN_REQUESTED,
+  payload,
+  meta: { pendingKey: "createCliToken" },
+  onReveal,
+});
+
+export const createCliTokenSucceeded = (
+  session: CliSession,
+  meta: PendingMeta,
+) => ({
+  type: actionTypes.CREATE_CLI_TOKEN_SUCCEEDED,
+  payload: { session },
+  meta,
+});
+
+export const revokeCliSession = (payload: { id: string }) => ({
+  type: actionTypes.REVOKE_CLI_SESSION_REQUESTED,
+  payload,
+  meta: { pendingKey: developerPendingKeys.cliSession(payload.id) },
+});
+
+export const revokeCliSessionSucceeded = (id: string, meta: PendingMeta) => ({
+  type: actionTypes.REVOKE_CLI_SESSION_SUCCEEDED,
   payload: { id },
   meta,
 });
