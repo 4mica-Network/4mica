@@ -436,9 +436,101 @@ const TEAM_LISTINGS = [
 
 const DEV_INVITATION = {
   email: "invitee@example.com",
-  role: "MEMBER",
+  role: "DEVELOPER",
   token: "4mica-labs-dev-invitation",
 } as const;
+
+const RESEARCH_PROJECT = {
+  slug: "research",
+  name: "Research",
+  description: "Experiments the wider team should not see yet.",
+  restricted: true,
+  viewer: 0,
+} as const;
+
+const SERVICE_ACCOUNT = {
+  name: "Payments reporter",
+  description: "Reports settled payments from the billing worker.",
+} as const;
+
+const SERVICE_ACCOUNT_KEY = {
+  name: "Billing worker (sandbox)",
+  namespace: "4mica_sk_test",
+  body: "seedPaymentsReporterDevKey0001",
+  scopes: ["PAYMENTS_WRITE"],
+} as const;
+
+const SERVICE_ACCOUNT_SECRET = `${SERVICE_ACCOUNT_KEY.namespace}_${SERVICE_ACCOUNT_KEY.body}`;
+
+type EnvironmentKind = "SANDBOX" | "PRODUCTION";
+
+interface SeededProject {
+  id: string;
+  environments: Record<EnvironmentKind, string>;
+}
+
+const environmentFor = (network: string | null): EnvironmentKind =>
+  network === "BASE" ? "PRODUCTION" : "SANDBOX";
+
+const scopeFor = (project: SeededProject, network: string | null) => ({
+  projectId: project.id,
+  environmentId: project.environments[environmentFor(network)],
+});
+
+const ensureProject = async (
+  organizationId: string,
+  fields: {
+    slug: string;
+    name: string;
+    description?: string | null;
+    isDefault: boolean;
+    restricted?: boolean;
+  },
+): Promise<SeededProject> => {
+  const data = {
+    name: fields.name,
+    ...(fields.description !== undefined
+      ? { description: fields.description }
+      : {}),
+    isDefault: fields.isDefault,
+    restricted: fields.restricted ?? false,
+    archivedAt: null,
+    deletedAt: null,
+  };
+
+  const project = await prisma.project.upsert({
+    where: { organizationId_slug: { organizationId, slug: fields.slug } },
+    update: data,
+    create: { organizationId, slug: fields.slug, ...data },
+    select: { id: true },
+  });
+
+  const environments = {} as Record<EnvironmentKind, string>;
+  for (const kind of ["SANDBOX", "PRODUCTION"] as const) {
+    const row = await prisma.environment.upsert({
+      where: { projectId_kind: { projectId: project.id, kind } },
+      update: {},
+      create: { projectId: project.id, kind },
+      select: { id: true },
+    });
+    environments[kind] = row.id;
+  }
+
+  return { id: project.id, environments };
+};
+
+const ensureDefaultProject = async (organizationId: string) => {
+  const existing = await prisma.project.findFirst({
+    where: { organizationId, isDefault: true, deletedAt: null },
+    select: { slug: true, name: true },
+  });
+
+  return ensureProject(organizationId, {
+    slug: existing?.slug ?? "default",
+    name: existing?.name ?? "Default",
+    isDefault: true,
+  });
+};
 
 const sha256Hex = (value: string): string =>
   createHash("sha256").update(value).digest("hex");
@@ -450,7 +542,7 @@ const ensurePersonalOrganization = async (user: {
   username: string;
   name: string;
   avatarUrl: string | null;
-}): Promise<{ id: string }> => {
+}): Promise<{ id: string; project: SeededProject }> => {
   const fields = {
     handle: user.username,
     name: user.name,
@@ -493,7 +585,7 @@ const ensurePersonalOrganization = async (user: {
     data: { defaultOrganizationId: org.id },
   });
 
-  return org;
+  return { id: org.id, project: await ensureDefaultProject(org.id) };
 };
 
 const seed = async (): Promise<void> => {
@@ -601,6 +693,7 @@ const seed = async (): Promise<void> => {
   for (const agent of AGENTS) {
     const fields = {
       organizationId: org.id,
+      ...scopeFor(org.project, agent.network),
       slug: agent.slug,
       name: agent.name,
       headline: agent.headline,
@@ -662,6 +755,7 @@ const seed = async (): Promise<void> => {
       visibility: listing.visibility,
       publishedAt: new Date(),
       network: listing.network,
+      ...scopeFor(org.project, listing.network),
       walletId: requireWalletId(
         listing.payToAddress,
         listing.network,
@@ -721,7 +815,12 @@ const seed = async (): Promise<void> => {
 
   const listingRow = await prisma.apiListing.findFirst({
     where: { organizationId: org.id, slug: API_LISTINGS[0].slug },
-    select: { id: true },
+    select: { id: true, projectId: true },
+  });
+
+  const agentRow = await prisma.agent.findFirst({
+    where: { organizationId: org.id, slug: AGENTS[0].slug },
+    select: { id: true, projectId: true },
   });
 
   await prisma.payment.deleteMany({
@@ -743,6 +842,9 @@ const seed = async (): Promise<void> => {
     await prisma.payment.create({
       data: {
         organizationId: org.id,
+        projectId: incoming
+          ? (listingRow?.projectId ?? null)
+          : (agentRow?.projectId ?? null),
         listingId: incoming ? (listingRow?.id ?? null) : null,
         payerAddress: incoming ? CUSTOMER_ADDRESS : ATLAS_PAYER,
         recipientAddress: incoming ? TREASURY : CUSTOMER_ADDRESS,
@@ -764,11 +866,6 @@ const seed = async (): Promise<void> => {
       },
     });
   }
-
-  const agentRow = await prisma.agent.findFirst({
-    where: { organizationId: org.id, slug: AGENTS[0].slug },
-    select: { id: true },
-  });
 
   const reviewers: { id: string }[] = [];
   for (const entry of REVIEWERS) {
@@ -937,6 +1034,7 @@ const seed = async (): Promise<void> => {
       dailyLimit: entry.dailyLimit,
       monthlyLimit: entry.monthlyLimit,
       limitCurrency: entry.limitCurrency,
+      projectId: org.project.id,
       deletedAt: null,
     };
 
@@ -991,7 +1089,7 @@ const seed = async (): Promise<void> => {
 
   for (const [userId, role] of [
     [owner.id, "OWNER"],
-    [reviewers[TEAM.member].id, "MEMBER"],
+    [reviewers[TEAM.member].id, "DEVELOPER"],
   ] as const) {
     await prisma.membership.upsert({
       where: { organizationId_userId: { organizationId: team.id, userId } },
@@ -999,6 +1097,28 @@ const seed = async (): Promise<void> => {
       create: { organizationId: team.id, userId, role },
     });
   }
+
+  const teamProject = await ensureDefaultProject(team.id);
+  const research = await ensureProject(team.id, {
+    slug: RESEARCH_PROJECT.slug,
+    name: RESEARCH_PROJECT.name,
+    description: RESEARCH_PROJECT.description,
+    isDefault: false,
+    restricted: RESEARCH_PROJECT.restricted,
+  });
+
+  const researchViewerId = reviewers[RESEARCH_PROJECT.viewer].id;
+  await prisma.projectMembership.upsert({
+    where: {
+      projectId_userId: { projectId: research.id, userId: researchViewerId },
+    },
+    update: { role: "VIEWER" },
+    create: {
+      projectId: research.id,
+      userId: researchViewerId,
+      role: "VIEWER",
+    },
+  });
 
   await prisma.apiListing.deleteMany({
     where: {
@@ -1055,6 +1175,7 @@ const seed = async (): Promise<void> => {
       visibility: listing.visibility,
       publishedAt: new Date(),
       network: listing.network,
+      ...scopeFor(teamProject, listing.network),
       walletId: teamWallet.id,
       payToAddress: listing.payToAddress,
       assetAddress: listing.assetAddress,
@@ -1095,6 +1216,57 @@ const seed = async (): Promise<void> => {
     create: { tokenHash: sha256Hex(DEV_INVITATION.token), ...invitationFields },
   });
 
+  const serviceAccountFields = {
+    organizationId: org.id,
+    projectId: org.project.id,
+    description: SERVICE_ACCOUNT.description,
+    suspendedAt: null,
+    deletedAt: null,
+  };
+
+  const existingServiceAccount = await prisma.serviceAccount.findFirst({
+    where: { projectId: org.project.id, name: SERVICE_ACCOUNT.name },
+    select: { id: true },
+  });
+
+  const serviceAccount = existingServiceAccount
+    ? await prisma.serviceAccount.update({
+        where: { id: existingServiceAccount.id },
+        data: serviceAccountFields,
+        select: { id: true },
+      })
+    : await prisma.serviceAccount.create({
+        data: {
+          name: SERVICE_ACCOUNT.name,
+          createdById: owner.id,
+          ...serviceAccountFields,
+        },
+        select: { id: true },
+      });
+
+  const serviceAccountKeyFields = {
+    organizationId: org.id,
+    projectId: org.project.id,
+    environmentId: org.project.environments.SANDBOX,
+    serviceAccountId: serviceAccount.id,
+    scopes: [...SERVICE_ACCOUNT_KEY.scopes],
+    name: SERVICE_ACCOUNT_KEY.name,
+    prefix: `${SERVICE_ACCOUNT_KEY.namespace}_${SERVICE_ACCOUNT_KEY.body.slice(0, 4)}`,
+    last4: SERVICE_ACCOUNT_KEY.body.slice(-4),
+    revokedAt: null,
+    expiresAt: null,
+  };
+
+  await prisma.apiKey.upsert({
+    where: { hashedKey: sha256Hex(SERVICE_ACCOUNT_SECRET) },
+    update: serviceAccountKeyFields,
+    create: {
+      hashedKey: sha256Hex(SERVICE_ACCOUNT_SECRET),
+      createdById: owner.id,
+      ...serviceAccountKeyFields,
+    },
+  });
+
   const [agents, wallets, listings, banners, payments, customers] =
     await Promise.all([
       prisma.agent.count(),
@@ -1109,7 +1281,7 @@ const seed = async (): Promise<void> => {
     `${count} ${noun}${count === 1 ? "" : "s"}`;
 
   console.info(
-    `[@4mica/seed] upserted profile @${PROFILE.username}, team @${TEAM.handle} (${plural(TEAM_LISTINGS.length, "api listing")}, invitation token "${DEV_INVITATION.token}"), ${plural(AGENTS.length, "agent")}, ${plural(WALLETS.length, "wallet")}, ${plural(API_LISTINGS.length, "api listing")} ${plural(BANNERS.length, "banner")}, ${plural(PAYMENTS.length, "payment")} and ${plural(CUSTOMERS.length, "customer")} (${agents} agent rows, ${wallets} wallet rows, ${listings} listing rows, ${banners} banner rows, ${payments} payment rows, ${customers} customer rows total).`,
+    `[@4mica/seed] upserted profile @${PROFILE.username}, team @${TEAM.handle} (${plural(TEAM_LISTINGS.length, "api listing")}, invitation token "${DEV_INVITATION.token}", restricted project "${RESEARCH_PROJECT.slug}"), service account "${SERVICE_ACCOUNT.name}" (sandbox key "${SERVICE_ACCOUNT_SECRET}"), ${plural(AGENTS.length, "agent")}, ${plural(WALLETS.length, "wallet")}, ${plural(API_LISTINGS.length, "api listing")} ${plural(BANNERS.length, "banner")}, ${plural(PAYMENTS.length, "payment")} and ${plural(CUSTOMERS.length, "customer")} (${agents} agent rows, ${wallets} wallet rows, ${listings} listing rows, ${banners} banner rows, ${payments} payment rows, ${customers} customer rows total).`,
   );
 };
 
