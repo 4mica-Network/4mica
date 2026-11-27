@@ -4,6 +4,7 @@ import {
   findApiKey,
   toApiKey,
 } from "@controllers/developer/repository";
+import type { UpdateApiKeyInput } from "@controllers/developer/schema";
 import { type ResourceScope, scopeData, scopeWhere } from "@utils/scope";
 import { generateApiKey } from "@utils/secrets";
 import type {
@@ -147,6 +148,7 @@ export const createServiceAccountKey = async (
   serviceAccountId: string,
   data: Pick<CreateServiceAccountKeyInput, "name" | "scopes"> & {
     expiresAt: Date | null;
+    ipAllowlist: string[];
   },
 ) => {
   const secret = generateApiKey(scope.environment);
@@ -161,10 +163,24 @@ export const createServiceAccountKey = async (
       last4: secret.last4,
       hashedKey: secret.hash,
       expiresAt: data.expiresAt,
+      ipAllowlist: data.ipAllowlist,
     },
     select: API_KEY_SELECT,
   });
   return { ...toApiKey(row), secret: secret.plaintext };
+};
+
+export const updateServiceAccountKey = async (
+  scope: ResourceScope,
+  serviceAccountId: string,
+  keyId: string,
+  data: UpdateApiKeyInput,
+) => {
+  const { count } = await prisma.apiKey.updateMany({
+    where: { id: keyId, ...keyWhere(scope, serviceAccountId) },
+    data,
+  });
+  return count > 0 ? findApiKey(keyId) : null;
 };
 
 export const revokeServiceAccountKey = async (
@@ -193,7 +209,13 @@ export const rotateServiceAccountKey = async (
       revokedAt: null,
       OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
     },
-    select: { id: true, name: true, scopes: true, expiresAt: true },
+    select: {
+      id: true,
+      name: true,
+      scopes: true,
+      expiresAt: true,
+      ipAllowlist: true,
+    },
   });
   if (!old) {
     return null;
@@ -223,5 +245,6 @@ export const rotateServiceAccountKey = async (
     name: old.name,
     scopes: old.scopes,
     expiresAt: old.expiresAt,
+    ipAllowlist: old.ipAllowlist,
   });
 };

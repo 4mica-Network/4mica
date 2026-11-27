@@ -10,6 +10,10 @@ import {
   stopAuditRetention,
 } from "./jobs/audit-retention/index";
 import {
+  startAuditStreams,
+  stopAuditStreams,
+} from "./jobs/audit-streams/index";
+import {
   startOnboardingDrip,
   stopOnboardingDrip,
 } from "./jobs/onboarding/index";
@@ -88,6 +92,8 @@ export const initApp = async (
   app.addHook("onClose", stopOnboardingDrip);
 
   app.addHook("onClose", stopAuditRetention);
+
+  app.addHook("onClose", stopAuditStreams);
 
   app.addHook("onClose", closeCoreClient);
 
@@ -266,6 +272,7 @@ export const runServer = async (): Promise<FastifyInstance> => {
 
   await startOnboardingDrip(app);
   await startAuditRetention();
+  await startAuditStreams();
 
   return app;
 };

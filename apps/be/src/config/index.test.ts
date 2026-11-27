@@ -81,6 +81,17 @@ describe("parseEnv", () => {
     );
   });
 
+  it("leaves audit streaming off by default and refuses a short signing key", () => {
+    expect(parseEnv(VALID).AUDIT_STREAM_SIGNING_KEY).toBe("");
+    expect(() =>
+      parseEnv({ ...VALID, AUDIT_STREAM_SIGNING_KEY: "short" }),
+    ).toThrow(/AUDIT_STREAM_SIGNING_KEY: must be at least 32 bytes/);
+    expect(
+      parseEnv({ ...VALID, AUDIT_STREAM_SIGNING_KEY: "k".repeat(32) })
+        .AUDIT_STREAM_SIGNING_KEY,
+    ).toHaveLength(32);
+  });
+
   it("leaves the onboarding drip unconfigured by default", () => {
     const env = parseEnv(VALID);
 

@@ -14,14 +14,20 @@ import {
   listMembersHandler,
   listOrganizationsHandler,
   previewInvitationHandler,
+  reactivateMemberHandler,
   removeMemberHandler,
   resendInvitationHandler,
   revokeInvitationHandler,
+  revokeMemberSessionsHandler,
+  suspendMemberHandler,
   transferOwnershipHandler,
   updateMemberHandler,
   updateOrganizationHandler,
 } from "@controllers/organizations/index";
-import { ORG_ROLES } from "@controllers/organizations/schema";
+import {
+  MEMBERSHIP_SOURCES,
+  ORG_ROLES,
+} from "@controllers/organizations/schema";
 import { sensitiveRateLimit } from "@plugins/rate-limit";
 import type { FastifyPluginCallback } from "fastify";
 import { cliGuards, guards } from "./guards";
@@ -52,6 +58,10 @@ const organizationSchema = {
     avatarUrl: nullableStr,
     personal: { type: "boolean" },
     role,
+    customRole: {
+      type: ["object", "null"],
+      properties: { id: str, name: str },
+    },
     permissions: {
       type: "array",
       items: { type: "string", enum: PERMISSIONS },
@@ -70,6 +80,12 @@ const memberSchema = {
     email: nullableStr,
     avatarUrl: nullableStr,
     role,
+    customRole: {
+      type: ["object", "null"],
+      properties: { id: str, name: str },
+    },
+    source: { type: ["string", "null"], enum: [...MEMBERSHIP_SOURCES, null] },
+    suspendedAt: { type: ["string", "null"], format: "date-time" },
     joinedAt: dateTime,
   },
 } as const;
@@ -187,6 +203,7 @@ const errors = {
   404: errorSchema,
   409: errorSchema,
   410: errorSchema,
+  503: errorSchema,
 } as const;
 
 const doc = (summary: string, response: Record<number, unknown>) => ({
@@ -297,7 +314,7 @@ export const organizationRoutes: FastifyPluginCallback = (app, _opts, done) => {
     {
       ...strict,
       schema: {
-        ...doc("Change a member's role", {
+        ...doc("Change a member's role or give them a custom role", {
           200: memberSchema,
           202: approvalRequiredResponseSchema,
         }),
@@ -314,6 +331,52 @@ export const organizationRoutes: FastifyPluginCallback = (app, _opts, done) => {
       schema: { ...doc("Remove a member", empty), params: userIdParams },
     },
     removeMemberHandler,
+  );
+
+  app.post(
+    "/me/organization/members/:userId/suspend",
+    {
+      ...strict,
+      schema: {
+        ...doc("Suspend a member", { 200: memberSchema }),
+        description:
+          "Needs `members.manage` and a recent sign-in. The member keeps their seat but can reach nothing in this organization, and their CLI sessions bound to it are revoked. You cannot suspend yourself or the last active owner.",
+        params: userIdParams,
+      },
+    },
+    suspendMemberHandler,
+  );
+
+  app.post(
+    "/me/organization/members/:userId/reactivate",
+    {
+      ...strict,
+      schema: {
+        ...doc("Lift a member's suspension", { 200: memberSchema }),
+        params: userIdParams,
+      },
+    },
+    reactivateMemberHandler,
+  );
+
+  app.post(
+    "/me/organization/members/:userId/sessions/revoke",
+    {
+      ...strict,
+      schema: {
+        ...doc("Sign a member out of every device", {
+          200: {
+            type: "object",
+            required: ["revoked"],
+            properties: { revoked: { type: "integer" } },
+          },
+        }),
+        description:
+          "Needs `members.manage` and a recent sign-in. Only for members whose primary email is on one of this organization's verified domains; anyone else answers 403 `identity_not_managed`.",
+        params: userIdParams,
+      },
+    },
+    revokeMemberSessionsHandler,
   );
 
   app.get(

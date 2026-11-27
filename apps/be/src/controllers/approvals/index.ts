@@ -1,6 +1,7 @@
 import { prisma } from "@4mica/db";
 import { environmentForNetwork } from "@4mica/rules";
 import { requireApiKeyScope } from "@auth/api-key";
+import { requireRecentAuth } from "@auth/security";
 import { writeAudit } from "@controllers/audit/repository";
 import {
   audit,
@@ -252,7 +253,7 @@ export const getGovernanceHandler: RouteHandler = async (request, reply) => {
 
 export const updateGovernanceHandler: RouteHandler = async (request, reply) => {
   const tenant = await requireTenant(request, reply, "governance.manage");
-  if (!tenant) {
+  if (!tenant || !(await requireRecentAuth(request, reply, tenant))) {
     return reply;
   }
 

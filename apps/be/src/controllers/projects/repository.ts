@@ -197,6 +197,7 @@ export const listOrgMembersWithProjectRole = async (
     orderBy: { createdAt: "asc" },
     select: {
       ...PROJECT_MEMBER_SELECT,
+      customRole: { select: { projectRole: true, deletedAt: true } },
       user: {
         select: {
           ...PROJECT_MEMBER_SELECT.user.select,
@@ -216,6 +217,10 @@ export const listOrgMembersWithProjectRole = async (
     email: row.user.email,
     avatarUrl: row.user.avatarUrl,
     orgRole: row.role,
+    customProjectRole:
+      row.customRole && row.customRole.deletedAt === null
+        ? row.customRole.projectRole
+        : null,
     projectRole: row.user.projectMemberships[0]?.role ?? null,
   }));
 };

@@ -9,6 +9,7 @@ import {
   rotateServiceAccountKeyHandler,
   suspendServiceAccountHandler,
   updateServiceAccountHandler,
+  updateServiceAccountKeyHandler,
 } from "@controllers/service-accounts/index";
 import { sensitiveRateLimit } from "@plugins/rate-limit";
 import type { FastifyPluginCallback } from "fastify";
@@ -231,6 +232,22 @@ export const serviceAccountRoutes: FastifyPluginCallback = (
       },
     },
     createServiceAccountKeyHandler,
+  );
+
+  app.patch(
+    `${PREFIX}/:id/keys/:keyId`,
+    {
+      ...strict,
+      schema: {
+        tags,
+        summary:
+          "Rename a service account key or change the addresses it may be used from",
+        security,
+        params: keyParamSchema,
+        response: { ...errors, 200: apiKeyResponseSchema },
+      },
+    },
+    updateServiceAccountKeyHandler,
   );
 
   app.post(

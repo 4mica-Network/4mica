@@ -1,5 +1,6 @@
 import type { OrgRole } from "@4mica/db";
-import { permissionsFor } from "@auth/permissions";
+import { permissionsFor, ROLE_PERMISSIONS } from "@auth/permissions";
+import { requireRecentAuth } from "@auth/security";
 import type { Tenant } from "@auth/tenant";
 import { config } from "@config/index";
 import { requireApproval } from "@controllers/approvals/gate";
@@ -8,7 +9,14 @@ import {
   exportAuditLogs,
   listAuditLogs,
 } from "@controllers/audit/repository";
+import { ensureIdentityMemberships } from "@controllers/domains/membership";
 import { rangeEnd, rangeStart } from "@controllers/finance/schema";
+import {
+  cannotGrant,
+  holdsGovernedPermission,
+  ungrantable,
+} from "@controllers/roles/grants";
+import { findRole } from "@controllers/roles/repository";
 import {
   audit,
   invalidBody,
@@ -19,23 +27,27 @@ import {
 } from "@controllers/shared";
 import { appLogger } from "@logger/index";
 import { clerk } from "@services/clerk";
+import { getClerkUser, primaryEmailDomain } from "@services/clerk-users";
 import { CSV_ROW_LIMIT, sendCsv } from "@utils/csv";
 import { isUniqueViolation } from "@utils/prisma-errors";
 import { generateInvitationToken, hashSecret } from "@utils/secrets";
 import type { FastifyReply, FastifyRequest, RouteHandler } from "fastify";
 import {
   acceptInvitation,
+  assignCustomRole,
   changeMemberRole,
   createInvitations,
   createOrganization,
   declineInvitation,
   existingMemberEmails,
   findInvitationByTokenHash,
+  findMemberIdentity,
   findMemberRole,
   findOpenInvitation,
   getOrganization,
   handleTaken,
   type InvitationByToken,
+  isVerifiedDomainOf,
   listMembers,
   listOrganizationsFor,
   listPendingInvitations,
@@ -44,6 +56,7 @@ import {
   reissueInvitation,
   removeMember,
   revokeInvitation,
+  setMemberSuspension,
   softDeleteOrganization,
   transferOwnership,
   updateOrganization,
@@ -68,10 +81,13 @@ const isGovernedRole = (role: OrgRole) => GOVERNED_ROLES.includes(role);
 
 const roleName = (role: OrgRole) => role.toLowerCase();
 
-const summary = (org: OrganizationRow) => ({
+const summary = ({ custom, ...org }: OrganizationRow) => ({
   ...org,
-  permissions: permissionsFor(org.role),
+  permissions: permissionsFor({ role: org.role, custom }),
 });
+
+const exceedsActor = (tenant: Tenant, role: OrgRole) =>
+  tenant.custom ? ungrantable(tenant, [...ROLE_PERMISSIONS[role]]) : [];
 
 const actor = (request: FastifyRequest, userId: string) => ({
   actorUserId: userId,
@@ -106,6 +122,12 @@ const membershipError = (
         error: "forbidden",
         message: "Only an owner can grant, change or remove the owner role.",
         permission: "org.transfer",
+      });
+    case "owner_custom_role":
+      return reply.code(409).send({
+        error: "owner_custom_role",
+        message:
+          "Owners cannot be given a custom role. Change them to another role first.",
       });
   }
 };
@@ -178,6 +200,7 @@ export const listOrganizationsHandler: RouteHandler = async (
     return reply;
   }
 
+  await ensureIdentityMemberships(request, userId);
   const { items, defaultOrganizationId } = await listOrganizationsFor(userId);
   const fallback = items.find((org) => org.personal) ?? items[0];
   const defaultId =
@@ -282,7 +305,7 @@ export const deleteOrganizationHandler: RouteHandler = async (
   reply,
 ) => {
   const tenant = await requireTenant(request, reply, "org.delete");
-  if (!tenant) {
+  if (!tenant || !(await requireRecentAuth(request, reply, tenant))) {
     return reply;
   }
 
@@ -329,7 +352,7 @@ export const transferOwnershipHandler: RouteHandler = async (
   reply,
 ) => {
   const tenant = await requireTenant(request, reply, "org.transfer");
-  if (!tenant) {
+  if (!tenant || !(await requireRecentAuth(request, reply, tenant))) {
     return reply;
   }
 
@@ -395,7 +418,19 @@ export const updateMemberHandler: RouteHandler = async (request, reply) => {
   }
 
   const { userId } = request.params as { userId: string };
-  const { role } = parsed.data;
+  const { role, customRoleId } = parsed.data;
+
+  if (customRoleId !== undefined) {
+    return assignCustomRoleTo(request, reply, tenant, userId, customRoleId);
+  }
+  if (role === undefined) {
+    return reply;
+  }
+
+  const missing = exceedsActor(tenant, role);
+  if (missing.length > 0) {
+    return cannotGrant(reply, missing);
+  }
 
   if (isGovernedRole(role)) {
     const current = await findMemberRole(tenant.orgId, userId);
@@ -408,7 +443,7 @@ export const updateMemberHandler: RouteHandler = async (request, reply) => {
     ) {
       return membershipError(reply, { ok: false, reason: "owner_only" });
     }
-    if (current.role !== role) {
+    if (current.role !== role || current.customRoleId) {
       const gate = await requireApproval(
         request,
         reply,
@@ -433,6 +468,64 @@ export const updateMemberHandler: RouteHandler = async (request, reply) => {
   return result.ok ? reply.send(result.member) : membershipError(reply, result);
 };
 
+const assignCustomRoleTo = async (
+  request: FastifyRequest,
+  reply: FastifyReply,
+  tenant: Tenant,
+  userId: string,
+  customRoleId: string,
+) => {
+  if (!(await requireRecentAuth(request, reply, tenant))) {
+    return reply;
+  }
+
+  const customRole = await findRole(tenant.orgId, customRoleId);
+  if (!customRole) {
+    return notFound(reply, "role");
+  }
+
+  const current = await findMemberRole(tenant.orgId, userId);
+  if (!current) {
+    return notFound(reply, "member");
+  }
+  if (current.role === "OWNER") {
+    return membershipError(reply, { ok: false, reason: "owner_custom_role" });
+  }
+
+  const missing = ungrantable(tenant, customRole.permissions);
+  if (missing.length > 0) {
+    return cannotGrant(reply, missing);
+  }
+
+  if (
+    current.customRoleId !== customRole.id &&
+    holdsGovernedPermission(customRole.permissions)
+  ) {
+    const gate = await requireApproval(
+      request,
+      reply,
+      tenant,
+      "member.role_grant",
+      { kind: "custom_role", userId, customRoleId: customRole.id },
+      `Give ${current.user.name} the ${customRole.name} role`.slice(
+        0,
+        SUMMARY_MAX,
+      ),
+    );
+    if (!gate.proceed) {
+      return reply;
+    }
+  }
+
+  const result = await assignCustomRole(
+    tenant.orgId,
+    userId,
+    customRole,
+    actor(request, tenant.userId),
+  );
+  return result.ok ? reply.send(result.member) : membershipError(reply, result);
+};
+
 export const removeMemberHandler: RouteHandler = async (request, reply) => {
   const tenant = await requireTenant(request, reply, "members.manage");
   if (!tenant) {
@@ -445,6 +538,160 @@ export const removeMemberHandler: RouteHandler = async (request, reply) => {
     action: userId === tenant.userId ? "member.left" : "member.removed",
   });
   return result.ok ? reply.code(204).send() : membershipError(reply, result);
+};
+
+const suspensionHandler =
+  (suspend: boolean): RouteHandler =>
+  async (request, reply) => {
+    const tenant = await requireTenant(request, reply, "members.manage");
+    if (!tenant) {
+      return reply;
+    }
+
+    if (tenant.personal) {
+      return personalOrganization(
+        reply,
+        "A personal workspace has a single member.",
+      );
+    }
+
+    const { userId } = request.params as { userId: string };
+    if (suspend && userId === tenant.userId) {
+      return reply.code(409).send({
+        error: "cannot_suspend_self",
+        message: "You cannot suspend yourself.",
+      });
+    }
+
+    if (!(await requireRecentAuth(request, reply, tenant))) {
+      return reply;
+    }
+
+    const result = await setMemberSuspension(
+      tenant.orgId,
+      tenant.role,
+      userId,
+      suspend,
+      actor(request, tenant.userId),
+    );
+    if (!result.ok) {
+      return result.reason === "last_owner"
+        ? reply.code(409).send({
+            error: "last_owner",
+            message:
+              "An organization needs at least one active owner. Make someone else an owner first.",
+          })
+        : membershipError(reply, result);
+    }
+
+    appLogger.info(suspend ? "Member suspended" : "Member reactivated", {
+      orgId: tenant.orgId,
+      userId,
+      actorUserId: tenant.userId,
+      cliSessionsRevoked: result.cliSessionsRevoked,
+    });
+    return reply.send(result.member);
+  };
+
+export const suspendMemberHandler = suspensionHandler(true);
+export const reactivateMemberHandler = suspensionHandler(false);
+
+const SESSION_PAGE = 100;
+const SESSION_PAGES_MAX = 10;
+
+const revokeClerkSessions = async (clerkUserId: string): Promise<number> => {
+  const ids: string[] = [];
+  for (let pageIndex = 0; pageIndex < SESSION_PAGES_MAX; pageIndex++) {
+    const page = await clerk.sessions.getSessionList({
+      userId: clerkUserId,
+      status: "active",
+      limit: SESSION_PAGE,
+      offset: pageIndex * SESSION_PAGE,
+    });
+    ids.push(...page.data.map((session) => session.id));
+    if (page.data.length < SESSION_PAGE) {
+      break;
+    }
+  }
+  await Promise.all(ids.map((id) => clerk.sessions.revokeSession(id)));
+  return ids.length;
+};
+
+export const revokeMemberSessionsHandler: RouteHandler = async (
+  request,
+  reply,
+) => {
+  const tenant = await requireTenant(request, reply, "members.manage");
+  if (!tenant) {
+    return reply;
+  }
+
+  if (tenant.personal) {
+    return personalOrganization(
+      reply,
+      "A personal workspace does not manage identities.",
+    );
+  }
+
+  if (!(await requireRecentAuth(request, reply, tenant))) {
+    return reply;
+  }
+
+  const { userId } = request.params as { userId: string };
+  const member = await findMemberIdentity(tenant.orgId, userId);
+  if (!member) {
+    return notFound(reply, "member");
+  }
+
+  const notManaged = () =>
+    reply.code(403).send({
+      error: "identity_not_managed",
+      message:
+        "This member's email is not on a verified domain of this organization, so their sign-ins are not yours to end.",
+    });
+
+  const { clerkUserId } = member.user;
+  let domain: string | null;
+  try {
+    domain = primaryEmailDomain(await getClerkUser(clerkUserId));
+  } catch (error) {
+    appLogger.error("Could not load the member from Clerk", {
+      orgId: tenant.orgId,
+      userId,
+      error,
+    });
+    return reply.code(503).send({
+      error: "identity_unavailable",
+      message: "The identity provider is unreachable. Retry shortly.",
+    });
+  }
+
+  if (!domain || !(await isVerifiedDomainOf(tenant.orgId, domain))) {
+    return notManaged();
+  }
+
+  let revoked: number;
+  try {
+    revoked = await revokeClerkSessions(clerkUserId);
+  } catch (error) {
+    appLogger.error("Could not revoke the member's sessions", {
+      orgId: tenant.orgId,
+      userId,
+      error,
+    });
+    return reply.code(503).send({
+      error: "identity_unavailable",
+      message: "The identity provider is unreachable. Retry shortly.",
+    });
+  }
+
+  await audit(request, tenant, {
+    action: "member.sessions_revoked",
+    targetType: "user",
+    targetId: userId,
+    metadata: { revoked, domain },
+  });
+  return reply.send({ revoked });
 };
 
 export const listInvitationsHandler: RouteHandler = async (request, reply) => {
@@ -480,6 +727,10 @@ export const createInvitationsHandler: RouteHandler = async (
   const { emails, role } = parsed.data;
   if (role === "OWNER" && tenant.role !== "OWNER") {
     return membershipError(reply, { ok: false, reason: "owner_only" });
+  }
+  const missing = exceedsActor(tenant, role);
+  if (missing.length > 0) {
+    return cannotGrant(reply, missing);
   }
 
   const members = await existingMemberEmails(tenant.orgId, emails);

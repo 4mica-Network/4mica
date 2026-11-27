@@ -182,6 +182,8 @@ beforeEach(() => {
   });
   db.membership.findMany.mockResolvedValue([
     {
+      role: "FINANCE",
+      customRole: null,
       user: {
         name: "Fin",
         email: "fin@example.com",

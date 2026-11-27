@@ -61,6 +61,16 @@ const FINANCE_ROLES = (Object.keys(ROLE_PERMISSIONS) as OrgRole[]).filter(
   (role) => can(role, "finance.manage"),
 );
 
+const FINANCE_MANAGERS = {
+  OR: [
+    { role: { in: FINANCE_ROLES }, customRoleId: null },
+    { role: "OWNER" },
+    {
+      customRole: { deletedAt: null, permissions: { has: "finance.manage" } },
+    },
+  ],
+} satisfies Prisma.MembershipWhereInput;
+
 export const financeRecipients = async (orgId: string) => {
   const [organization, settings] = await Promise.all([
     prisma.organization.findUnique({
@@ -77,11 +87,19 @@ export const financeRecipients = async (orgId: string) => {
   const members = await prisma.membership.findMany({
     where: {
       organizationId: orgId,
-      ...(chosen.length > 0
-        ? { userId: { in: chosen } }
-        : { role: { in: FINANCE_ROLES } }),
+      suspendedAt: null,
+      ...(chosen.length > 0 ? { userId: { in: chosen } } : FINANCE_MANAGERS),
     },
     select: {
+      role: true,
+      customRole: {
+        select: {
+          id: true,
+          permissions: true,
+          projectRole: true,
+          deletedAt: true,
+        },
+      },
       user: {
         select: {
           name: true,
@@ -96,6 +114,20 @@ export const financeRecipients = async (orgId: string) => {
   return {
     workspaceName: organization?.name || organization?.handle || "Workspace",
     recipients: members
+      .filter(
+        (member) =>
+          chosen.length > 0 ||
+          can(
+            {
+              role: member.role,
+              custom:
+                member.customRole && member.customRole.deletedAt === null
+                  ? member.customRole
+                  : null,
+            },
+            "finance.manage",
+          ),
+      )
       .map((member) => member.user)
       .filter(
         (user): user is typeof user & { email: string } =>

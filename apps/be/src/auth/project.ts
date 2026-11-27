@@ -15,6 +15,7 @@ export interface ProjectScope {
   orgId: string;
   userId: string;
   orgRole: Tenant["role"];
+  customProjectRole: ProjectRole | null;
   projectId: string;
   projectSlug: string;
   isDefaultProject: boolean;
@@ -81,6 +82,7 @@ const lookup = async (
 
   const role = effectiveProjectRole({
     orgRole: tenant.role,
+    customProjectRole: tenant.custom?.projectRole ?? null,
     projectRole: project.members[0]?.role ?? null,
     restricted: project.restricted,
   });
@@ -94,6 +96,7 @@ const lookup = async (
     orgId: tenant.orgId,
     userId: tenant.userId,
     orgRole: tenant.role,
+    customProjectRole: tenant.custom?.projectRole ?? null,
     projectId: project.id,
     projectSlug: project.slug,
     isDefaultProject: project.isDefault,

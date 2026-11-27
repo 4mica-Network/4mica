@@ -124,6 +124,8 @@ describe("notifyFinance", () => {
     });
     h.db.membership.findMany.mockResolvedValue([
       {
+        role: "FINANCE",
+        customRole: null,
         user: {
           name: "Fin",
           email: "fin@example.com",
@@ -132,6 +134,8 @@ describe("notifyFinance", () => {
         },
       },
       {
+        role: "ADMIN",
+        customRole: null,
         user: {
           name: "Unverified",
           email: "u@example.com",
@@ -148,7 +152,17 @@ describe("notifyFinance", () => {
 
     expect(h.db.membership.findMany.mock.calls[0]?.[0].where).toEqual({
       organizationId: ORG_ID,
-      role: { in: ["OWNER", "ADMIN", "FINANCE"] },
+      suspendedAt: null,
+      OR: [
+        { role: { in: ["OWNER", "ADMIN", "FINANCE"] }, customRoleId: null },
+        { role: "OWNER" },
+        {
+          customRole: {
+            deletedAt: null,
+            permissions: { has: "finance.manage" },
+          },
+        },
+      ],
     });
     expect(send).toHaveBeenCalledTimes(1);
     expect(send.mock.calls[0]?.[0]).toMatchObject({
@@ -172,8 +186,54 @@ describe("notifyFinance", () => {
     );
     expect(h.db.membership.findMany.mock.calls[0]?.[0].where).toEqual({
       organizationId: ORG_ID,
+      suspendedAt: null,
       userId: { in: [USER_ID] },
     });
+  });
+
+  it("emails a member whose custom role manages finance, but not one whose custom role does not", async () => {
+    h.db.membership.findMany.mockResolvedValue([
+      {
+        role: "VIEWER",
+        customRole: {
+          id: "role-1",
+          permissions: ["finance.manage"],
+          projectRole: "VIEWER",
+          deletedAt: null,
+        },
+        user: {
+          name: "Treasurer",
+          email: "treasurer@example.com",
+          emailVerified: true,
+          deletedAt: null,
+        },
+      },
+      {
+        role: "ADMIN",
+        customRole: {
+          id: "role-2",
+          permissions: ["payments.read"],
+          projectRole: "VIEWER",
+          deletedAt: null,
+        },
+        user: {
+          name: "Reader",
+          email: "reader@example.com",
+          emailVerified: true,
+          deletedAt: null,
+        },
+      },
+    ]);
+
+    await notifyFinance(
+      email,
+      ORG_ID,
+      await raiseAlerts(h.db.prisma as never, [alert()]),
+    );
+
+    expect(send.mock.calls.map(([arg]) => arg.to)).toEqual([
+      "treasurer@example.com",
+    ]);
   });
 
   it("never throws", async () => {

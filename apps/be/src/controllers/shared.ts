@@ -6,6 +6,7 @@ import {
   type ProjectPermission,
 } from "@auth/permissions";
 import { type ProjectScope, resolveProject } from "@auth/project";
+import { enforceAccessPolicy } from "@auth/security";
 import { resolveTenant, type Tenant } from "@auth/tenant";
 import { type AuditEntry, writeAudit } from "@controllers/audit/repository";
 import type { SellerWalletResult } from "@controllers/wallets/repository";
@@ -84,7 +85,11 @@ export const requireTenant = async (
     return null;
   }
 
-  if (!can(tenant.role, permission)) {
+  if (!(await enforceAccessPolicy(request, reply, tenant))) {
+    return null;
+  }
+
+  if (!can(tenant, permission)) {
     recordDenied(request, tenant.orgId, userId, permission);
 
     reply.code(403).send({
@@ -111,6 +116,10 @@ export const requireProject = async (
   const tenant = await resolveTenant(request, userId);
   if (!tenant) {
     notFound(reply, "organization");
+    return null;
+  }
+
+  if (!(await enforceAccessPolicy(request, reply, tenant))) {
     return null;
   }
 

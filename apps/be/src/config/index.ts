@@ -105,6 +105,7 @@ const EnvSchema = v.object({
   RATE_LIMIT_SENSITIVE_MAX: numeric("RATE_LIMIT_SENSITIVE_MAX", 1, 10_000),
   RATE_LIMIT_API_KEY_MAX: numeric("RATE_LIMIT_API_KEY_MAX", 1, 1_000_000),
   TRUST_PROXY_HOPS: numeric("TRUST_PROXY_HOPS", 0, 5),
+  AUDIT_STREAM_SIGNING_KEY: v.string(),
 });
 
 export type Env = v.InferOutput<typeof EnvSchema>;
@@ -146,6 +147,7 @@ export const parseEnv = (source: NodeJS.ProcessEnv): Env => {
     RATE_LIMIT_SENSITIVE_MAX: source.RATE_LIMIT_SENSITIVE_MAX ?? "10",
     RATE_LIMIT_API_KEY_MAX: source.RATE_LIMIT_API_KEY_MAX ?? "600",
     TRUST_PROXY_HOPS: source.TRUST_PROXY_HOPS ?? "1",
+    AUDIT_STREAM_SIGNING_KEY: source.AUDIT_STREAM_SIGNING_KEY ?? "",
   });
 
   if (!result.success) {
@@ -181,6 +183,15 @@ export const parseEnv = (source: NodeJS.ProcessEnv): Env => {
   ) {
     throw new Error(
       "Invalid environment configuration:\n  - REVALIDATE_SECRET: must be at least 32 characters",
+    );
+  }
+
+  if (
+    result.output.AUDIT_STREAM_SIGNING_KEY.length > 0 &&
+    Buffer.byteLength(result.output.AUDIT_STREAM_SIGNING_KEY) < 32
+  ) {
+    throw new Error(
+      "Invalid environment configuration:\n  - AUDIT_STREAM_SIGNING_KEY: must be at least 32 bytes",
     );
   }
 
@@ -272,6 +283,9 @@ export const config = {
     apiKeyMax: env.RATE_LIMIT_API_KEY_MAX,
   },
   trustProxyHops: env.TRUST_PROXY_HOPS,
+  auditStreams: {
+    signingKey: env.AUDIT_STREAM_SIGNING_KEY || undefined,
+  },
   core: {
     url: env.CORE_URL || undefined,
     signerKey: (env.CORE_SIGNER_KEY || undefined) as `0x${string}` | undefined,

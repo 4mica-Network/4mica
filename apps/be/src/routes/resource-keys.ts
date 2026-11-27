@@ -5,6 +5,7 @@ import {
   getResourceHandler,
   listResourceKeysHandler,
   revokeResourceKeyHandler,
+  updateResourceKeyHandler,
 } from "@controllers/resource-keys/index";
 import type { ResourceKind } from "@controllers/trust/repository";
 import { apiKeyRateLimit, sensitiveRateLimit } from "@plugins/rate-limit";
@@ -128,6 +129,27 @@ export const resourceKeyRoutes: FastifyPluginCallback = (app, _opts, done) => {
         },
       },
       revokeResourceKeyHandler(kind),
+    );
+
+    app.patch(
+      `${prefix}/:id/keys/:keyId`,
+      {
+        ...strict,
+        schema: {
+          tags: [tag],
+          summary: "Rename a key or change the addresses it may be used from",
+          security: [{ bearerAuth: [] }],
+          params: keyParamSchema,
+          response: {
+            ...limitedResponses,
+            200: apiKeyResponseSchema,
+            400: errorResponseSchema,
+            401: errorResponseSchema,
+            404: errorResponseSchema,
+          },
+        },
+      },
+      updateResourceKeyHandler(kind),
     );
 
     app.delete(

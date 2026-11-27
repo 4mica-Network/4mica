@@ -16,6 +16,7 @@ export const API_KEY_SELECT = {
   last4: true,
   scopes: true,
   serviceAccountId: true,
+  ipAllowlist: true,
   lastUsedAt: true,
   expiresAt: true,
   revokedAt: true,
@@ -92,6 +93,7 @@ export const createApiKey = async (
       last4: secret.last4,
       hashedKey: secret.hash,
       expiresAt: data.expiresAt ? new Date(data.expiresAt) : null,
+      ipAllowlist: data.ipAllowlist ?? [],
     },
     select: API_KEY_SELECT,
   });

@@ -148,6 +148,7 @@ export const apiKeyResponseSchema = {
       },
     },
     serviceAccountId: nullStr,
+    ipAllowlist: { type: "array", items: str },
     lastUsedAt: nullDate,
     expiresAt: nullDate,
     revokedAt: nullDate,
@@ -833,6 +834,9 @@ export const errorResponseSchema = {
     permission: str,
     scope: str,
     requestId: str,
+    domain: str,
+    ip: str,
+    reauthWithinMinutes: int,
     issues: {
       type: "array",
       items: {

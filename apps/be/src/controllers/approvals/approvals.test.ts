@@ -83,7 +83,7 @@ const signedIn = () => ({
     tokenType: "session_token",
     userId: "user_123",
     sessionId: "sess_123",
-    sessionClaims: { sub: "user_123", sid: "sess_123" },
+    sessionClaims: { sub: "user_123", sid: "sess_123", fva: [1, -1] },
   }),
 });
 

@@ -1,6 +1,7 @@
 import { type OrgRole, Prisma } from "@4mica/db";
 import { clearUserCache } from "@auth/user-store";
 import { organizationRoutes } from "@routes/organizations";
+import { clearClerkUserCache } from "@services/clerk-users";
 import { hashSecret } from "@utils/secrets";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { initApp } from "@/server";
@@ -17,53 +18,68 @@ import {
   OTHER_ORG_ID,
 } from "@/test-support/tenancy";
 
-const { authenticateRequest, getUser, db } = vi.hoisted(() => {
-  const db = {
-    membership: {
-      findFirst: vi.fn(),
-      findMany: vi.fn(),
-      findUnique: vi.fn(),
-      findUniqueOrThrow: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
-      delete: vi.fn(),
-    },
-    auditLog: { create: vi.fn(), findMany: vi.fn() },
-    projectMembership: { deleteMany: vi.fn() },
-    organization: {
-      findFirst: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
-    },
-    invitation: {
-      findMany: vi.fn(),
-      findFirst: vi.fn(),
-      findUnique: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
-      updateMany: vi.fn(),
-    },
-    user: {
-      findUnique: vi.fn(),
-      findFirst: vi.fn(),
-      upsert: vi.fn(),
-      update: vi.fn(),
-      updateMany: vi.fn(),
-    },
-    governanceSettings: { findUnique: vi.fn() },
-    approvalRequest: {
-      findFirst: vi.fn(),
-      create: vi.fn(),
-      updateMany: vi.fn(),
-    },
-    $queryRaw: vi.fn(),
-    $transaction: vi.fn(),
-  };
-  return { authenticateRequest: vi.fn(), getUser: vi.fn(), db };
-});
+const { authenticateRequest, getUser, getSessionList, revokeSession, db } =
+  vi.hoisted(() => {
+    const db = {
+      membership: {
+        findFirst: vi.fn(),
+        findMany: vi.fn(),
+        findUnique: vi.fn(),
+        findUniqueOrThrow: vi.fn(),
+        create: vi.fn(),
+        update: vi.fn(),
+        delete: vi.fn(),
+      },
+      auditLog: { create: vi.fn(), findMany: vi.fn() },
+      projectMembership: { deleteMany: vi.fn() },
+      cliSession: { updateMany: vi.fn() },
+      organizationDomain: { findFirst: vi.fn() },
+      organization: {
+        findFirst: vi.fn(),
+        create: vi.fn(),
+        update: vi.fn(),
+      },
+      invitation: {
+        findMany: vi.fn(),
+        findFirst: vi.fn(),
+        findUnique: vi.fn(),
+        create: vi.fn(),
+        update: vi.fn(),
+        updateMany: vi.fn(),
+      },
+      user: {
+        findUnique: vi.fn(),
+        findFirst: vi.fn(),
+        upsert: vi.fn(),
+        update: vi.fn(),
+        updateMany: vi.fn(),
+      },
+      governanceSettings: { findUnique: vi.fn() },
+      securitySettings: { findUnique: vi.fn() },
+      ssoConnection: { findMany: vi.fn() },
+      approvalRequest: {
+        findFirst: vi.fn(),
+        create: vi.fn(),
+        updateMany: vi.fn(),
+      },
+      $queryRaw: vi.fn(),
+      $transaction: vi.fn(),
+    };
+    return {
+      authenticateRequest: vi.fn(),
+      getUser: vi.fn(),
+      getSessionList: vi.fn(),
+      revokeSession: vi.fn(),
+      db,
+    };
+  });
 
 vi.mock("@clerk/backend", () => ({
-  createClerkClient: vi.fn(() => ({ authenticateRequest, users: { getUser } })),
+  createClerkClient: vi.fn(() => ({
+    authenticateRequest,
+    users: { getUser },
+    sessions: { getSessionList, revokeSession },
+  })),
 }));
 
 vi.mock("@4mica/db", async () => {
@@ -91,7 +107,7 @@ const AUTH_USER = {
   deletedAt: null,
 };
 
-const signedIn = () => ({
+const signedIn = (fva: unknown = [1, -1]) => ({
   isAuthenticated: true,
   status: "signed-in",
   reason: null,
@@ -99,7 +115,7 @@ const signedIn = () => ({
     tokenType: "session_token",
     userId: "user_123",
     sessionId: "sess_123",
-    sessionClaims: { sub: "user_123", sid: "sess_123" },
+    sessionClaims: { sub: "user_123", sid: "sess_123", fva },
   }),
 });
 
@@ -176,7 +192,10 @@ describe("organization routes", () => {
     }
     authenticateRequest.mockReset();
     getUser.mockReset();
+    getSessionList.mockReset();
+    revokeSession.mockReset();
     clearUserCache();
+    clearClerkUserCache();
 
     authenticateRequest.mockResolvedValue(signedIn());
     db.user.upsert.mockResolvedValue(AUTH_USER);
@@ -186,6 +205,7 @@ describe("organization routes", () => {
         : Promise.all(arg as Promise<unknown>[]),
     );
     actAs(db);
+    db.ssoConnection.findMany.mockResolvedValue([]);
     getUser.mockResolvedValue({ emailAddresses: [] });
   });
 
@@ -954,6 +974,7 @@ describe("organization routes", () => {
       expect(res.json().role).toBe("FINANCE");
       expect(db.membership.update.mock.calls[0][0].data).toEqual({
         role: "FINANCE",
+        customRoleId: null,
       });
 
       await instance.close();
@@ -1473,6 +1494,319 @@ describe("organization routes", () => {
 
         await instance.close();
       });
+    });
+  });
+
+  describe("recent sign-in", () => {
+    it("asks for a fresh sign-in before transferring ownership", async () => {
+      actInTeam("OWNER");
+      authenticateRequest.mockResolvedValue(signedIn([120, -1]));
+      const instance = await app();
+
+      const res = await instance.inject({
+        method: "POST",
+        url: "/me/organization/transfer",
+        headers: TEAM,
+        payload: { userId: OTHER_USER_ID },
+      });
+
+      expect(res.statusCode).toBe(403);
+      expect(res.json()).toMatchObject({ error: "reauth_required" });
+      expect(db.membership.update).not.toHaveBeenCalled();
+      await instance.close();
+    });
+
+    it("asks for a fresh sign-in before deleting the organization", async () => {
+      actInTeam("OWNER");
+      authenticateRequest.mockResolvedValue(signedIn(null));
+      const instance = await app();
+
+      const res = await instance.inject({
+        method: "DELETE",
+        url: "/me/organization",
+        headers: TEAM,
+      });
+
+      expect(res.statusCode).toBe(403);
+      expect(res.json()).toMatchObject({ error: "reauth_required" });
+      expect(db.organization.update).not.toHaveBeenCalled();
+      await instance.close();
+    });
+  });
+
+  describe("suspension", () => {
+    const suspended = (userId: string, role: string) => ({
+      ...memberRow(userId, role),
+      source: "INVITATION",
+      suspendedAt: new Date("2026-11-20T00:00:00Z"),
+      customRole: null,
+    });
+
+    const suspend = async (userId: string, action = "suspend") => {
+      const instance = await app();
+      const res = await instance.inject({
+        method: "POST",
+        url: `/me/organization/members/${userId}/${action}`,
+        headers: TEAM,
+      });
+      await instance.close();
+      return res;
+    };
+
+    beforeEach(() => {
+      db.$queryRaw.mockResolvedValue([{ user_id: USER_ID }]);
+      db.cliSession.updateMany.mockResolvedValue({ count: 2 });
+    });
+
+    it("suspends a member, revokes their bound CLI sessions and audits it", async () => {
+      actInTeam("ADMIN");
+      db.membership.findUnique.mockResolvedValue(
+        memberRow(OTHER_USER_ID, "DEVELOPER"),
+      );
+      db.membership.update.mockResolvedValue(
+        suspended(OTHER_USER_ID, "DEVELOPER"),
+      );
+
+      const res = await suspend(OTHER_USER_ID);
+
+      expect(res.statusCode).toBe(200);
+      expect(res.json()).toMatchObject({
+        userId: OTHER_USER_ID,
+        suspendedAt: "2026-11-20T00:00:00.000Z",
+        source: "INVITATION",
+        customRole: null,
+      });
+      expect(db.membership.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: { suspendedAt: expect.any(Date) },
+        }),
+      );
+      expect(db.cliSession.updateMany).toHaveBeenCalledWith({
+        where: {
+          userId: OTHER_USER_ID,
+          organizationId: ORG_ID,
+          revokedAt: null,
+        },
+        data: { revokedAt: expect.any(Date) },
+      });
+      expect(auditActions()).toEqual(["member.suspended"]);
+    });
+
+    it("reactivates a suspended member without touching sessions", async () => {
+      actInTeam("ADMIN");
+      db.membership.findUnique.mockResolvedValue(
+        suspended(OTHER_USER_ID, "DEVELOPER"),
+      );
+      db.membership.update.mockResolvedValue(
+        memberRow(OTHER_USER_ID, "DEVELOPER"),
+      );
+
+      const res = await suspend(OTHER_USER_ID, "reactivate");
+
+      expect(res.statusCode).toBe(200);
+      expect(res.json().suspendedAt).toBeNull();
+      expect(db.membership.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { suspendedAt: null } }),
+      );
+      expect(db.cliSession.updateMany).not.toHaveBeenCalled();
+      expect(auditActions()).toEqual(["member.reactivated"]);
+    });
+
+    it("cannot target yourself", async () => {
+      actInTeam("OWNER");
+
+      const res = await suspend(USER_ID);
+
+      expect(res.statusCode).toBe(409);
+      expect(res.json()).toMatchObject({ error: "cannot_suspend_self" });
+      expect(db.membership.update).not.toHaveBeenCalled();
+    });
+
+    it("cannot suspend the last active owner", async () => {
+      actInTeam("OWNER");
+      db.$queryRaw.mockResolvedValue([{ user_id: OTHER_USER_ID }]);
+      db.membership.findUnique.mockResolvedValue(
+        memberRow(OTHER_USER_ID, "OWNER"),
+      );
+
+      const res = await suspend(OTHER_USER_ID);
+
+      expect(res.statusCode).toBe(409);
+      expect(res.json()).toMatchObject({ error: "last_owner" });
+      expect(db.membership.update).not.toHaveBeenCalled();
+    });
+
+    it("lets an owner suspend another owner while one stays active", async () => {
+      actInTeam("OWNER");
+      db.$queryRaw.mockResolvedValue([
+        { user_id: USER_ID },
+        { user_id: OTHER_USER_ID },
+      ]);
+      db.membership.findUnique.mockResolvedValue(
+        memberRow(OTHER_USER_ID, "OWNER"),
+      );
+      db.membership.update.mockResolvedValue(suspended(OTHER_USER_ID, "OWNER"));
+
+      expect((await suspend(OTHER_USER_ID)).statusCode).toBe(200);
+    });
+
+    it("forbids an admin from suspending an owner", async () => {
+      actInTeam("ADMIN");
+      db.membership.findUnique.mockResolvedValue(
+        memberRow(OTHER_USER_ID, "OWNER"),
+      );
+
+      const res = await suspend(OTHER_USER_ID);
+
+      expect(res.statusCode).toBe(403);
+      expect(db.membership.update).not.toHaveBeenCalled();
+    });
+
+    it("is refused to a developer", async () => {
+      actInTeam("DEVELOPER");
+
+      const res = await suspend(OTHER_USER_ID);
+
+      expect(res.statusCode).toBe(403);
+      expect(res.json()).toMatchObject({ permission: "members.manage" });
+    });
+
+    it("answers 404 for someone who is not a member", async () => {
+      actInTeam("OWNER");
+      db.membership.findUnique.mockResolvedValue(null);
+
+      expect((await suspend(OTHER_USER_ID)).statusCode).toBe(404);
+    });
+
+    it("needs a recent sign-in", async () => {
+      actInTeam("OWNER");
+      authenticateRequest.mockResolvedValue(signedIn([60, -1]));
+
+      const res = await suspend(OTHER_USER_ID);
+
+      expect(res.statusCode).toBe(403);
+      expect(res.json()).toMatchObject({ error: "reauth_required" });
+    });
+
+    it("keeps a suspended member out of the organization", async () => {
+      actAs(db, "ADMIN");
+      db.membership.findFirst.mockResolvedValue({
+        ...membershipRow("ADMIN", ORG_ID, false),
+        suspendedAt: new Date(),
+      });
+      const instance = await app();
+
+      const res = await instance.inject({
+        method: "GET",
+        url: "/me/organization/members",
+        headers: TEAM,
+      });
+
+      expect(res.statusCode).toBe(403);
+      expect(res.json()).toMatchObject({ error: "member_suspended" });
+      expect(db.membership.findMany).not.toHaveBeenCalled();
+      await instance.close();
+    });
+  });
+
+  describe("session revocation", () => {
+    const clerkUser = (address: string) => ({
+      id: "user_other",
+      primaryEmailAddressId: "email_1",
+      emailAddresses: [
+        {
+          id: "email_1",
+          emailAddress: address,
+          verification: { status: "verified" },
+        },
+      ],
+    });
+
+    const revoke = async () => {
+      const instance = await app();
+      const res = await instance.inject({
+        method: "POST",
+        url: `/me/organization/members/${OTHER_USER_ID}/sessions/revoke`,
+        headers: TEAM,
+      });
+      await instance.close();
+      return res;
+    };
+
+    beforeEach(() => {
+      actInTeam("ADMIN");
+      db.membership.findUnique.mockResolvedValue({
+        user: { clerkUserId: "user_other", email: "grace@acme.com" },
+      });
+      getSessionList.mockResolvedValue({
+        data: [{ id: "sess_a" }, { id: "sess_b" }],
+        totalCount: 2,
+      });
+      revokeSession.mockResolvedValue({});
+    });
+
+    it("revokes every Clerk session of a member on a verified domain", async () => {
+      getUser.mockResolvedValue(clerkUser("grace@acme.com"));
+      db.organizationDomain.findFirst.mockResolvedValue({ id: "domain_1" });
+
+      const res = await revoke();
+
+      expect(res.statusCode).toBe(200);
+      expect(res.json()).toEqual({ revoked: 2 });
+      expect(db.organizationDomain.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            organizationId: ORG_ID,
+            domain: "acme.com",
+            verifiedAt: { not: null },
+          },
+        }),
+      );
+      expect(getSessionList).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: "user_other", status: "active" }),
+      );
+      expect(revokeSession.mock.calls.map(([id]) => id)).toEqual([
+        "sess_a",
+        "sess_b",
+      ]);
+      expect(auditActions()).toEqual(["member.sessions_revoked"]);
+    });
+
+    it("refuses a member whose identity the organization does not manage", async () => {
+      getUser.mockResolvedValue(clerkUser("grace@gmail.com"));
+      db.organizationDomain.findFirst.mockResolvedValue(null);
+
+      const res = await revoke();
+
+      expect(res.statusCode).toBe(403);
+      expect(res.json()).toMatchObject({ error: "identity_not_managed" });
+      expect(revokeSession).not.toHaveBeenCalled();
+    });
+
+    it("answers 404 for someone who is not a member", async () => {
+      db.membership.findUnique.mockResolvedValue(null);
+
+      expect((await revoke()).statusCode).toBe(404);
+      expect(getSessionList).not.toHaveBeenCalled();
+    });
+
+    it("answers 503 when Clerk is unreachable", async () => {
+      getUser.mockRejectedValue(new Error("down"));
+
+      const res = await revoke();
+
+      expect(res.statusCode).toBe(503);
+      expect(revokeSession).not.toHaveBeenCalled();
+    });
+
+    it("needs a recent sign-in", async () => {
+      authenticateRequest.mockResolvedValue(signedIn([60, -1]));
+
+      const res = await revoke();
+
+      expect(res.statusCode).toBe(403);
+      expect(res.json()).toMatchObject({ error: "reauth_required" });
+      expect(getUser).not.toHaveBeenCalled();
     });
   });
 });

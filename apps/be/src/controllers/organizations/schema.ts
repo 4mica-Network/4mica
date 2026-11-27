@@ -14,6 +14,12 @@ export const ORG_ROLES = [
   "VIEWER",
   "FINANCE",
 ] as const;
+export const MEMBERSHIP_SOURCES = [
+  "INVITATION",
+  "CREATOR",
+  "SCIM",
+  "DOMAIN",
+] as const;
 export const GOVERNED_ROLES: readonly OrgRoleInput[] = [
   "OWNER",
   "ADMIN",
@@ -55,7 +61,19 @@ export const UpdateOrganizationSchema = v.pipe(
   ),
 );
 
-export const UpdateMemberSchema = v.object({ role: RoleSchema });
+export const UpdateMemberSchema = v.pipe(
+  v.object({
+    role: v.optional(RoleSchema),
+    customRoleId: v.optional(
+      v.pipe(v.string(), v.trim(), v.toLowerCase(), v.uuid()),
+    ),
+  }),
+  v.check(
+    (value) =>
+      (value.role === undefined) !== (value.customRoleId === undefined),
+    "set either role or customRoleId",
+  ),
+);
 
 export const TransferOwnershipSchema = v.object({
   userId: v.pipe(v.string(), v.uuid()),

@@ -43,9 +43,14 @@ import {
 
 const ENVIRONMENTS: readonly EnvironmentKind[] = ["SANDBOX", "PRODUCTION"];
 
-const roleOn = (row: ProjectRow, orgRole: OrgRole): ProjectRole | null =>
+const roleOn = (
+  row: ProjectRow,
+  orgRole: OrgRole,
+  customProjectRole: ProjectRole | null = null,
+): ProjectRole | null =>
   effectiveProjectRole({
     orgRole,
+    customProjectRole,
     projectRole: row.members[0]?.role ?? null,
     restricted: row.restricted,
   });
@@ -110,7 +115,7 @@ export const listProjectsHandler: RouteHandler = async (request, reply) => {
 
   const rows = await listProjects(tenant.orgId, tenant.userId);
   const items = rows.flatMap((row) => {
-    const role = roleOn(row, tenant.role);
+    const role = roleOn(row, tenant.role, tenant.custom?.projectRole ?? null);
     return role ? [summary(row, role)] : [];
   });
 
@@ -143,7 +148,8 @@ export const createProjectHandler: RouteHandler = async (request, reply) => {
       { name, slug, description: description ?? null, restricted },
       actor(request, tenant.userId),
     );
-    const role = roleOn(row, tenant.role) ?? "ADMIN";
+    const role =
+      roleOn(row, tenant.role, tenant.custom?.projectRole ?? null) ?? "ADMIN";
     return reply.code(201).send(summary(row, role));
   } catch (error) {
     if (isUniqueViolation(error)) {
@@ -258,9 +264,13 @@ export const deleteProjectHandler: RouteHandler = async (request, reply) => {
   return reply.code(204).send();
 };
 
-const toProjectMember = (row: ProjectMemberRow, restricted: boolean) => ({
+const toProjectMember = (
+  { customProjectRole, ...row }: ProjectMemberRow,
+  restricted: boolean,
+) => ({
   ...row,
   effectiveRole: effectiveProjectRole({
+    customProjectRole,
     orgRole: row.orgRole,
     projectRole: row.projectRole,
     restricted,
@@ -371,7 +381,9 @@ export const moveResourcesHandler: RouteHandler = async (request, reply) => {
   }
 
   const target = await getProject(scope.orgId, scope.userId, targetProjectId);
-  const targetRole = target ? roleOn(target, scope.orgRole) : null;
+  const targetRole = target
+    ? roleOn(target, scope.orgRole, scope.customProjectRole)
+    : null;
   if (!target || !targetRole) {
     return notFound(reply, "project");
   }

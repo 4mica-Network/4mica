@@ -103,7 +103,8 @@ export const developerRoutes: FastifyPluginCallback = (app, _opts, done) => {
       ...base,
       schema: {
         tags: ["developer"],
-        summary: "Rename an API key",
+        summary:
+          "Rename an API key or change the addresses it may be used from",
         security: [{ bearerAuth: [] }],
         params: idParamSchema,
         response: {

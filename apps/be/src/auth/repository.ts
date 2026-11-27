@@ -1,5 +1,5 @@
 import type { AuthIdentity } from "@4mica/auth";
-import { prisma } from "@4mica/db";
+import { type ProjectRole, prisma } from "@4mica/db";
 import { defaultProjectCreate } from "@utils/default-project";
 import { isUniqueViolation } from "@utils/prisma-errors";
 import type { Tenant } from "./tenant";
@@ -104,7 +104,15 @@ export const findApiKeyByHash = (hashedKey: string) =>
       environmentId: true,
       serviceAccountId: true,
       scopes: true,
-      organization: { select: { deletedAt: true } },
+      ipAllowlist: true,
+      organization: {
+        select: {
+          deletedAt: true,
+          securitySettings: {
+            select: { ipAllowlist: true, enforceIpAllowlistForApiKeys: true },
+          },
+        },
+      },
       project: { select: { deletedAt: true, archivedAt: true } },
       environment: { select: { kind: true } },
       serviceAccount: { select: { suspendedAt: true, deletedAt: true } },
@@ -118,6 +126,10 @@ export const touchApiKey = (id: string) =>
 
 const MEMBERSHIP_SELECT = {
   role: true,
+  suspendedAt: true,
+  customRole: {
+    select: { id: true, permissions: true, projectRole: true, deletedAt: true },
+  },
   organization: { select: { id: true, personal: true } },
 } as const;
 
@@ -125,6 +137,13 @@ const toTenant = (
   userId: string,
   row: {
     role: Tenant["role"];
+    suspendedAt?: Date | null;
+    customRole?: {
+      id: string;
+      permissions: string[];
+      projectRole: ProjectRole;
+      deletedAt: Date | null;
+    } | null;
     organization: { id: string; personal: boolean };
   },
 ): Tenant => ({
@@ -132,6 +151,15 @@ const toTenant = (
   userId,
   role: row.role,
   personal: row.organization.personal,
+  custom:
+    row.customRole && row.customRole.deletedAt === null
+      ? {
+          id: row.customRole.id,
+          permissions: row.customRole.permissions,
+          projectRole: row.customRole.projectRole,
+        }
+      : null,
+  suspended: Boolean(row.suspendedAt),
 });
 
 export const findMembership = async (

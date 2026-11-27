@@ -5,6 +5,7 @@ import {
   scopesOrAll,
   toApiKey,
 } from "@controllers/developer/repository";
+import type { UpdateApiKeyInput } from "@controllers/developer/schema";
 import type { ResourceKind } from "@controllers/trust/repository";
 import { type ResourceScope, scopeData, scopeWhere } from "@utils/scope";
 import { generateApiKey } from "@utils/secrets";
@@ -46,11 +47,27 @@ export const createResourceKey = async (
       last4: secret.last4,
       hashedKey: secret.hash,
       expiresAt: data.expiresAt ? new Date(data.expiresAt) : null,
+      ipAllowlist: data.ipAllowlist ?? [],
     },
     select: API_KEY_SELECT,
   });
 
   return { apiKey: toApiKey(row), plaintext: secret.plaintext };
+};
+
+export const updateResourceKey = async (
+  scope: ResourceScope,
+  kind: ResourceKind,
+  id: string,
+  keyId: string,
+  data: UpdateApiKeyInput,
+) => {
+  const { count } = await prisma.apiKey.updateMany({
+    where: { id: keyId, ...target(kind, id), ...scopeWhere(scope) },
+    data,
+  });
+
+  return count > 0 ? findApiKey(keyId) : null;
 };
 
 export const revokeResourceKey = async (

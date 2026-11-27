@@ -538,6 +538,25 @@ describe("service account routes", () => {
       expect(auditActions()).toEqual(["api_key.revoked"]);
     });
 
+    it("changes the allowlist of a key of this account only", async () => {
+      const res = await call("PATCH", `${BASE}/${ACCOUNT_ID}/keys/${KEY_ID}`, {
+        ipAllowlist: ["198.51.100.7", "2001:db8::/48"],
+      });
+
+      expect(res.statusCode).toBe(200);
+      expect(apiKey.updateMany.mock.calls[0][0]).toEqual({
+        where: {
+          id: KEY_ID,
+          organizationId: ORG_ID,
+          projectId: PROJECT_ID,
+          environmentId: SANDBOX_ENV_ID,
+          serviceAccountId: ACCOUNT_ID,
+        },
+        data: { ipAllowlist: ["198.51.100.7", "2001:db8::/48"] },
+      });
+      expect(auditActions()).toEqual(["api_key.updated"]);
+    });
+
     it("rotates immediately by default, revoking the old key", async () => {
       const res = await call(
         "POST",

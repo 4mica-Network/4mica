@@ -4,6 +4,7 @@ import type { ProjectScope } from "@auth/project";
 import { getAgent } from "@controllers/agents/repository";
 import { getApiListing } from "@controllers/api-listings/repository";
 import { requireProductionKeyApproval } from "@controllers/approvals/key-gate";
+import { UpdateApiKeySchema } from "@controllers/developer/schema";
 import {
   auditProject,
   invalidBody,
@@ -25,6 +26,7 @@ import {
   deleteResourceKey,
   listResourceKeys,
   revokeResourceKey,
+  updateResourceKey,
 } from "./repository";
 import { CreateResourceKeySchema } from "./schema";
 
@@ -132,6 +134,34 @@ export const revokeResourceKeyHandler = (kind: ResourceKind): RouteHandler =>
     }
 
     return notFound(reply, "active key");
+  });
+
+export const updateResourceKeyHandler = (kind: ResourceKind): RouteHandler =>
+  withOwnedResource(kind, "keys.manage", async (id, scope, request, reply) => {
+    const parsed = parseBody(UpdateApiKeySchema, request.body);
+    if (!parsed.success) {
+      return invalidBody(reply, parsed.issues);
+    }
+
+    const { keyId } = request.params as { keyId: string };
+    const updated = await updateResourceKey(
+      scope,
+      kind,
+      id,
+      keyId,
+      parsed.data,
+    );
+    if (!updated) {
+      return notFound(reply, "key");
+    }
+
+    await auditProject(request, scope, {
+      action: "api_key.updated",
+      targetType: "api_key",
+      targetId: keyId,
+      metadata: { ...resourceRef(kind, id), ...parsed.data },
+    });
+    return reply.send(updated);
   });
 
 export const deleteResourceKeyHandler = (kind: ResourceKind): RouteHandler =>

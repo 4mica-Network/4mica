@@ -566,6 +566,66 @@ describe("developer routes", () => {
       await app.close();
     });
 
+    it("restricts a key to the addresses it is given, and shows them", async () => {
+      apiKey.create.mockResolvedValue({
+        ...STORED_KEY,
+        ipAllowlist: ["203.0.113.0/24"],
+      });
+      const app = await initApp([{ plugin: developerRoutes }]);
+      const res = await app.inject({
+        method: "POST",
+        url: "/me/api-keys",
+        headers: AUTH,
+        payload: { name: "CI", ipAllowlist: ["203.0.113.9/24"] },
+      });
+
+      expect(res.statusCode).toBe(201);
+      expect(apiKey.create.mock.calls[0][0].data).toMatchObject({
+        ipAllowlist: ["203.0.113.0/24"],
+      });
+      expect(res.json().apiKey.ipAllowlist).toEqual(["203.0.113.0/24"]);
+      await app.close();
+    });
+
+    it("changes a key's allowlist without renaming it", async () => {
+      apiKey.updateMany.mockResolvedValue({ count: 1 });
+      const app = await initApp([{ plugin: developerRoutes }]);
+      const res = await app.inject({
+        method: "PATCH",
+        url: "/me/api-keys/key_1",
+        headers: AUTH,
+        payload: { ipAllowlist: ["2001:DB8::/32"] },
+      });
+
+      expect(res.statusCode).toBe(200);
+      expect(apiKey.updateMany.mock.calls[0][0].data).toEqual({
+        ipAllowlist: ["2001:db8::/32"],
+      });
+      await app.close();
+    });
+
+    it("rejects an allowlist entry that is not an address or range", async () => {
+      const app = await initApp([{ plugin: developerRoutes }]);
+      const create = await app.inject({
+        method: "POST",
+        url: "/me/api-keys",
+        headers: AUTH,
+        payload: { name: "CI", ipAllowlist: ["office"] },
+      });
+      const update = await app.inject({
+        method: "PATCH",
+        url: "/me/api-keys/key_1",
+        headers: AUTH,
+        payload: {},
+      });
+
+      expect(create.statusCode).toBe(400);
+      expect(update.statusCode).toBe(400);
+      expect(apiKey.create).not.toHaveBeenCalled();
+      expect(apiKey.updateMany).not.toHaveBeenCalled();
+      await app.close();
+    });
+
     it("rejects an empty or unknown scope list", async () => {
       const app = await initApp([{ plugin: developerRoutes }]);
       for (const scopes of [[], ["ADMIN"]]) {

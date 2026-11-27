@@ -426,6 +426,34 @@ describe("resource key routes", () => {
       await instance.close();
     });
 
+    it("changes the allowlist of a key bound to this resource only", async () => {
+      const instance = await app();
+
+      const res = await instance.inject({
+        method: "PATCH",
+        url: `/me/agents/${AGENT_ID}/keys/${KEY_ID}`,
+        headers: AUTH,
+        payload: { ipAllowlist: ["198.51.100.0/24"] },
+      });
+
+      expect(res.statusCode).toBe(200);
+      expect(apiKey.updateMany.mock.calls[0][0]).toEqual({
+        where: {
+          id: KEY_ID,
+          agentId: AGENT_ID,
+          organizationId: ORG_ID,
+          projectId: PROJECT_ID,
+          environmentId: SANDBOX_ENV_ID,
+        },
+        data: { ipAllowlist: ["198.51.100.0/24"] },
+      });
+      expect(tenancy.auditLog.create.mock.calls[0][0].data).toMatchObject({
+        action: "api_key.updated",
+        targetId: KEY_ID,
+      });
+      await instance.close();
+    });
+
     it("revokes only a key bound to this resource", async () => {
       const instance = await app();
 

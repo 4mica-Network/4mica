@@ -1,5 +1,6 @@
 import type { OrgRole } from "@4mica/db";
 import type { FastifyRequest } from "fastify";
+import type { CustomRoleGrant } from "./permissions";
 import { ensurePersonalOrganization, findMembership } from "./repository";
 
 export const ORG_HEADER = "x-org-id";
@@ -9,6 +10,8 @@ export interface Tenant {
   userId: string;
   role: OrgRole;
   personal: boolean;
+  custom?: CustomRoleGrant | null;
+  suspended?: boolean;
 }
 
 const lookups = new WeakMap<FastifyRequest, Promise<Tenant | null>>();

@@ -89,6 +89,26 @@ const API_KEY_ROUTES = new Set([
   "POST /v1/spend/authorizations/:id/release",
 ]);
 
+const SCIM_ROUTES = new Set([
+  "GET /scim/v2/ServiceProviderConfig",
+  "GET /scim/v2/ResourceTypes",
+  "GET /scim/v2/ResourceTypes/:id",
+  "GET /scim/v2/Schemas",
+  "GET /scim/v2/Schemas/:id",
+  "GET /scim/v2/Users",
+  "POST /scim/v2/Users",
+  "GET /scim/v2/Users/:id",
+  "PUT /scim/v2/Users/:id",
+  "PATCH /scim/v2/Users/:id",
+  "DELETE /scim/v2/Users/:id",
+  "GET /scim/v2/Groups",
+  "POST /scim/v2/Groups",
+  "GET /scim/v2/Groups/:id",
+  "PUT /scim/v2/Groups/:id",
+  "PATCH /scim/v2/Groups/:id",
+  "DELETE /scim/v2/Groups/:id",
+]);
+
 const CLI_TOKEN_ROUTES = new Set([
   "GET /v1/cli/session",
   "DELETE /v1/cli/session",
@@ -179,7 +199,10 @@ beforeAll(async () => {
 const protectedRoutes = () => routes.filter((r) => !PUBLIC.has(keyOf(r)));
 const sessionRoutes = () =>
   protectedRoutes().filter(
-    (r) => !API_KEY_ROUTES.has(keyOf(r)) && !CLI_TOKEN_ROUTES.has(keyOf(r)),
+    (r) =>
+      !API_KEY_ROUTES.has(keyOf(r)) &&
+      !CLI_TOKEN_ROUTES.has(keyOf(r)) &&
+      !SCIM_ROUTES.has(keyOf(r)),
   );
 
 describe("route inventory", () => {
@@ -193,18 +216,26 @@ describe("route inventory", () => {
       ...PUBLIC,
       ...API_KEY_ROUTES,
       ...CLI_TOKEN_ROUTES,
+      ...SCIM_ROUTES,
     ]) {
       expect(keys).toContain(expected);
     }
     expect(
-      keys.filter((key) =>
-        /\/(admin|internal|debug|metrics|docs|v2|legacy|test)\b/.test(key),
+      keys.filter(
+        (key) =>
+          key !== "POST /me/organization/audit-streams/:id/test" &&
+          !SCIM_ROUTES.has(key) &&
+          /\/(admin|internal|debug|metrics|docs|v2|legacy|test)\b/.test(key),
       ),
     ).toEqual([]);
+    expect(
+      keys.filter((key) => /^[A-Z]+ \/scim(\/|$)/.test(key)).sort(),
+    ).toEqual([...SCIM_ROUTES].sort());
     expect(
       keys.filter(
         (key) =>
           !PUBLIC.has(key) &&
+          !SCIM_ROUTES.has(key) &&
           !/^[A-Z]+ \/(me|v1)(\/|$)/.test(key) &&
           !/^[A-Z]+ \/(banners|config|webhook-events)(\/|$)/.test(key),
       ),
@@ -329,6 +360,10 @@ describe("authentication matrix", () => {
       "financialAlert",
       "approvalDecision",
       "governanceSettings",
+      "scimToken",
+      "scimGroup",
+      "scimGroupMember",
+      "securitySettings",
       "$queryRaw",
     ];
     const failures: string[] = [];
@@ -349,6 +384,39 @@ describe("authentication matrix", () => {
     }
 
     expect(failures).toEqual([]);
+  });
+
+  it("accepts neither a Clerk session nor an API key on SCIM routes", async () => {
+    authenticateRequest.mockResolvedValue(signedIn());
+    userRow.current = {
+      id: ID,
+      clerkUserId: "user_matrix",
+      email: null,
+      name: null,
+      avatarUrl: null,
+      banned: false,
+      locked: false,
+      deletedAt: null,
+    };
+    const scimRoutes = routes.filter((r) => SCIM_ROUTES.has(keyOf(r)));
+    expect(scimRoutes).toHaveLength(SCIM_ROUTES.size);
+
+    for (const authorization of [
+      "Bearer a-valid-session-token",
+      "Bearer 4mica_sk_live_abcdefghijklmnop",
+      "Bearer 4mica_cli_abcdefghijklmnop",
+    ]) {
+      touched.clear();
+      for (const route of scimRoutes) {
+        const { statusCode, body } = await inject(route, { authorization });
+        expect(statusCode, `${keyOf(route)} ${authorization}`).toBe(401);
+        expect(JSON.parse(body).schemas).toEqual([
+          "urn:ietf:params:scim:api:messages:2.0:Error",
+        ]);
+      }
+      expect([...touched]).toEqual([]);
+    }
+    expect(authenticateRequest).not.toHaveBeenCalled();
   });
 
   it("does not accept a valid Clerk session on CLI-token routes", async () => {

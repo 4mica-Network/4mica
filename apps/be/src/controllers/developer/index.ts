@@ -110,6 +110,7 @@ export const updateApiKeyHandler: RouteHandler = async (request, reply) => {
     action: "api_key.updated",
     targetType: "api_key",
     targetId: id,
+    metadata: parsed.data,
   });
   return reply.send(updated);
 };

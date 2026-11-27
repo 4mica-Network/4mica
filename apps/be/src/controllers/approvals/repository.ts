@@ -6,7 +6,7 @@ import {
   type Prisma,
   prisma,
 } from "@4mica/db";
-import { can } from "@auth/permissions";
+import { can, type RoleSubject } from "@auth/permissions";
 import { onApprovalResolved } from "@controllers/spend/approval-hook";
 import { payloadHash } from "@utils/canonical";
 import {
@@ -56,9 +56,8 @@ export type ApprovalRow = Prisma.ApprovalRequestGetPayload<{
   select: typeof APPROVAL_SELECT;
 }>;
 
-export interface Viewer {
+export interface Viewer extends RoleSubject {
   userId: string;
-  role: OrgRole;
 }
 
 const isExpired = (row: { status: ApprovalStatus; expiresAt: Date }) =>
@@ -95,8 +94,7 @@ export const toApproval = (row: ApprovalRow, viewer: Viewer) => {
     approvals: row.decisions.filter((decision) => decision.vote === "APPROVE")
       .length,
     canDecide:
-      can(viewer.role, "approvals.decide") &&
-      decisionBlocker(row, viewer) === null,
+      can(viewer, "approvals.decide") && decisionBlocker(row, viewer) === null,
   };
 };
 

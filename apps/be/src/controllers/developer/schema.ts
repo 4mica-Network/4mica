@@ -4,6 +4,7 @@ import {
   publicHttpsUrl,
   singleLine,
 } from "@controllers/schema-primitives";
+import { IpAllowlistSchema } from "@controllers/security/schema";
 import { isKnownEvent } from "@utils/webhook-events";
 import * as v from "valibot";
 
@@ -46,15 +47,25 @@ export const apiKeyScopes = v.pipe(
   v.transform((scopes): ApiKeyScope[] => [...new Set(scopes)]),
 );
 
+export const keyIpAllowlist = v.optional(IpAllowlistSchema);
+
 export const CreateApiKeySchema = v.object({
   name,
   scopes: v.optional(apiKeyScopes),
   expiresAt: v.optional(v.nullable(futureTimestamp)),
+  ipAllowlist: keyIpAllowlist,
 });
 
-export const UpdateApiKeySchema = v.object({
-  name,
-});
+export const UpdateApiKeySchema = v.pipe(
+  v.object({
+    name: v.optional(name),
+    ipAllowlist: keyIpAllowlist,
+  }),
+  v.check(
+    (data) => data.name !== undefined || data.ipAllowlist !== undefined,
+    "send a name or an ipAllowlist",
+  ),
+);
 
 export const CreateWebhookSchema = v.object({
   url: webhookUrl,

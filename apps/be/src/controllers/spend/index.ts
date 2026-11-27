@@ -248,6 +248,7 @@ export const listAuthorizationsHandler: RouteHandler = async (
       project &&
       effectiveProjectRole({
         orgRole: tenant.role,
+        customProjectRole: tenant.custom?.projectRole ?? null,
         projectRole: project.members[0]?.role ?? null,
         restricted: project.restricted,
       });

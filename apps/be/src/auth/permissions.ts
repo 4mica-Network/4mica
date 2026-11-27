@@ -17,6 +17,9 @@ export const PERMISSIONS = [
   "approvals.decide",
   "governance.manage",
   "reports.export",
+  "security.manage",
+  "roles.manage",
+  "compliance.read",
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -50,6 +53,7 @@ const ADMIN: readonly Permission[] = [
   "finance.manage",
   "approvals.decide",
   "reports.export",
+  "compliance.read",
 ];
 
 const OWNER: readonly Permission[] = [
@@ -57,6 +61,8 @@ const OWNER: readonly Permission[] = [
   "org.delete",
   "org.transfer",
   "governance.manage",
+  "security.manage",
+  "roles.manage",
 ];
 
 export const ROLE_PERMISSIONS: Readonly<
@@ -69,11 +75,47 @@ export const ROLE_PERMISSIONS: Readonly<
   FINANCE: new Set(FINANCE),
 };
 
-export const can = (role: OrgRole, permission: Permission): boolean =>
-  ROLE_PERMISSIONS[role].has(permission);
+export const OWNER_ONLY_PERMISSIONS: ReadonlySet<Permission> = new Set([
+  "org.delete",
+  "org.transfer",
+  "governance.manage",
+  "security.manage",
+  "roles.manage",
+]);
 
-export const permissionsFor = (role: OrgRole): Permission[] =>
-  PERMISSIONS.filter((permission) => can(role, permission));
+export const ASSIGNABLE_PERMISSIONS: readonly Permission[] = PERMISSIONS.filter(
+  (permission) => !OWNER_ONLY_PERMISSIONS.has(permission),
+);
+
+export interface CustomRoleGrant {
+  id: string;
+  permissions: readonly string[];
+  projectRole: ProjectRole;
+}
+
+export interface RoleSubject {
+  role: OrgRole;
+  custom?: CustomRoleGrant | null;
+}
+
+export const can = (
+  subject: OrgRole | RoleSubject,
+  permission: Permission,
+): boolean => {
+  if (typeof subject === "string") {
+    return ROLE_PERMISSIONS[subject].has(permission);
+  }
+  if (subject.custom && subject.role !== "OWNER") {
+    return (
+      !OWNER_ONLY_PERMISSIONS.has(permission) &&
+      subject.custom.permissions.includes(permission)
+    );
+  }
+  return ROLE_PERMISSIONS[subject.role].has(permission);
+};
+
+export const permissionsFor = (subject: OrgRole | RoleSubject): Permission[] =>
+  PERMISSIONS.filter((permission) => can(subject, permission));
 
 export const PROJECT_PERMISSIONS = [
   "project.read",
@@ -133,14 +175,16 @@ export interface ProjectAccessInput {
   orgRole: OrgRole;
   projectRole: ProjectRole | null;
   restricted: boolean;
+  customProjectRole?: ProjectRole | null;
 }
 
 export const effectiveProjectRole = ({
   orgRole,
   projectRole,
   restricted,
+  customProjectRole,
 }: ProjectAccessInput): ProjectRole | null => {
-  if (orgRole === "OWNER" || orgRole === "ADMIN") {
+  if (orgRole === "OWNER" || (orgRole === "ADMIN" && !customProjectRole)) {
     return "ADMIN";
   }
   if (projectRole) {
@@ -148,6 +192,9 @@ export const effectiveProjectRole = ({
   }
   if (restricted) {
     return null;
+  }
+  if (customProjectRole) {
+    return customProjectRole;
   }
   return orgRole === "DEVELOPER" ? "DEVELOPER" : "VIEWER";
 };

@@ -95,3 +95,10 @@ export const normalizeUserCode = (value: string): string | null => {
 
 export const formatUserCode = (code: string): string =>
   `${code.slice(0, 4)}-${code.slice(4)}`;
+
+const SCIM_TOKEN_NAMESPACE = "4mica_scim";
+
+export const SCIM_TOKEN_PREFIX = `${SCIM_TOKEN_NAMESPACE}_`;
+
+export const generateScimToken = (): GeneratedSecret =>
+  generate(SCIM_TOKEN_NAMESPACE);

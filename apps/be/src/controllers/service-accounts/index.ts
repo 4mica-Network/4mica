@@ -1,4 +1,5 @@
 import { requireProductionKeyApproval } from "@controllers/approvals/key-gate";
+import { UpdateApiKeySchema } from "@controllers/developer/schema";
 import {
   auditProject,
   invalidBody,
@@ -18,6 +19,7 @@ import {
   revokeServiceAccountKey,
   rotateServiceAccountKey,
   updateServiceAccount,
+  updateServiceAccountKey,
 } from "./repository";
 import {
   CreateServiceAccountKeySchema,
@@ -228,6 +230,7 @@ export const createServiceAccountKeyHandler: RouteHandler = async (
     name: parsed.data.name,
     scopes: parsed.data.scopes,
     expiresAt: parsed.data.expiresAt ? new Date(parsed.data.expiresAt) : null,
+    ipAllowlist: parsed.data.ipAllowlist ?? [],
   });
   await auditProject(request, scope, {
     action: "api_key.created",
@@ -246,6 +249,39 @@ export const createServiceAccountKeyHandler: RouteHandler = async (
   });
 
   return reply.code(201).send(key);
+};
+
+export const updateServiceAccountKeyHandler: RouteHandler = async (
+  request,
+  reply,
+) => {
+  const scope = await requireProject(request, reply, "keys.manage");
+  if (!scope) {
+    return reply;
+  }
+
+  const parsed = parseBody(UpdateApiKeySchema, request.body);
+  if (!parsed.success) {
+    return invalidBody(reply, parsed.issues);
+  }
+
+  const { id, keyId = "" } = params(request);
+  if (!(await getServiceAccount(scope, id))) {
+    return notFound(reply, "service account");
+  }
+
+  const updated = await updateServiceAccountKey(scope, id, keyId, parsed.data);
+  if (!updated) {
+    return notFound(reply, "key");
+  }
+
+  await auditProject(request, scope, {
+    action: "api_key.updated",
+    targetType: "api_key",
+    targetId: keyId,
+    metadata: { serviceAccountId: id, ...parsed.data },
+  });
+  return reply.send(updated);
 };
 
 export const revokeServiceAccountKeyHandler: RouteHandler = async (

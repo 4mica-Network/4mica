@@ -197,6 +197,8 @@ vi.mock("@4mica/db", () => {
       ),
     },
     auditLog: { create: vi.fn(async () => ({ id: "audit" })) },
+    securitySettings: { findUnique: vi.fn(async () => null) },
+    ssoConnection: { findMany: vi.fn(async () => []) },
     user: {
       findUnique: vi.fn(
         async ({ where }: { where: Row }) =>

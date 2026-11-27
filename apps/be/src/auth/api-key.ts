@@ -1,5 +1,6 @@
 import type { ApiKeyScope, EnvironmentKind } from "@4mica/db";
 import { appLogger } from "@logger/index";
+import { ipAllowed } from "@utils/ip-allowlist";
 import { hashSecret } from "@utils/secrets";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import { findApiKeyByHash, touchApiKey } from "./repository";
@@ -69,6 +70,34 @@ export const bearerToken = (request: FastifyRequest): string | null => {
   return token && token.length > 0 ? token : null;
 };
 
+interface IpRestrictions {
+  ipAllowlist?: string[];
+  organization: {
+    securitySettings?: {
+      ipAllowlist: string[];
+      enforceIpAllowlistForApiKeys: boolean;
+    } | null;
+  };
+}
+
+export const ipRefusal = (
+  ip: string,
+  { ipAllowlist = [], organization }: IpRestrictions,
+): string | null => {
+  if (ipAllowlist.length > 0 && !ipAllowed(ip, ipAllowlist)) {
+    return "ip_not_allowed_by_key";
+  }
+  const org = organization.securitySettings;
+  if (
+    org?.enforceIpAllowlistForApiKeys &&
+    org.ipAllowlist.length > 0 &&
+    !ipAllowed(ip, org.ipAllowlist)
+  ) {
+    return "ip_not_allowed_by_organization";
+  }
+  return null;
+};
+
 export const authenticateApiKey = async (
   request: FastifyRequest,
   reply: FastifyReply,
@@ -100,7 +129,7 @@ export const authenticateApiKey = async (
               ? "service_account_inactive"
               : record.listing?.deletedAt || record.agent?.deletedAt
                 ? "resource_deleted"
-                : null;
+                : ipRefusal(request.ip, record);
 
   if (!record || reason) {
     rejected(request, reply, reason ?? "unknown", token);
