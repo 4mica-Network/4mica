@@ -6,7 +6,7 @@ import { profileTag } from "@/actions/shared";
 import { serverEnv } from "@/env.server";
 import { parseUsername } from "@/schema/params";
 import { RevalidateBodySchema } from "@/schema/revalidate";
-import { ownerTag, resourceTag } from "@/services/cache";
+import { organizationTag, resourceTag } from "@/services/cache";
 import { prisma } from "@/services/db";
 
 export const dynamic = "force-dynamic";
@@ -40,37 +40,37 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "invalid_body" }, { status: 400 });
   }
 
-  const { ownerId, resources = [] } = parsed.output;
+  const { organizationId, resources = [] } = parsed.output;
   const username = parseUsername(parsed.output.username);
   const usernames = (parsed.output.usernames ?? [])
     .map(parseUsername)
     .filter((handle): handle is string => handle !== null);
 
-  if (!ownerId && !username && usernames.length === 0) {
+  if (!organizationId && !username && usernames.length === 0) {
     return NextResponse.json({ error: "invalid_body" }, { status: 400 });
   }
 
-  const owner = ownerId
-    ? await prisma.user.findUnique({
-        where: { id: ownerId },
-        select: { id: true, username: true },
+  const organization = organizationId
+    ? await prisma.organization.findUnique({
+        where: { id: organizationId },
+        select: { id: true, handle: true },
       })
     : username
-      ? await prisma.user.findUnique({
-          where: { username },
-          select: { id: true, username: true },
+      ? await prisma.organization.findUnique({
+          where: { handle: username },
+          select: { id: true, handle: true },
         })
       : null;
 
-  const staleOwnerId = ownerId ?? owner?.id;
+  const staleOrganizationId = organizationId ?? organization?.id;
   const handles = new Set(
-    [username, ...usernames, owner?.username].filter(
+    [username, ...usernames, organization?.handle].filter(
       (handle): handle is string => Boolean(handle),
     ),
   );
 
-  if (staleOwnerId) {
-    revalidateTag(ownerTag(staleOwnerId), { expire: 0 });
+  if (staleOrganizationId) {
+    revalidateTag(organizationTag(staleOrganizationId), { expire: 0 });
   }
 
   for (const handle of handles) {

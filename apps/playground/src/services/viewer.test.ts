@@ -20,6 +20,10 @@ const ROW = {
   banned: false,
   locked: false,
   deletedAt: null,
+  memberships: [
+    { organizationId: "019fce62-0000-7000-8000-00000000000a" },
+    { organizationId: "019fce62-0000-7000-8000-00000000000b" },
+  ],
 };
 
 describe("getViewer", () => {
@@ -37,6 +41,20 @@ describe("getViewer", () => {
       username: "ada",
       name: "Ada Lovelace",
       avatarUrl: null,
+      organizationIds: [
+        "019fce62-0000-7000-8000-00000000000a",
+        "019fce62-0000-7000-8000-00000000000b",
+      ],
+    });
+  });
+
+  it("loads only the memberships of live organizations", async () => {
+    findUnique.mockResolvedValue({ ...ROW, memberships: [] });
+
+    expect((await getViewer())?.organizationIds).toEqual([]);
+    expect(findUnique.mock.calls[0][0].select.memberships).toEqual({
+      where: { organization: { deletedAt: null } },
+      select: { organizationId: true },
     });
   });
 

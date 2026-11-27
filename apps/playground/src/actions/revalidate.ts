@@ -2,7 +2,8 @@
 
 import { revalidatePath, updateTag } from "next/cache";
 import { parseUsername } from "@/schema/params";
-import { ownerTag } from "@/services/cache";
+import { organizationTag } from "@/services/cache";
+import { prisma } from "@/services/db";
 import { getViewer } from "@/services/viewer";
 import { allowWrite } from "@/services/writeLimit";
 import { type ActionResult, profileTag } from "./shared";
@@ -29,7 +30,16 @@ export const revalidateProfile = async (
 
   const viewer = await getViewer();
 
-  if (!viewer || viewer.username !== parsed) {
+  if (!viewer) {
+    return { ok: false, error: "forbidden" };
+  }
+
+  const organization = await prisma.organization.findFirst({
+    where: { handle: parsed, deletedAt: null },
+    select: { id: true },
+  });
+
+  if (!organization || !viewer.organizationIds.includes(organization.id)) {
     return { ok: false, error: "forbidden" };
   }
 
@@ -37,7 +47,7 @@ export const revalidateProfile = async (
   // updateTag gives read-your-own-writes semantics so the owner sees the fresh
   // page on the very next render instead of one navigation later.
   updateTag(profileTag(parsed));
-  updateTag(ownerTag(viewer.id));
+  updateTag(organizationTag(organization.id));
   revalidatePath(`/${parsed}`, "layout");
 
   return { ok: true };

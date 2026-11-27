@@ -4,9 +4,13 @@ import { cache } from "react";
 import { profileTag } from "@/actions/shared";
 import type { PublicProfile } from "@/schema/profile";
 import { cachedPublic } from "./cache";
-import { prisma } from "./db";
-import { isProfileRenderable, toPublicProfile } from "./profile-rules";
-import { getViewer } from "./viewer";
+import { type Prisma, prisma } from "./db";
+import {
+  isProfileRenderable,
+  toProfileRow,
+  toPublicProfile,
+} from "./profile-rules";
+import { getViewer, type Viewer } from "./viewer";
 
 export const PROFILE_SELECT = {
   id: true,
@@ -30,55 +34,83 @@ export const PROFILE_SELECT = {
   secondaryBrandColor: true,
   disableBranding: true,
   theme: true,
-} as const;
+} as const satisfies Prisma.UserSelect;
+
+export const ORGANIZATION_PROFILE_SELECT = {
+  id: true,
+  handle: true,
+  name: true,
+  avatarUrl: true,
+  personal: true,
+  createdAt: true,
+  deletedAt: true,
+  memberships: {
+    where: { role: "OWNER" },
+    orderBy: { createdAt: "asc" },
+    take: 1,
+    select: { user: { select: PROFILE_SELECT } },
+  },
+} as const satisfies Prisma.OrganizationSelect;
 
 export interface ProfileResult {
-  ownerId: string;
+  organizationId: string;
   profile: PublicProfile;
 }
 
 interface PublicProfileGate {
-  ownerId: string;
+  organizationId: string;
   renderable: boolean;
   profile: PublicProfile;
 }
 
-const loadPublicProfileGate = cachedPublic(
-  "profile-gate",
-  async (username: string): Promise<PublicProfileGate | null> => {
-    const row = await prisma.user.findUnique({
-      where: { username },
-      select: PROFILE_SELECT,
-    });
-
-    return row
-      ? {
-          ownerId: row.id,
-          renderable: isProfileRenderable(row),
-          profile: toPublicProfile(row, { isOwner: false }),
-        }
-      : null;
-  },
-  (username) => [profileTag(username)],
-);
-
-const loadOwnerProfile = async (
-  username: string,
-): Promise<ProfileResult | null> => {
-  const row = await prisma.user.findUnique({
-    where: { username },
-    select: PROFILE_SELECT,
+const findOrganization = (handle: string) =>
+  prisma.organization.findFirst({
+    where: { handle, deletedAt: null },
+    select: ORGANIZATION_PROFILE_SELECT,
   });
 
-  return row
-    ? { ownerId: row.id, profile: toPublicProfile(row, { isOwner: true }) }
+const loadPublicProfileGate = cachedPublic(
+  "profile-gate",
+  async (handle: string): Promise<PublicProfileGate | null> => {
+    const org = await findOrganization(handle);
+
+    if (!org) {
+      return null;
+    }
+
+    const row = toProfileRow(org);
+
+    return {
+      organizationId: org.id,
+      renderable: isProfileRenderable(row),
+      profile: toPublicProfile(row, { isOwner: false }),
+    };
+  },
+  (handle) => [profileTag(handle)],
+);
+
+const loadMemberProfile = async (
+  handle: string,
+): Promise<ProfileResult | null> => {
+  const org = await findOrganization(handle);
+
+  return org
+    ? {
+        organizationId: org.id,
+        profile: toPublicProfile(toProfileRow(org), { isOwner: true }),
+      }
     : null;
 };
 
+export const isMemberOf = (
+  viewer: Viewer | null,
+  organizationId: string,
+): boolean => viewer?.organizationIds.includes(organizationId) ?? false;
+
 export const getPublicProfile = cache(
-  async (username: string): Promise<ProfileResult | null> => {
+  async (handle: string): Promise<ProfileResult | null> => {
     const [gate, viewer] = await Promise.all([
-      loadPublicProfileGate(username),
+      loadPublicProfileGate(handle),
       getViewer(),
     ]);
 
@@ -86,22 +118,22 @@ export const getPublicProfile = cache(
       return null;
     }
 
-    if (viewer?.id === gate.ownerId) {
-      return loadOwnerProfile(username);
+    if (isMemberOf(viewer, gate.organizationId)) {
+      return loadMemberProfile(handle);
     }
 
     return gate.renderable
-      ? { ownerId: gate.ownerId, profile: gate.profile }
+      ? { organizationId: gate.organizationId, profile: gate.profile }
       : null;
   },
 );
 
 export const getAnonymousProfile = cache(
-  async (username: string): Promise<ProfileResult | null> => {
-    const gate = await loadPublicProfileGate(username);
+  async (handle: string): Promise<ProfileResult | null> => {
+    const gate = await loadPublicProfileGate(handle);
 
     return gate?.renderable
-      ? { ownerId: gate.ownerId, profile: gate.profile }
+      ? { organizationId: gate.organizationId, profile: gate.profile }
       : null;
   },
 );

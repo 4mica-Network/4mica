@@ -203,10 +203,10 @@ export const listFaqs = cache(
 export const hasSettledPayment = async (
   kind: ResourceKind,
   id: string,
-  viewerId: string,
+  organizationIds: string[],
 ): Promise<boolean> => {
   const wallets = await prisma.wallet.findMany({
-    where: { ownerId: viewerId },
+    where: { organizationId: { in: organizationIds } },
     select: { address: true },
   });
 

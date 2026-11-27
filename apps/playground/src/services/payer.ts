@@ -20,7 +20,7 @@ const getPayerWallets = cache(async () => {
 
   return prisma.wallet.findMany({
     where: {
-      ownerId: viewer.id,
+      organizationId: { in: viewer.organizationIds },
       status: "ACTIVE",
       role: { in: ["PAYER", "BOTH"] },
     },

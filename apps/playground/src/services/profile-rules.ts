@@ -30,7 +30,57 @@ export interface ProfileRow extends ProfileGateRow {
   theme: string;
 }
 
+export interface OrganizationProfileRow {
+  id: string;
+  handle: string | null;
+  name: string;
+  avatarUrl: string | null;
+  personal: boolean;
+  createdAt: Date;
+  deletedAt: Date | null;
+  memberships: { user: ProfileRow }[];
+}
+
 export { isProfileRenderable };
+
+export const toProfileRow = (org: OrganizationProfileRow): ProfileRow => {
+  const owner = org.personal ? org.memberships[0]?.user : undefined;
+
+  if (owner) {
+    return {
+      ...owner,
+      id: org.id,
+      username: org.handle,
+      name: owner.name || org.name,
+      avatarUrl: owner.avatarUrl ?? org.avatarUrl,
+      deletedAt: org.deletedAt ?? owner.deletedAt,
+    };
+  }
+
+  return {
+    id: org.id,
+    username: org.handle,
+    name: org.name,
+    bio: null,
+    avatarUrl: org.avatarUrl,
+    verified: false,
+    createdAt: org.createdAt,
+    private: org.personal,
+    banned: false,
+    deletedAt: org.deletedAt,
+    allowSEOIndexing: false,
+    allowEmailVisibility: false,
+    allowPhoneNumberVisibility: false,
+    email: null,
+    emailVerified: false,
+    phoneNumber: null,
+    allowCustomBrandColor: false,
+    primaryBrandColor: "",
+    secondaryBrandColor: "",
+    disableBranding: false,
+    theme: "dark",
+  };
+};
 
 export const toPublicProfile = (
   row: ProfileRow,

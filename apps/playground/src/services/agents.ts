@@ -3,7 +3,7 @@ import "server-only";
 import { cache } from "react";
 import type { PublicAgent } from "@/schema/agent";
 import type { PaymentNetwork } from "@/schema/params";
-import { cachedPublic, ownerTag } from "./cache";
+import { cachedPublic, organizationTag } from "./cache";
 import { prisma } from "./db";
 
 /**
@@ -103,12 +103,12 @@ export const toPublicAgent = (row: AgentRow): PublicAgent => ({
  * previewing their own profile sees everything.
  */
 const queryAgents = async (
-  ownerId: string,
+  organizationId: string,
   includeHidden: boolean,
 ): Promise<PublicAgent[]> => {
   const rows = await prisma.agent.findMany({
     where: {
-      ownerId,
+      organizationId,
       deletedAt: null,
       ...(includeHidden ? {} : { visibility: "PUBLIC" }),
     },
@@ -122,13 +122,15 @@ const queryAgents = async (
 
 const loadPublicAgents = cachedPublic(
   "agents:list",
-  (ownerId: string) => queryAgents(ownerId, false),
-  (ownerId) => [ownerTag(ownerId)],
+  (organizationId: string) => queryAgents(organizationId, false),
+  (organizationId) => [organizationTag(organizationId)],
 );
 
 export const listPublicAgents = cache(
-  (ownerId: string, includeHidden = false): Promise<PublicAgent[]> =>
-    includeHidden ? queryAgents(ownerId, true) : loadPublicAgents(ownerId),
+  (organizationId: string, includeHidden = false): Promise<PublicAgent[]> =>
+    includeHidden
+      ? queryAgents(organizationId, true)
+      : loadPublicAgents(organizationId),
 );
 
 /**
@@ -140,13 +142,13 @@ export const listPublicAgents = cache(
  * future caller would leak the address.
  */
 const queryAgent = async (
-  ownerId: string,
+  organizationId: string,
   idOrSlug: string,
   isOwner: boolean,
 ): Promise<PublicAgent | null> => {
   const row = await prisma.agent.findFirst({
     where: {
-      ownerId,
+      organizationId,
       deletedAt: null,
       ...(isOwner
         ? {}
@@ -161,17 +163,18 @@ const queryAgent = async (
 
 const loadPublicAgent = cachedPublic(
   "agents:one",
-  (ownerId: string, idOrSlug: string) => queryAgent(ownerId, idOrSlug, false),
-  (ownerId) => [ownerTag(ownerId)],
+  (organizationId: string, idOrSlug: string) =>
+    queryAgent(organizationId, idOrSlug, false),
+  (organizationId) => [organizationTag(organizationId)],
 );
 
 export const getPublicAgent = cache(
   (
-    ownerId: string,
+    organizationId: string,
     idOrSlug: string,
     isOwner = false,
   ): Promise<PublicAgent | null> =>
     isOwner
-      ? queryAgent(ownerId, idOrSlug, true)
-      : loadPublicAgent(ownerId, idOrSlug),
+      ? queryAgent(organizationId, idOrSlug, true)
+      : loadPublicAgent(organizationId, idOrSlug),
 );

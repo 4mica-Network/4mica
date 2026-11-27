@@ -11,9 +11,9 @@ export const unclaimedHandleInRequest = async (): Promise<string | null> => {
     return null;
   }
 
-  const owner = await prisma.user.findUnique({
-    where: { username: handle },
+  const organization = await prisma.organization.findUnique({
+    where: { handle },
     select: { id: true },
   });
-  return owner ? null : handle;
+  return organization ? null : handle;
 };
