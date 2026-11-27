@@ -1,4 +1,5 @@
 import { formatPrice, PAYMENT_NETWORKS } from "@4mica/rules";
+import { agentGaps } from "@/lib/payable";
 import type { PublicAgent } from "@/schema/agent";
 import {
   buildCurlHandshake,
@@ -99,8 +100,11 @@ console.log(receipt);`;
 
 export const isSellable = (
   agent: PublicAgent,
-): agent is PublicAgent & { payToAddress: string; endpointUrl: string } =>
-  agent.payToAddress !== null && agent.endpointUrl !== null;
+): agent is PublicAgent & {
+  payToAddress: string;
+  endpointUrl: string;
+  priceAmount: string;
+} => agentGaps(agent).length === 0;
 
 export const buildAgentBuyerSnippets = (
   agent: PublicAgent,

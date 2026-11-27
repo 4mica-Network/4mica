@@ -1,11 +1,7 @@
 import { formatPrice, PAYMENT_NETWORKS } from "@4mica/rules";
+import { listingGaps } from "@/lib/payable";
 import type { PublicApiListing } from "@/schema/api-listing";
-import {
-  buildCurlHandshake,
-  codeString,
-  commentLine,
-  PLACEHOLDER,
-} from "./shared";
+import { buildCurlHandshake, codeString, commentLine } from "./shared";
 
 export interface ApiListingSnippets {
   install: string;
@@ -15,18 +11,14 @@ export interface ApiListingSnippets {
   receipt: string;
 }
 
-/**
- * A listing can only produce runnable code once its owner has published where
- * payment goes and on which chain. Everything else (url, price) degrades to a
- * placeholder; these two cannot, because a guarantee signed against the wrong
- * chain or recipient is not a near-miss — it is unpayable.
- */
 export const isPayable = (
   listing: PublicApiListing,
 ): listing is PublicApiListing & {
   network: NonNullable<PublicApiListing["network"]>;
   payToAddress: string;
-} => listing.network !== null && listing.payToAddress !== null;
+  url: string;
+  priceAmount: string;
+} => listingGaps(listing).length === 0;
 
 /**
  * Build the copyable integration snippets for one API listing.
@@ -43,7 +35,7 @@ export const buildApiListingSnippets = (
   }
 
   const { caip2, sdkName } = PAYMENT_NETWORKS[listing.network];
-  const url = listing.url ?? PLACEHOLDER.baseUrl;
+  const { url } = listing;
   const price = formatPrice(
     listing.priceAmount,
     listing.priceCurrency,

@@ -93,12 +93,13 @@ describe("buildAgentSnippets", () => {
 });
 
 describe("isSellable", () => {
-  it("needs both a recipient and an endpoint", () => {
+  it("needs a recipient, an endpoint and a price", () => {
     expect(isSellable(agent())).toBe(false);
     expect(isSellable(agent({ payToAddress: PAY_TO }))).toBe(false);
     expect(isSellable(agent({ endpointUrl: "https://x.example/call" }))).toBe(
       false,
     );
+    expect(isSellable(sellable({ priceAmount: null }))).toBe(false);
     expect(isSellable(sellable())).toBe(true);
   });
 });
@@ -148,17 +149,16 @@ describe("buildAgentBuyerSnippets", () => {
     expect(snippets?.typescript).not.toContain("0.002000000000000000");
   });
 
-  it("falls back to the display label when there is no machine price", () => {
-    const snippets = buildAgentBuyerSnippets(
-      sellable({
-        priceAmount: null,
-        priceCurrency: null,
-        priceLabel: "Usage-based",
-      }),
-    );
-
-    expect(snippets?.typescript).toContain("Usage-based per call");
-    expect(snippets?.curl).not.toContain("maxAmountRequired");
+  it("returns null when only a display label was published", () => {
+    expect(
+      buildAgentBuyerSnippets(
+        sellable({
+          priceAmount: null,
+          priceCurrency: null,
+          priceLabel: "Usage-based",
+        }),
+      ),
+    ).toBeNull();
   });
 
   it("posts to the agent's real endpoint", () => {

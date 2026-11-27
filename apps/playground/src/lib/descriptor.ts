@@ -168,7 +168,7 @@ export const buildApiListingDescriptor = (
     publishedAt: listing.publishedAt,
     seller: sellerOf(profile),
     payable,
-    invocable: payable && resourceUrl !== null,
+    invocable: payable,
     resource: resourceUrl ? { url: resourceUrl, method: listing.method } : null,
     payment: payable
       ? paymentOf(
