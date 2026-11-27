@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { config as loadEnv } from "dotenv";
 
@@ -393,6 +394,108 @@ const BANNERS = [
   },
 ] as const;
 
+const TEAM = {
+  handle: "4mica-labs",
+  name: "4mica Labs",
+  member: 0,
+} as const;
+
+const TEAM_WALLET = {
+  label: "Labs treasury",
+  description: "Receives payment for the 4mica Labs listings.",
+  address: "0x5b3d9c7e2f0a4b6d8e1c3a5f7b9d0e2c4a6f8b13",
+  network: "BASE_SEPOLIA",
+  role: "RECIPIENT",
+  status: "ACTIVE",
+  isDefault: true,
+  verifiedChainId: 84532,
+} as const;
+
+const TEAM_LISTINGS = [
+  {
+    slug: "agent-reputation",
+    name: "Agent Reputation API",
+    summary: "Settlement history and dispute rate for any payer address.",
+    description:
+      "Score a counterparty before extending it credit: settled volume, late settlements and open disputes, aggregated across every 4Mica tab it has opened.",
+    url: "https://labs.4mica.io/v1/reputation/:address",
+    method: "GET",
+    docsUrl: "https://docs.4mica.io/labs/reputation",
+    category: "Risk",
+    tags: ["reputation", "risk", "agents"],
+    priceLabel: "$0.02 per lookup",
+    visibility: "PUBLIC",
+    network: "BASE_SEPOLIA",
+    payToAddress: TEAM_WALLET.address,
+    assetAddress: USDC_BASE_SEPOLIA,
+    priceAmount: "0.02",
+    priceCurrency: "USDC",
+    x402Endpoint: "https://labs.4mica.io/v1/x402",
+  },
+] as const;
+
+const DEV_INVITATION = {
+  email: "invitee@example.com",
+  role: "MEMBER",
+  token: "4mica-labs-dev-invitation",
+} as const;
+
+const sha256Hex = (value: string): string =>
+  createHash("sha256").update(value).digest("hex");
+
+const inSevenDays = () => new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+const ensurePersonalOrganization = async (user: {
+  id: string;
+  username: string;
+  name: string;
+  avatarUrl: string | null;
+}): Promise<{ id: string }> => {
+  const fields = {
+    handle: user.username,
+    name: user.name,
+    avatarUrl: user.avatarUrl,
+    personal: true,
+    deletedAt: null,
+  };
+
+  const existing = await prisma.organization.findFirst({
+    where: {
+      personal: true,
+      memberships: { some: { userId: user.id, role: "OWNER" } },
+    },
+    select: { id: true },
+  });
+
+  const org = existing
+    ? await prisma.organization.update({
+        where: { id: existing.id },
+        data: fields,
+        select: { id: true },
+      })
+    : await prisma.organization.upsert({
+        where: { handle: user.username },
+        update: fields,
+        create: fields,
+        select: { id: true },
+      });
+
+  await prisma.membership.upsert({
+    where: {
+      organizationId_userId: { organizationId: org.id, userId: user.id },
+    },
+    update: { role: "OWNER" },
+    create: { organizationId: org.id, userId: user.id, role: "OWNER" },
+  });
+
+  await prisma.user.updateMany({
+    where: { id: user.id, defaultOrganizationId: null },
+    data: { defaultOrganizationId: org.id },
+  });
+
+  return org;
+};
+
 const seed = async (): Promise<void> => {
   const profileFields = {
     username: PROFILE.username,
@@ -419,23 +522,30 @@ const seed = async (): Promise<void> => {
     select: { id: true },
   });
 
+  const org = await ensurePersonalOrganization({
+    id: owner.id,
+    username: PROFILE.username,
+    name: PROFILE.name,
+    avatarUrl: PROFILE.avatarUrl,
+  });
+
   await prisma.agent.deleteMany({
     where: {
-      ownerId: owner.id,
+      organizationId: org.id,
       walletAddress: { notIn: AGENTS.map((agent) => agent.walletAddress) },
     },
   });
 
   await prisma.apiListing.deleteMany({
     where: {
-      ownerId: owner.id,
+      organizationId: org.id,
       slug: { notIn: API_LISTINGS.map((listing) => listing.slug) },
     },
   });
 
   await prisma.wallet.deleteMany({
     where: {
-      ownerId: owner.id,
+      organizationId: org.id,
       address: { notIn: WALLETS.map((wallet) => wallet.address) },
     },
   });
@@ -458,15 +568,16 @@ const seed = async (): Promise<void> => {
 
     const row = await prisma.wallet.upsert({
       where: {
-        ownerId_address_network: {
-          ownerId: owner.id,
+        organizationId_address_network: {
+          organizationId: org.id,
           address: wallet.address,
           network: wallet.network,
         },
       },
       update: fields,
       create: {
-        ownerId: owner.id,
+        organizationId: org.id,
+        createdById: owner.id,
         address: wallet.address,
         network: wallet.network,
         ...fields,
@@ -489,7 +600,7 @@ const seed = async (): Promise<void> => {
 
   for (const agent of AGENTS) {
     const fields = {
-      ownerId: owner.id,
+      organizationId: org.id,
       slug: agent.slug,
       name: agent.name,
       headline: agent.headline,
@@ -529,7 +640,11 @@ const seed = async (): Promise<void> => {
         },
       },
       update: fields,
-      create: { walletAddress: agent.walletAddress, ...fields },
+      create: {
+        walletAddress: agent.walletAddress,
+        createdById: owner.id,
+        ...fields,
+      },
     });
   }
 
@@ -560,9 +675,16 @@ const seed = async (): Promise<void> => {
     };
 
     await prisma.apiListing.upsert({
-      where: { ownerId_slug: { ownerId: owner.id, slug: listing.slug } },
+      where: {
+        organizationId_slug: { organizationId: org.id, slug: listing.slug },
+      },
       update: fields,
-      create: { ownerId: owner.id, slug: listing.slug, ...fields },
+      create: {
+        organizationId: org.id,
+        createdById: owner.id,
+        slug: listing.slug,
+        ...fields,
+      },
       select: { id: true },
     });
   }
@@ -598,12 +720,12 @@ const seed = async (): Promise<void> => {
   const ATLAS_PAYER = "0x7a9f3c4b2e8d5a1f6c0b4e9d2a8c3f5b7e1d6a04";
 
   const listingRow = await prisma.apiListing.findFirst({
-    where: { ownerId: owner.id, slug: API_LISTINGS[0].slug },
+    where: { organizationId: org.id, slug: API_LISTINGS[0].slug },
     select: { id: true },
   });
 
   await prisma.payment.deleteMany({
-    where: { ownerId: owner.id, reqId: { startsWith: "0xseed" } },
+    where: { organizationId: org.id, reqId: { startsWith: "0xseed" } },
   });
 
   const now = new Date();
@@ -620,7 +742,7 @@ const seed = async (): Promise<void> => {
 
     await prisma.payment.create({
       data: {
-        ownerId: owner.id,
+        organizationId: org.id,
         listingId: incoming ? (listingRow?.id ?? null) : null,
         payerAddress: incoming ? CUSTOMER_ADDRESS : ATLAS_PAYER,
         recipientAddress: incoming ? TREASURY : CUSTOMER_ADDRESS,
@@ -644,11 +766,11 @@ const seed = async (): Promise<void> => {
   }
 
   const agentRow = await prisma.agent.findFirst({
-    where: { ownerId: owner.id, slug: AGENTS[0].slug },
+    where: { organizationId: org.id, slug: AGENTS[0].slug },
     select: { id: true },
   });
 
-  const reviewers = [];
+  const reviewers: { id: string }[] = [];
   for (const entry of REVIEWERS) {
     const fields = {
       username: entry.username,
@@ -660,14 +782,21 @@ const seed = async (): Promise<void> => {
       isSeeded: true,
     };
 
-    reviewers.push(
-      await prisma.user.upsert({
-        where: { clerkUserId: entry.clerkUserId },
-        update: fields,
-        create: { clerkUserId: entry.clerkUserId, ...fields },
-        select: { id: true },
-      }),
-    );
+    const reviewer = await prisma.user.upsert({
+      where: { clerkUserId: entry.clerkUserId },
+      update: fields,
+      create: { clerkUserId: entry.clerkUserId, ...fields },
+      select: { id: true },
+    });
+
+    await ensurePersonalOrganization({
+      id: reviewer.id,
+      username: entry.username,
+      name: entry.name,
+      avatarUrl: null,
+    });
+
+    reviewers.push(reviewer);
   }
 
   if (listingRow) {
@@ -792,7 +921,10 @@ const seed = async (): Promise<void> => {
   }
 
   await prisma.customer.deleteMany({
-    where: { ownerId: owner.id, name: { notIn: CUSTOMERS.map((c) => c.name) } },
+    where: {
+      organizationId: org.id,
+      name: { notIn: CUSTOMERS.map((c) => c.name) },
+    },
   });
 
   for (const entry of CUSTOMERS) {
@@ -809,7 +941,7 @@ const seed = async (): Promise<void> => {
     };
 
     const existing = await prisma.customer.findFirst({
-      where: { ownerId: owner.id, name: entry.name },
+      where: { organizationId: org.id, name: entry.name },
       select: { id: true },
     });
 
@@ -820,7 +952,12 @@ const seed = async (): Promise<void> => {
           select: { id: true },
         })
       : await prisma.customer.create({
-          data: { ownerId: owner.id, name: entry.name, ...fields },
+          data: {
+            organizationId: org.id,
+            createdById: owner.id,
+            name: entry.name,
+            ...fields,
+          },
           select: { id: true },
         });
 
@@ -831,7 +968,7 @@ const seed = async (): Promise<void> => {
     for (const identity of entry.identities) {
       await prisma.customerPaymentIdentity.create({
         data: {
-          ownerId: owner.id,
+          organizationId: org.id,
           customerId: customerRow.id,
           type: identity.type,
           network: "network" in identity ? identity.network : null,
@@ -843,6 +980,120 @@ const seed = async (): Promise<void> => {
       });
     }
   }
+
+  const teamFields = { name: TEAM.name, personal: false, deletedAt: null };
+  const team = await prisma.organization.upsert({
+    where: { handle: TEAM.handle },
+    update: teamFields,
+    create: { handle: TEAM.handle, ...teamFields },
+    select: { id: true },
+  });
+
+  for (const [userId, role] of [
+    [owner.id, "OWNER"],
+    [reviewers[TEAM.member].id, "MEMBER"],
+  ] as const) {
+    await prisma.membership.upsert({
+      where: { organizationId_userId: { organizationId: team.id, userId } },
+      update: { role },
+      create: { organizationId: team.id, userId, role },
+    });
+  }
+
+  await prisma.apiListing.deleteMany({
+    where: {
+      organizationId: team.id,
+      slug: { notIn: TEAM_LISTINGS.map((listing) => listing.slug) },
+    },
+  });
+
+  await prisma.wallet.deleteMany({
+    where: { organizationId: team.id, address: { not: TEAM_WALLET.address } },
+  });
+
+  const teamWalletFields = {
+    label: TEAM_WALLET.label,
+    description: TEAM_WALLET.description,
+    role: TEAM_WALLET.role,
+    status: TEAM_WALLET.status,
+    isDefault: TEAM_WALLET.isDefault,
+    verifiedAt: new Date(),
+    verificationMethod: "EOA_SIGNATURE" as const,
+    verifiedChainId: TEAM_WALLET.verifiedChainId,
+  };
+
+  const teamWallet = await prisma.wallet.upsert({
+    where: {
+      organizationId_address_network: {
+        organizationId: team.id,
+        address: TEAM_WALLET.address,
+        network: TEAM_WALLET.network,
+      },
+    },
+    update: teamWalletFields,
+    create: {
+      organizationId: team.id,
+      createdById: owner.id,
+      address: TEAM_WALLET.address,
+      network: TEAM_WALLET.network,
+      ...teamWalletFields,
+    },
+    select: { id: true },
+  });
+
+  for (const listing of TEAM_LISTINGS) {
+    const fields = {
+      name: listing.name,
+      summary: listing.summary,
+      description: listing.description,
+      url: listing.url,
+      method: listing.method,
+      docsUrl: listing.docsUrl,
+      category: listing.category,
+      tags: [...listing.tags],
+      priceLabel: listing.priceLabel,
+      visibility: listing.visibility,
+      publishedAt: new Date(),
+      network: listing.network,
+      walletId: teamWallet.id,
+      payToAddress: listing.payToAddress,
+      assetAddress: listing.assetAddress,
+      priceAmount: listing.priceAmount,
+      priceCurrency: listing.priceCurrency,
+      x402Endpoint: listing.x402Endpoint,
+    };
+
+    await prisma.apiListing.upsert({
+      where: {
+        organizationId_slug: { organizationId: team.id, slug: listing.slug },
+      },
+      update: fields,
+      create: {
+        organizationId: team.id,
+        createdById: owner.id,
+        slug: listing.slug,
+        ...fields,
+      },
+      select: { id: true },
+    });
+  }
+
+  const invitationFields = {
+    organizationId: team.id,
+    email: DEV_INVITATION.email,
+    role: DEV_INVITATION.role,
+    invitedById: owner.id,
+    expiresAt: inSevenDays(),
+    acceptedAt: null,
+    declinedAt: null,
+    revokedAt: null,
+  };
+
+  await prisma.invitation.upsert({
+    where: { tokenHash: sha256Hex(DEV_INVITATION.token) },
+    update: invitationFields,
+    create: { tokenHash: sha256Hex(DEV_INVITATION.token), ...invitationFields },
+  });
 
   const [agents, wallets, listings, banners, payments, customers] =
     await Promise.all([
@@ -858,7 +1109,7 @@ const seed = async (): Promise<void> => {
     `${count} ${noun}${count === 1 ? "" : "s"}`;
 
   console.info(
-    `[@4mica/seed] upserted profile @${PROFILE.username}, ${plural(AGENTS.length, "agent")}, ${plural(WALLETS.length, "wallet")}, ${plural(API_LISTINGS.length, "api listing")} ${plural(BANNERS.length, "banner")}, ${plural(PAYMENTS.length, "payment")} and ${plural(CUSTOMERS.length, "customer")} (${agents} agent rows, ${wallets} wallet rows, ${listings} listing rows, ${banners} banner rows, ${payments} payment rows, ${customers} customer rows total).`,
+    `[@4mica/seed] upserted profile @${PROFILE.username}, team @${TEAM.handle} (${plural(TEAM_LISTINGS.length, "api listing")}, invitation token "${DEV_INVITATION.token}"), ${plural(AGENTS.length, "agent")}, ${plural(WALLETS.length, "wallet")}, ${plural(API_LISTINGS.length, "api listing")} ${plural(BANNERS.length, "banner")}, ${plural(PAYMENTS.length, "payment")} and ${plural(CUSTOMERS.length, "customer")} (${agents} agent rows, ${wallets} wallet rows, ${listings} listing rows, ${banners} banner rows, ${payments} payment rows, ${customers} customer rows total).`,
   );
 };
 
