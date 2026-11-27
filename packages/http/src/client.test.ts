@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { HttpClient, HttpError, HttpMethod } from "./client";
+import { setRequestHeadersProvider } from "./headers";
 import { setAuthTokenProvider, setUnauthorizedHandler } from "./token";
 
 const json = (body: unknown, status = 200) =>
@@ -20,6 +21,7 @@ describe("HttpClient", () => {
   afterEach(() => {
     setAuthTokenProvider(null);
     setUnauthorizedHandler(null);
+    setRequestHeadersProvider(null);
     vi.unstubAllGlobals();
   });
 
@@ -72,6 +74,49 @@ describe("HttpClient", () => {
     await expect(client.get("/me")).resolves.toEqual({ ok: true });
     const headers = fetchMock.mock.calls[0][1].headers as Headers;
     expect(headers.has("authorization")).toBe(false);
+  });
+
+  it("attaches headers from the registered request headers provider", async () => {
+    setRequestHeadersProvider(() => ({ "X-Org-Id": "org_1" }));
+    await client.get("/me");
+    const headers = fetchMock.mock.calls[0][1].headers as Headers;
+    expect(headers.get("x-org-id")).toBe("org_1");
+  });
+
+  it("reads the headers provider again on every request", async () => {
+    let org = "org_1";
+    setRequestHeadersProvider(() => ({ "X-Org-Id": org }));
+    fetchMock.mockImplementation(async () => json({ ok: true }));
+    await client.get("/me");
+    org = "org_2";
+    await client.get("/me");
+    const second = fetchMock.mock.calls[1][1].headers as Headers;
+    expect(second.get("x-org-id")).toBe("org_2");
+  });
+
+  it("lets a header passed with the request win over the provider", async () => {
+    setRequestHeadersProvider(() => ({ "X-Org-Id": "org_1" }));
+    await client.get("/me", { headers: { "X-Org-Id": "org_explicit" } });
+    const headers = fetchMock.mock.calls[0][1].headers as Headers;
+    expect(headers.get("x-org-id")).toBe("org_explicit");
+  });
+
+  it("does not attach provider headers to an unauthenticated request", async () => {
+    setRequestHeadersProvider(() => ({ "X-Org-Id": "org_1" }));
+    await client.request({
+      url: "/public",
+      method: HttpMethod.GET,
+      skipAuth: true,
+    });
+    const headers = fetchMock.mock.calls[0][1].headers as Headers;
+    expect(headers.has("x-org-id")).toBe(false);
+  });
+
+  it("does not fail the request when the headers provider throws", async () => {
+    setRequestHeadersProvider(() => {
+      throw new Error("store unavailable");
+    });
+    await expect(client.get("/me")).resolves.toEqual({ ok: true });
   });
 
   it("serialises JSON bodies and sets the content type", async () => {
