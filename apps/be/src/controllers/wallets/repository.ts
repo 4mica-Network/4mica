@@ -1,4 +1,9 @@
 import { type PaymentNetwork, type Prisma, prisma } from "@4mica/db";
+import {
+  type EnvironmentKind,
+  environmentForNetwork,
+  networksForEnvironment,
+} from "@4mica/rules";
 import type { ValidationIssue } from "@controllers/shared";
 import { generateWalletNonce } from "@utils/secrets";
 import {
@@ -29,9 +34,16 @@ export const WALLET_SELECT = {
   updatedAt: true,
 } as const;
 
-export type WalletRow = Prisma.WalletGetPayload<{
+type WalletRecord = Prisma.WalletGetPayload<{
   select: typeof WALLET_SELECT;
 }>;
+
+export type WalletRow = WalletRecord & { environment: EnvironmentKind };
+
+const withEnvironment = (row: WalletRecord): WalletRow => ({
+  ...row,
+  environment: environmentForNetwork(row.network),
+});
 
 const escapeLike = (value: string): string =>
   value.replace(/[\\%_]/g, (match) => `\\${match}`);
@@ -53,15 +65,19 @@ const orderFor = (
 
 const whereFor = (
   orgId: string,
+  environment: EnvironmentKind,
   query: ListWalletsQuery,
 ): Prisma.WalletWhereInput => {
-  const where: Prisma.WalletWhereInput = { organizationId: orgId };
+  const networks = networksForEnvironment(environment);
+  const where: Prisma.WalletWhereInput = {
+    organizationId: orgId,
+    network: query.network
+      ? { in: networks.filter((network) => network === query.network) }
+      : { in: networks },
+  };
 
   if (query.status) {
     where.status = query.status;
-  }
-  if (query.network) {
-    where.network = query.network;
   }
   if (query.role) {
     where.role = query.role;
@@ -81,6 +97,7 @@ const whereFor = (
 
 export const listWallets = async (
   orgId: string,
+  environment: EnvironmentKind,
   query: ListWalletsQuery,
 ): Promise<{
   items: WalletRow[];
@@ -88,10 +105,10 @@ export const listWallets = async (
   page: number;
   limit: number;
 }> => {
-  const where = whereFor(orgId, query);
+  const where = whereFor(orgId, environment, query);
   const skip = (query.page - 1) * query.limit;
 
-  const [items, total] = await prisma.$transaction([
+  const [rows, total] = await prisma.$transaction([
     prisma.wallet.findMany({
       where,
       orderBy: orderFor(query.sort),
@@ -102,14 +119,24 @@ export const listWallets = async (
     prisma.wallet.count({ where }),
   ]);
 
-  return { items, total, page: query.page, limit: query.limit };
+  return {
+    items: rows.map(withEnvironment),
+    total,
+    page: query.page,
+    limit: query.limit,
+  };
 };
 
-export const getWallet = (orgId: string, id: string) =>
-  prisma.wallet.findFirst({
+export const getWallet = async (
+  orgId: string,
+  id: string,
+): Promise<WalletRow | null> => {
+  const row = await prisma.wallet.findFirst({
     where: { id, organizationId: orgId },
     select: WALLET_SELECT,
   });
+  return row ? withEnvironment(row) : null;
+};
 
 export const createWalletNonce = async (
   userId: string,
@@ -176,8 +203,8 @@ export const consumeNonceAndCreateWallet = async (
   nonceId: string,
   data: CreateWalletInput,
   chainId: number,
-): Promise<WalletRow | null> =>
-  prisma.$transaction(async (tx) => {
+): Promise<WalletRow | null> => {
+  const row = await prisma.$transaction(async (tx) => {
     const { count } = await tx.walletNonce.updateMany({
       where: { id: nonceId, consumedAt: null, expiresAt: { gt: new Date() } },
       data: { consumedAt: new Date() },
@@ -203,6 +230,8 @@ export const consumeNonceAndCreateWallet = async (
       select: WALLET_SELECT,
     });
   });
+  return row ? withEnvironment(row) : null;
+};
 
 export const updateWallet = async (
   orgId: string,
@@ -211,7 +240,7 @@ export const updateWallet = async (
 ): Promise<WalletRow | null> => {
   const { isDefault, ...rest } = data;
 
-  return prisma.$transaction(async (tx) => {
+  const row = await prisma.$transaction(async (tx) => {
     const current = await tx.wallet.findFirst({
       where: { id, organizationId: orgId },
       select: { id: true, network: true, role: true, status: true },
@@ -262,6 +291,7 @@ export const updateWallet = async (
       select: WALLET_SELECT,
     });
   });
+  return row ? withEnvironment(row) : null;
 };
 
 type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];

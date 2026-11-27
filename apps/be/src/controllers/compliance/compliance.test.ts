@@ -519,8 +519,11 @@ describe("compliance routes", () => {
       expect(beneficialOwner.findMany).not.toHaveBeenCalled();
     });
 
-    it("lets a member read but not change compliance details", async () => {
-      actAs(tenancy, "MEMBER");
+    it.each([
+      "DEVELOPER",
+      "VIEWER",
+    ] as const)("lets a %s read but not change compliance details", async (role) => {
+      actAs(tenancy, role);
 
       expect((await call("GET", "/me/compliance")).statusCode).toBe(200);
 

@@ -4,8 +4,13 @@ import {
   randomInt,
   timingSafeEqual,
 } from "node:crypto";
+import type { EnvironmentKind } from "@4mica/db";
 
 const API_KEY_PREFIX = "4mica_sk";
+const API_KEY_ENVIRONMENT: Readonly<Record<EnvironmentKind, string>> = {
+  SANDBOX: `${API_KEY_PREFIX}_test`,
+  PRODUCTION: `${API_KEY_PREFIX}_live`,
+};
 const WEBHOOK_SECRET_PREFIX = "whsec";
 const EMAIL_VERIFICATION_PREFIX = "4mica_ev";
 const CLI_TOKEN_NAMESPACE = "4mica_cli";
@@ -45,7 +50,10 @@ const generate = (namespace: string): GeneratedSecret => {
   };
 };
 
-export const generateApiKey = (): GeneratedSecret => generate(API_KEY_PREFIX);
+export const generateApiKey = (
+  environment?: EnvironmentKind,
+): GeneratedSecret =>
+  generate(environment ? API_KEY_ENVIRONMENT[environment] : API_KEY_PREFIX);
 
 export const generateWebhookSecret = (): GeneratedSecret =>
   generate(WEBHOOK_SECRET_PREFIX);

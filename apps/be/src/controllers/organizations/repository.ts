@@ -1,5 +1,6 @@
 import { type OrgRole, type Prisma, prisma } from "@4mica/db";
 import { type AuditEntry, writeAudit } from "@controllers/audit/repository";
+import { defaultProjectCreate } from "@utils/default-project";
 
 type Tx = Prisma.TransactionClient;
 
@@ -116,6 +117,7 @@ export const createOrganization = (
         name: data.name,
         handle: data.handle,
         memberships: { create: { userId, role: "OWNER" } },
+        projects: { create: defaultProjectCreate() },
       },
       select: ORG_SELECT,
     });
@@ -299,6 +301,9 @@ export const removeMember = (
       where: {
         organizationId_userId: { organizationId: orgId, userId: targetUserId },
       },
+    });
+    await tx.projectMembership.deleteMany({
+      where: { userId: targetUserId, project: { organizationId: orgId } },
     });
     await tx.user.updateMany({
       where: { id: targetUserId, defaultOrganizationId: orgId },

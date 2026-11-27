@@ -140,11 +140,19 @@ export const initApp = async (
             description: "Organizations, members, invitations and audit log",
           },
           {
+            name: "projects",
+            description: "Projects, their environments and members",
+          },
+          {
             name: "compliance",
             description: "KYB details, beneficial owners and review",
           },
           { name: "verification", description: "Email verification" },
           { name: "developer", description: "API keys and webhooks" },
+          {
+            name: "service-accounts",
+            description: "Non-human identities a project mints keys for",
+          },
           {
             name: "banners",
             description: "Dashboard promo banners and interaction tracking",

@@ -1,6 +1,7 @@
 import { type Prisma, prisma } from "@4mica/db";
 import { SLUG_MAX_LENGTH } from "@4mica/rules";
 import { amountText, optionalAmountText } from "@utils/amount";
+import { type ResourceScope, scopeData, scopeWhere } from "@utils/scope";
 import type { ListAgentsQuery } from "./schema";
 
 export const AGENT_SELECT = {
@@ -66,11 +67,11 @@ const orderFor = (
 };
 
 const whereFor = (
-  orgId: string,
+  scope: ResourceScope,
   query: ListAgentsQuery,
 ): Prisma.AgentWhereInput => {
   const where: Prisma.AgentWhereInput = {
-    organizationId: orgId,
+    ...scopeWhere(scope),
     deletedAt: null,
   };
 
@@ -97,7 +98,7 @@ const whereFor = (
 };
 
 export const listAgents = async (
-  orgId: string,
+  scope: ResourceScope,
   query: ListAgentsQuery,
 ): Promise<{
   items: AgentRow[];
@@ -105,7 +106,7 @@ export const listAgents = async (
   page: number;
   limit: number;
 }> => {
-  const where = whereFor(orgId, query);
+  const where = whereFor(scope, query);
   const skip = (query.page - 1) * query.limit;
 
   const [items, total] = await prisma.$transaction([
@@ -128,11 +129,11 @@ export const listAgents = async (
 };
 
 export const getAgent = async (
-  orgId: string,
+  scope: ResourceScope,
   id: string,
 ): Promise<AgentRow | null> => {
   const row = await prisma.agent.findFirst({
-    where: { id, organizationId: orgId, deletedAt: null },
+    where: { id, ...scopeWhere(scope), deletedAt: null },
     select: AGENT_SELECT,
   });
 
@@ -149,12 +150,15 @@ export const takenSlugs = async (orgId: string): Promise<Set<string>> => {
 };
 
 export const createAgent = async (
-  orgId: string,
+  scope: ResourceScope,
   userId: string,
-  data: Prisma.AgentUncheckedCreateInput,
+  data: Omit<
+    Prisma.AgentUncheckedCreateInput,
+    "organizationId" | "projectId" | "environmentId" | "createdById"
+  >,
 ): Promise<AgentRow> => {
   const row = await prisma.agent.create({
-    data: { ...data, organizationId: orgId, createdById: userId },
+    data: { ...data, ...scopeData(scope), createdById: userId },
     select: AGENT_SELECT,
   });
 
@@ -162,24 +166,24 @@ export const createAgent = async (
 };
 
 export const updateAgent = async (
-  orgId: string,
+  scope: ResourceScope,
   id: string,
   data: Record<string, unknown>,
 ): Promise<AgentRow | null> => {
   const { count } = await prisma.agent.updateMany({
-    where: { id, organizationId: orgId, deletedAt: null },
+    where: { id, ...scopeWhere(scope), deletedAt: null },
     data: data as Prisma.AgentUpdateManyMutationInput,
   });
 
-  return count > 0 ? getAgent(orgId, id) : null;
+  return count > 0 ? getAgent(scope, id) : null;
 };
 
 export const softDeleteAgent = async (
-  orgId: string,
+  scope: ResourceScope,
   id: string,
 ): Promise<boolean> => {
   const row = await prisma.agent.findFirst({
-    where: { id, organizationId: orgId, deletedAt: null },
+    where: { id, ...scopeWhere(scope), deletedAt: null },
     select: { id: true, slug: true },
   });
 
@@ -202,11 +206,11 @@ export const softDeleteAgent = async (
 };
 
 export const batchSoftDeleteAgents = async (
-  orgId: string,
+  scope: ResourceScope,
   ids: string[],
 ): Promise<{ deleted: string[]; notFound: string[] }> => {
   const owned = await prisma.agent.findMany({
-    where: { id: { in: ids }, organizationId: orgId, deletedAt: null },
+    where: { id: { in: ids }, ...scopeWhere(scope), deletedAt: null },
     select: { id: true, slug: true },
   });
 

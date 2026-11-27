@@ -1,3 +1,4 @@
+import { apiKeyScopes } from "@controllers/developer/schema";
 import { futureTimestamp, singleLine } from "@controllers/schema-primitives";
 import * as v from "valibot";
 
@@ -11,6 +12,7 @@ const name = v.pipe(
 
 export const CreateResourceKeySchema = v.object({
   name,
+  scopes: v.optional(apiKeyScopes),
   expiresAt: v.optional(v.nullable(futureTimestamp)),
 });
 

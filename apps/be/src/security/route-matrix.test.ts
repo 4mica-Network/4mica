@@ -369,6 +369,8 @@ describe("authentication matrix", () => {
     expect(lookedUp.sort()).toEqual([
       "DELETE /me/wallets/:id",
       "DELETE /v1/cli/session",
+      "GET /me/organizations",
+      "GET /me/projects",
       "GET /me/wallets",
       "GET /v1/cli/session",
       "POST /me/wallets",

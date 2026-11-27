@@ -133,6 +133,15 @@ export const apiKeyResponseSchema = {
     name: str,
     prefix: str,
     last4: str,
+    environment: { type: "string", enum: ["SANDBOX", "PRODUCTION"] },
+    scopes: {
+      type: "array",
+      items: {
+        type: "string",
+        enum: ["PAYMENTS_WRITE", "CUSTOMERS_READ", "RESOURCE_READ"],
+      },
+    },
+    serviceAccountId: nullStr,
     lastUsedAt: nullDate,
     expiresAt: nullDate,
     revokedAt: nullDate,
@@ -238,13 +247,22 @@ const paymentNetworkEnum = {
 
 export const walletResponseSchema = {
   type: "object",
-  required: ["id", "label", "address", "network", "role", "status"],
+  required: [
+    "id",
+    "label",
+    "address",
+    "network",
+    "environment",
+    "role",
+    "status",
+  ],
   properties: {
     id: str,
     label: str,
     description: nullStr,
     address: str,
     network: paymentNetworkEnum,
+    environment: { type: "string", enum: ["SANDBOX", "PRODUCTION"] },
     role: { type: "string", enum: ["PAYER", "RECIPIENT", "BOTH"] },
     status: { type: "string", enum: ["ACTIVE", "PAUSED", "RETIRED"] },
     isDefault: bool,
@@ -804,6 +822,8 @@ export const errorResponseSchema = {
   properties: {
     error: str,
     message: str,
+    permission: str,
+    scope: str,
     requestId: str,
     issues: {
       type: "array",

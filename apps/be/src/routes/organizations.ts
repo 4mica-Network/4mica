@@ -1,3 +1,4 @@
+import { onlyBoundOrganization } from "@auth/cli-token";
 import { PERMISSIONS } from "@auth/permissions";
 import {
   acceptInvitationHandler,
@@ -22,7 +23,7 @@ import {
 import { ORG_ROLES } from "@controllers/organizations/schema";
 import { sensitiveRateLimit } from "@plugins/rate-limit";
 import type { FastifyPluginCallback } from "fastify";
-import { guards } from "./guards";
+import { cliGuards, guards } from "./guards";
 import {
   errorResponseSchema,
   idParam,
@@ -191,16 +192,20 @@ export const organizationRoutes: FastifyPluginCallback = (app, _opts, done) => {
   app.get(
     "/me/organizations",
     {
-      ...base,
-      schema: doc("List the organizations the caller belongs to", {
-        200: {
-          type: "object",
-          properties: {
-            items: { type: "array", items: organizationSchema },
-            defaultId: nullableStr,
+      ...cliGuards(app, "account:read"),
+      preSerialization: onlyBoundOrganization,
+      schema: {
+        ...doc("List the organizations the caller belongs to", {
+          200: {
+            type: "object",
+            properties: {
+              items: { type: "array", items: organizationSchema },
+              defaultId: nullableStr,
+            },
           },
-        },
-      }),
+        }),
+        security: [{ bearerAuth: [] }, { cliTokenAuth: [] }],
+      },
     },
     listOrganizationsHandler,
   );

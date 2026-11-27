@@ -1,5 +1,10 @@
-import { networkForChainId, PAYMENT_NETWORKS } from "@4mica/rules";
-import { coreUnavailable, requireTenant } from "@controllers/shared";
+import {
+  environmentForNetwork,
+  networkForChainId,
+  PAYMENT_NETWORKS,
+} from "@4mica/rules";
+import { requestedEnvironment } from "@auth/project";
+import { coreUnavailable, notFound, requireTenant } from "@controllers/shared";
 import { appLogger } from "@logger/index";
 import { getCoreClient } from "@services/core";
 import type { RouteHandler } from "fastify";
@@ -12,6 +17,11 @@ export const listBalancesHandler: RouteHandler = async (request, reply) => {
     return reply;
   }
 
+  const environment = requestedEnvironment(request);
+  if (!environment) {
+    return notFound(reply, "environment");
+  }
+
   try {
     const core = await getCoreClient();
     if (!core) {
@@ -19,7 +29,7 @@ export const listBalancesHandler: RouteHandler = async (request, reply) => {
     }
 
     const network = networkForChainId(core.publicParams.chainId);
-    if (!network) {
+    if (!network || environmentForNetwork(network) !== environment) {
       return reply.send({ network: null, wallets: [] });
     }
 

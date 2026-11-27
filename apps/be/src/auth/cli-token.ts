@@ -39,6 +39,7 @@ export interface CliSessionContext {
   kind: "DEVICE" | "TOKEN";
   name: string;
   scopes: string[];
+  organizationId: string | null;
   createdAt: Date;
   expiresAt: Date;
 }
@@ -123,6 +124,7 @@ export const authenticateCliToken =
       kind: record.kind,
       name: record.name,
       scopes: record.scopes,
+      organizationId: record.organizationId,
       createdAt: record.createdAt,
       expiresAt: record.expiresAt,
     };
@@ -137,3 +139,31 @@ export const authenticateCliToken =
 
     void touchCliSession(record.id, record.lastUsedAt).catch(() => {});
   };
+
+export const boundOrganizationId = (request: FastifyRequest): string | null =>
+  request.cliSession?.organizationId ?? null;
+
+export const onlyBoundOrganization = async (
+  request: FastifyRequest,
+  _reply: FastifyReply,
+  payload: unknown,
+): Promise<unknown> => {
+  const bound = boundOrganizationId(request);
+  if (bound === null || payload === null || typeof payload !== "object") {
+    return payload;
+  }
+
+  const { items } = payload as { items?: unknown };
+  if (!Array.isArray(items)) {
+    return payload;
+  }
+
+  const kept = items.filter(
+    (item: { id?: unknown } | null) => item?.id === bound,
+  );
+  return {
+    ...payload,
+    items: kept,
+    defaultId: kept.length > 0 ? bound : null,
+  };
+};

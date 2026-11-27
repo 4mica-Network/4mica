@@ -1,12 +1,12 @@
-import type { Permission } from "@auth/permissions";
-import type { Tenant } from "@auth/tenant";
+import type { ProjectPermission } from "@auth/permissions";
+import type { ProjectScope } from "@auth/project";
 import { MAX_OFFSET } from "@controllers/schema-primitives";
 import {
-  audit,
+  auditProject,
   invalidBody,
   notFound,
   parseBody,
-  requireTenant,
+  requireProject,
 } from "@controllers/shared";
 import type { RouteHandler } from "fastify";
 import {
@@ -44,27 +44,27 @@ const what = (kind: ResourceKind) =>
 const withOwnedResource =
   (
     kind: ResourceKind,
-    permission: Permission,
+    permission: ProjectPermission,
     run: (
       id: string,
       request: Parameters<RouteHandler>[0],
       reply: Parameters<RouteHandler>[1],
-      tenant: Tenant,
+      scope: ProjectScope,
     ) => Promise<unknown>,
   ): RouteHandler =>
   async (request, reply) => {
-    const tenant = await requireTenant(request, reply, permission);
-    if (!tenant) {
+    const scope = await requireProject(request, reply, permission);
+    if (!scope) {
       return reply;
     }
 
     const { id } = request.params as { id: string };
 
-    if (!(await ownsResource(kind, tenant.orgId, id))) {
+    if (!(await ownsResource(kind, scope, id))) {
       return notFound(reply, what(kind));
     }
 
-    return run(id, request, reply, tenant);
+    return run(id, request, reply, scope);
   };
 
 const auditTarget = (kind: ResourceKind) =>
@@ -79,14 +79,14 @@ export const upsertPolicyHandler = (kind: ResourceKind): RouteHandler =>
   withOwnedResource(
     kind,
     "resources.write",
-    async (id, request, reply, tenant) => {
+    async (id, request, reply, scope) => {
       const parsed = parseBody(UpsertPolicySchema, request.body);
       if (!parsed.success) {
         return invalidBody(reply, parsed.issues);
       }
 
       const policy = await upsertPolicy(kind, id, parsed.data);
-      await audit(request, tenant, {
+      await auditProject(request, scope, {
         action: "resource_policy.updated",
         targetType: auditTarget(kind),
         targetId: id,
@@ -121,7 +121,7 @@ export const replyToReviewHandler = (kind: ResourceKind): RouteHandler =>
   withOwnedResource(
     kind,
     "resources.write",
-    async (id, request, reply, tenant) => {
+    async (id, request, reply, scope) => {
       const parsed = parseBody(ReplyToReviewSchema, request.body);
       if (!parsed.success) {
         return invalidBody(reply, parsed.issues);
@@ -135,7 +135,7 @@ export const replyToReviewHandler = (kind: ResourceKind): RouteHandler =>
       }
 
       const updated = await replyToReview(review.id, parsed.data.reply);
-      await audit(request, tenant, {
+      await auditProject(request, scope, {
         action: "review.replied",
         targetType: "review",
         targetId: review.id,
@@ -166,7 +166,7 @@ export const updateReportHandler = (kind: ResourceKind): RouteHandler =>
   withOwnedResource(
     kind,
     "resources.write",
-    async (id, request, reply, tenant) => {
+    async (id, request, reply, scope) => {
       const parsed = parseBody(UpdateReportSchema, request.body);
       if (!parsed.success) {
         return invalidBody(reply, parsed.issues);
@@ -184,7 +184,7 @@ export const updateReportHandler = (kind: ResourceKind): RouteHandler =>
         parsed.data.status,
         parsed.data.resolutionNote,
       );
-      await audit(request, tenant, {
+      await auditProject(request, scope, {
         action: "report.updated",
         targetType: "report",
         targetId: report.id,

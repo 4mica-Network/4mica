@@ -37,6 +37,7 @@ const listQuerySchema = {
       enum: ["BASE", "BASE_SEPOLIA", "ETHEREUM_SEPOLIA"],
     },
     wallet: { type: "string", maxLength: 42 },
+    projectId: { type: "string", maxLength: 64 },
     q: { type: "string", maxLength: 100 },
     sort: {
       type: "string",

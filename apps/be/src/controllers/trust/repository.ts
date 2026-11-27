@@ -1,4 +1,5 @@
 import { type Prisma, prisma } from "@4mica/db";
+import { type ResourceScope, scopeWhere } from "@utils/scope";
 import type {
   FaqItemInput,
   ListReportsQuery,
@@ -10,19 +11,19 @@ export type ResourceKind = "listing" | "agent";
 
 export const ownsResource = async (
   kind: ResourceKind,
-  orgId: string,
+  scope: ResourceScope,
   id: string,
 ): Promise<boolean> => {
   if (kind === "listing") {
     const row = await prisma.apiListing.findFirst({
-      where: { id, organizationId: orgId, deletedAt: null },
+      where: { id, ...scopeWhere(scope), deletedAt: null },
       select: { id: true },
     });
     return row !== null;
   }
 
   const row = await prisma.agent.findFirst({
-    where: { id, organizationId: orgId, deletedAt: null },
+    where: { id, ...scopeWhere(scope), deletedAt: null },
     select: { id: true },
   });
   return row !== null;

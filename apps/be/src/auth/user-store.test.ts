@@ -123,6 +123,26 @@ describe("loadUser", () => {
     expect(upsert.mock.calls[0][0].update).not.toHaveProperty("name");
   });
 
+  it("creates a personal organization with a default project in both environments", async () => {
+    await loadUser(IDENTITY);
+
+    const organization = createArg(0).memberships.create.organization.create;
+    expect(createArg(0).memberships.create.role).toBe("OWNER");
+    expect(organization).toMatchObject({
+      personal: true,
+      handle: createArg(0).username,
+      projects: {
+        create: {
+          slug: "default",
+          isDefault: true,
+          environments: {
+            create: [{ kind: "SANDBOX" }, { kind: "PRODUCTION" }],
+          },
+        },
+      },
+    });
+  });
+
   it("draws a new handle when the generated one is taken", async () => {
     upsert
       .mockRejectedValueOnce(uniqueViolation(["username"]))

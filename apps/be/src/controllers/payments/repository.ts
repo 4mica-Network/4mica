@@ -1,4 +1,5 @@
-import { Prisma, prisma } from "@4mica/db";
+import { type PaymentNetwork, Prisma, prisma } from "@4mica/db";
+import { type EnvironmentKind, networksForEnvironment } from "@4mica/rules";
 import { amountText } from "@utils/amount";
 import type { ListPaymentsQuery, ReportPaymentInput } from "./schema";
 
@@ -77,9 +78,17 @@ const toRow = (row: RawPayment, myAddresses: Set<string>): PaymentRow => {
   };
 };
 
-export const walletAddressesFor = async (orgId: string): Promise<string[]> => {
+export const walletAddressesFor = async (
+  orgId: string,
+  environment?: EnvironmentKind,
+): Promise<string[]> => {
   const rows = await prisma.wallet.findMany({
-    where: { organizationId: orgId },
+    where: {
+      organizationId: orgId,
+      ...(environment
+        ? { network: { in: networksForEnvironment(environment) } }
+        : {}),
+    },
     select: { address: true },
   });
 
@@ -115,8 +124,21 @@ const orderFor = (
   }
 };
 
+const inEnvironment = (
+  environment: EnvironmentKind,
+  only?: PaymentNetwork,
+): Prisma.PaymentWhereInput => {
+  const networks = networksForEnvironment(environment);
+  return {
+    network: {
+      in: only ? networks.filter((network) => network === only) : networks,
+    },
+  };
+};
+
 const whereFor = (
   addresses: string[],
+  environment: EnvironmentKind,
   query: ListPaymentsQuery,
 ): Prisma.PaymentWhereInput => {
   const sent: Prisma.PaymentWhereInput = {
@@ -126,18 +148,20 @@ const whereFor = (
     recipientAddress: { in: addresses },
   };
 
-  const where: Prisma.PaymentWhereInput =
-    query.direction === "sent"
+  const where: Prisma.PaymentWhereInput = {
+    ...(query.direction === "sent"
       ? sent
       : query.direction === "received"
         ? received
-        : { OR: [sent, received] };
+        : { OR: [sent, received] }),
+    ...inEnvironment(environment, query.network),
+  };
 
   if (query.status) {
     where.status = query.status;
   }
-  if (query.network) {
-    where.network = query.network;
+  if (query.projectId) {
+    where.projectId = query.projectId;
   }
 
   if (query.q) {
@@ -161,6 +185,7 @@ const whereFor = (
 
 export const listPayments = async (
   orgId: string,
+  environment: EnvironmentKind,
   query: ListPaymentsQuery,
 ): Promise<{
   items: PaymentRow[];
@@ -168,7 +193,7 @@ export const listPayments = async (
   page: number;
   limit: number;
 }> => {
-  const addresses = await walletAddressesFor(orgId);
+  const addresses = await walletAddressesFor(orgId, environment);
   const scope = query.wallet
     ? addresses.filter((address) => address === query.wallet)
     : addresses;
@@ -177,7 +202,7 @@ export const listPayments = async (
     return { items: [], total: 0, page: query.page, limit: query.limit };
   }
 
-  const where = whereFor(scope, query);
+  const where = whereFor(scope, environment, query);
   const skip = (query.page - 1) * query.limit;
   const mine = new Set(addresses);
 
@@ -253,16 +278,23 @@ const totalsFor = async (
 
 export const paymentSummary = async (
   orgId: string,
+  environment: EnvironmentKind,
 ): Promise<PaymentSummary> => {
-  const addresses = await walletAddressesFor(orgId);
+  const addresses = await walletAddressesFor(orgId, environment);
 
   if (addresses.length === 0) {
     return { sent: emptyTotals(), received: emptyTotals() };
   }
 
   const [sent, received] = await Promise.all([
-    totalsFor({ payerAddress: { in: addresses } }),
-    totalsFor({ recipientAddress: { in: addresses } }),
+    totalsFor({
+      payerAddress: { in: addresses },
+      ...inEnvironment(environment),
+    }),
+    totalsFor({
+      recipientAddress: { in: addresses },
+      ...inEnvironment(environment),
+    }),
   ]);
 
   return { sent, received };
@@ -270,9 +302,10 @@ export const paymentSummary = async (
 
 export const getPayment = async (
   orgId: string,
+  environment: EnvironmentKind,
   id: string,
 ): Promise<PaymentRow | null> => {
-  const addresses = await walletAddressesFor(orgId);
+  const addresses = await walletAddressesFor(orgId, environment);
 
   if (addresses.length === 0) {
     return null;
@@ -285,6 +318,7 @@ export const getPayment = async (
         { payerAddress: { in: addresses } },
         { recipientAddress: { in: addresses } },
       ],
+      ...inEnvironment(environment),
     },
     select: PAYMENT_SELECT,
   });
@@ -297,28 +331,45 @@ export interface ReportResolution {
   agentId: string | null;
 }
 
-export const resolveReportTargets = async (
+export interface ReportScope {
+  orgId: string;
+  projectId: string;
+  environmentId: string;
+}
+
+export const projectVisibleTo = async (
   orgId: string,
+  userId: string,
+  projectId: string,
+) =>
+  prisma.project.findFirst({
+    where: { id: projectId, organizationId: orgId, deletedAt: null },
+    select: {
+      restricted: true,
+      members: { where: { userId }, select: { role: true } },
+    },
+  });
+
+export const resolveReportTargets = async (
+  scope: ReportScope,
   data: ReportPaymentInput,
 ): Promise<ReportResolution> => {
+  const owner = {
+    organizationId: scope.orgId,
+    projectId: scope.projectId,
+    environmentId: scope.environmentId,
+    deletedAt: null,
+  };
   const [listing, agent] = await Promise.all([
     data.listingSlug
       ? prisma.apiListing.findFirst({
-          where: {
-            organizationId: orgId,
-            slug: data.listingSlug,
-            deletedAt: null,
-          },
+          where: { ...owner, slug: data.listingSlug },
           select: { id: true },
         })
       : Promise.resolve(null),
     data.agentSlug
       ? prisma.agent.findFirst({
-          where: {
-            organizationId: orgId,
-            slug: data.agentSlug,
-            deletedAt: null,
-          },
+          where: { ...owner, slug: data.agentSlug },
           select: { id: true },
         })
       : Promise.resolve(null),
@@ -416,6 +467,7 @@ const isRedeemable = (row: RawPayment): boolean =>
 
 export const reportPayment = async (
   orgId: string,
+  projectId: string,
   data: ReportPaymentInput,
   targets: ReportResolution,
 ): Promise<ReportOutcome> => {
@@ -456,6 +508,7 @@ export const reportPayment = async (
         const row = await prisma.payment.create({
           data: {
             organizationId: orgId,
+            projectId,
             reqId: data.reqId,
             ...identity,
             ...detail,
@@ -616,10 +669,11 @@ const monthKeys = (months: number): string[] => {
 
 export const paymentStats = async (
   orgId: string,
+  environment: EnvironmentKind,
   months: number,
 ): Promise<PaymentStats> => {
   const keys = monthKeys(months);
-  const addresses = await walletAddressesFor(orgId);
+  const addresses = await walletAddressesFor(orgId, environment);
 
   const empty = (): MonthlyBucket[] =>
     keys.map((month) => ({
@@ -641,6 +695,7 @@ export const paymentStats = async (
 
   const since = new Date(`${keys[0]}-01T00:00:00.000Z`);
   const owned = Prisma.join(addresses);
+  const networks = Prisma.join(networksForEnvironment(environment));
 
   const [counts, volumes, listings, agents] = await Promise.all([
     prisma.$queryRaw<CountRow[]>`
@@ -650,6 +705,7 @@ export const paymentStats = async (
              COUNT(*) AS count
         FROM payments
        WHERE created_at >= ${since}
+         AND network::text IN (${networks})
          AND (payer_address IN (${owned}) OR recipient_address IN (${owned}))
        GROUP BY 1, 2, 3
     `,
@@ -662,6 +718,7 @@ export const paymentStats = async (
         FROM payments
        WHERE created_at >= ${since}
          AND status = 'SETTLED'
+         AND network::text IN (${networks})
          AND (payer_address IN (${owned}) OR recipient_address IN (${owned}))
        GROUP BY 1, 2, 3, 4
     `,
@@ -671,6 +728,7 @@ export const paymentStats = async (
         JOIN api_listings l ON l.id = p.listing_id
        WHERE p.created_at >= ${since}
          AND p.status = 'SETTLED'
+         AND p.network::text IN (${networks})
          AND p.recipient_address IN (${owned})
        GROUP BY 1, 2, 3
        ORDER BY amount DESC
@@ -682,6 +740,7 @@ export const paymentStats = async (
         JOIN agents a ON a.id = p.agent_id
        WHERE p.created_at >= ${since}
          AND p.status = 'SETTLED'
+         AND p.network::text IN (${networks})
          AND p.payer_address IN (${owned})
        GROUP BY 1, 2, 3
        ORDER BY amount DESC

@@ -2,7 +2,15 @@ import { clearUserCache } from "@auth/user-store";
 import { trustRoutes } from "@routes/trust";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { initApp } from "@/server";
-import { actAs, ORG_ID, OTHER_ORG_ID } from "@/test-support/tenancy";
+import {
+  actAs,
+  ORG_ID,
+  OTHER_ORG_ID,
+  OTHER_PROJECT_ID,
+  PRODUCTION_ENV_ID,
+  PROJECT_ID,
+  SANDBOX_ENV_ID,
+} from "@/test-support/tenancy";
 
 const {
   authenticateRequest,
@@ -20,6 +28,7 @@ const {
   tenancy: {
     membership: { findFirst: vi.fn(), create: vi.fn() },
     auditLog: { create: vi.fn() },
+    project: { findFirst: vi.fn() },
   },
   authenticateRequest: vi.fn(),
   getUser: vi.fn(),
@@ -148,7 +157,13 @@ describe("ownership", () => {
 
     expect(apiListing.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: LISTING_ID, organizationId: ORG_ID, deletedAt: null },
+        where: {
+          id: LISTING_ID,
+          organizationId: ORG_ID,
+          projectId: PROJECT_ID,
+          environmentId: SANDBOX_ENV_ID,
+          deletedAt: null,
+        },
       }),
     );
     await instance.close();
@@ -165,6 +180,65 @@ describe("ownership", () => {
 
     expect(response.statusCode).toBe(404);
     expect(apiListing.findFirst).not.toHaveBeenCalled();
+    await instance.close();
+  });
+
+  it("probes the production environment when X-Environment asks for it", async () => {
+    resourcePolicy.findFirst.mockResolvedValue(null);
+    const instance = await app();
+
+    await instance.inject({
+      method: "GET",
+      url: `/me/api-listings/${LISTING_ID}/policy`,
+      headers: { ...AUTH, "x-environment": "production" },
+    });
+
+    expect(apiListing.findFirst.mock.calls[0][0].where).toMatchObject({
+      projectId: PROJECT_ID,
+      environmentId: PRODUCTION_ENV_ID,
+    });
+    await instance.close();
+  });
+
+  it("404s and probes nothing for a project the caller cannot see", async () => {
+    const instance = await app();
+
+    const response = await instance.inject({
+      method: "GET",
+      url: `/me/api-listings/${LISTING_ID}/policy`,
+      headers: { ...AUTH, "x-project-id": OTHER_PROJECT_ID },
+    });
+
+    expect(response.statusCode).toBe(404);
+    expect(apiListing.findFirst).not.toHaveBeenCalled();
+    await instance.close();
+  });
+
+  it("lets a viewer read but not write", async () => {
+    actAs(tenancy, "VIEWER");
+    resourcePolicy.findFirst.mockResolvedValue(null);
+    const instance = await app();
+
+    const read = await instance.inject({
+      method: "GET",
+      url: `/me/api-listings/${LISTING_ID}/policy`,
+      headers: AUTH,
+    });
+    expect(read.statusCode).toBe(200);
+
+    const write = await instance.inject({
+      method: "PUT",
+      url: `/me/api-listings/${LISTING_ID}/policy`,
+      headers: AUTH,
+      payload: { refundPolicy: "None." },
+    });
+    expect(write.statusCode).toBe(403);
+    expect(write.json()).toMatchObject({
+      error: "forbidden",
+      permission: "resources.write",
+    });
+    expect(resourcePolicy.create).not.toHaveBeenCalled();
+    expect(resourcePolicy.update).not.toHaveBeenCalled();
     await instance.close();
   });
 
@@ -520,7 +594,13 @@ describe("agents share the same surface", () => {
     expect(response.statusCode).toBe(200);
     expect(agent.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: "agent-1", organizationId: ORG_ID, deletedAt: null },
+        where: {
+          id: "agent-1",
+          organizationId: ORG_ID,
+          projectId: PROJECT_ID,
+          environmentId: SANDBOX_ENV_ID,
+          deletedAt: null,
+        },
       }),
     );
     expect(apiListing.findFirst).not.toHaveBeenCalled();

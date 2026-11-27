@@ -12,7 +12,9 @@ import { healthRoutes } from "./health";
 import { meRoutes } from "./me";
 import { organizationRoutes } from "./organizations";
 import { paymentRoutes } from "./payments";
+import { projectRoutes } from "./projects";
 import { resourceKeyRoutes } from "./resource-keys";
+import { serviceAccountRoutes } from "./service-accounts";
 import { supportRoutes } from "./support";
 import { trustRoutes } from "./trust";
 import { unsubscribeRoutes } from "./unsubscribe";
@@ -28,6 +30,7 @@ export const routes: RouteRegistration[] = [
   { plugin: healthRoutes },
   { plugin: meRoutes },
   { plugin: organizationRoutes },
+  { plugin: projectRoutes },
   { plugin: verificationRoutes },
   { plugin: developerRoutes },
   { plugin: bannerRoutes },
@@ -40,6 +43,7 @@ export const routes: RouteRegistration[] = [
   { plugin: customerRoutes },
   { plugin: trustRoutes },
   { plugin: resourceKeyRoutes },
+  { plugin: serviceAccountRoutes },
   { plugin: complianceRoutes },
   { plugin: configRoutes },
   { plugin: supportRoutes },
@@ -59,7 +63,9 @@ export {
   meRoutes,
   organizationRoutes,
   paymentRoutes,
+  projectRoutes,
   resourceKeyRoutes,
+  serviceAccountRoutes,
   supportRoutes,
   trustRoutes,
   unsubscribeRoutes,

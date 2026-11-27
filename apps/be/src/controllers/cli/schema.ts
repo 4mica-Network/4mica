@@ -14,9 +14,14 @@ const name = v.pipe(
   singleLine,
 );
 
+const organizationId = v.optional(v.pipe(v.string(), v.trim(), v.uuid()));
+
 export const CreateDeviceCodeSchema = v.object({
   client_name: v.optional(name, "4mica CLI"),
   scope: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(200))),
+  organization: v.optional(
+    v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(64)),
+  ),
 });
 
 export const DeviceTokenSchema = v.object({
@@ -24,9 +29,11 @@ export const DeviceTokenSchema = v.object({
   device_code: v.pipe(v.string(), v.minLength(1), v.maxLength(128)),
 });
 
-export const UserCodeSchema = v.object({
-  userCode: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(32)),
-});
+const userCode = v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(32));
+
+export const UserCodeSchema = v.object({ userCode });
+
+export const ApproveDeviceSchema = v.object({ userCode, organizationId });
 
 export const CreateCliTokenSchema = v.object({
   name,
@@ -37,6 +44,7 @@ export const CreateCliTokenSchema = v.object({
     ),
   ),
   expiresInDays: v.optional(v.picklist(TOKEN_LIFETIME_DAYS), 90),
+  organizationId,
 });
 
 export type CreateDeviceCodeInput = v.InferOutput<

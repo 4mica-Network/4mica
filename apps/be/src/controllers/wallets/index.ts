@@ -1,3 +1,4 @@
+import { requestedEnvironment } from "@auth/project";
 import {
   audit,
   invalidBody,
@@ -55,6 +56,11 @@ export const listWalletsHandler: RouteHandler = async (request, reply) => {
     return reply;
   }
 
+  const environment = requestedEnvironment(request);
+  if (!environment) {
+    return notFound(reply, "environment");
+  }
+
   const parsed = parseBody(ListWalletsQuerySchema, request.query);
   if (!parsed.success) {
     return invalidBody(reply, parsed.issues);
@@ -66,7 +72,7 @@ export const listWalletsHandler: RouteHandler = async (request, reply) => {
     ]);
   }
 
-  return reply.send(await listWallets(tenant.orgId, parsed.data));
+  return reply.send(await listWallets(tenant.orgId, environment, parsed.data));
 };
 
 export const getWalletHandler: RouteHandler = async (request, reply) => {

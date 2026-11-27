@@ -1,3 +1,4 @@
+import type { ApiKeyScope, EnvironmentKind } from "@4mica/db";
 import { appLogger } from "@logger/index";
 import { hashSecret } from "@utils/secrets";
 import type { FastifyReply, FastifyRequest } from "fastify";
@@ -6,12 +7,19 @@ import { findApiKeyByHash, touchApiKey } from "./repository";
 export interface ApiKeyContext {
   id: string;
   orgId: string;
+  projectId: string;
+  environmentId: string;
+  environment: EnvironmentKind;
+  serviceAccountId: string | null;
+  scopes: ApiKeyScope[];
   listingId: string | null;
   agentId: string | null;
 }
 
 export interface ResourceKeyContext {
   orgId: string;
+  projectId: string;
+  environment: EnvironmentKind;
   kind: "listing" | "agent";
   id: string;
 }
@@ -83,9 +91,16 @@ export const authenticateApiKey = async (
         ? "expired"
         : record.organization.deletedAt !== null
           ? "organization_deleted"
-          : record.listing?.deletedAt || record.agent?.deletedAt
-            ? "resource_deleted"
-            : null;
+          : record.project.deletedAt !== null ||
+              record.project.archivedAt !== null
+            ? "project_inactive"
+            : record.serviceAccount &&
+                (record.serviceAccount.suspendedAt !== null ||
+                  record.serviceAccount.deletedAt !== null)
+              ? "service_account_inactive"
+              : record.listing?.deletedAt || record.agent?.deletedAt
+                ? "resource_deleted"
+                : null;
 
   if (!record || reason) {
     rejected(request, reply, reason ?? "unknown", token);
@@ -95,6 +110,11 @@ export const authenticateApiKey = async (
   request.apiKey = {
     id: record.id,
     orgId: record.organizationId,
+    projectId: record.projectId,
+    environmentId: record.environmentId,
+    environment: record.environment.kind,
+    serviceAccountId: record.serviceAccountId,
+    scopes: record.scopes,
     listingId: record.listingId,
     agentId: record.agentId,
   };
@@ -123,13 +143,13 @@ export const requireResourceKey = (
     return null;
   }
 
-  const { orgId, listingId, agentId } = request.apiKey;
+  const { orgId, projectId, environment, listingId, agentId } = request.apiKey;
 
   if (listingId) {
-    return { orgId, kind: "listing", id: listingId };
+    return { orgId, projectId, environment, kind: "listing", id: listingId };
   }
   if (agentId) {
-    return { orgId, kind: "agent", id: agentId };
+    return { orgId, projectId, environment, kind: "agent", id: agentId };
   }
 
   reply.code(403).send({
@@ -137,4 +157,31 @@ export const requireResourceKey = (
     message: "This key is not tied to an API or agent.",
   });
   return null;
+};
+
+export const requireApiKeyScope = (
+  request: FastifyRequest,
+  reply: FastifyReply,
+  scope: ApiKeyScope,
+): ApiKeyContext | null => {
+  if (!request.apiKey) {
+    unauthorized(reply);
+    return null;
+  }
+
+  if (!request.apiKey.scopes.includes(scope)) {
+    appLogger.warn("API key lacks scope", {
+      keyId: request.apiKey.id,
+      scope,
+      route: request.routeOptions.url ?? null,
+    });
+    reply.code(403).send({
+      error: "insufficient_scope",
+      message: `This key is not allowed to do that. It needs the ${scope} scope.`,
+      scope,
+    });
+    return null;
+  }
+
+  return request.apiKey;
 };

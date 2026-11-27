@@ -843,9 +843,19 @@ describe("account routes", () => {
       await app.close();
     });
 
-    it("refuses a member editing the business", async () => {
-      actAs(tenancy, "MEMBER");
+    it.each([
+      "DEVELOPER",
+      "VIEWER",
+    ] as const)("lets a %s read but not edit the business", async (role) => {
+      actAs(tenancy, role);
       const app = await initApp([{ plugin: meRoutes }]);
+      const read = await app.inject({
+        method: "GET",
+        url: "/me/business",
+        headers: AUTH,
+      });
+      expect(read.statusCode).toBe(200);
+
       const res = await app.inject({
         method: "PUT",
         url: "/me/business",
@@ -854,7 +864,10 @@ describe("account routes", () => {
       });
 
       expect(res.statusCode).toBe(403);
-      expect(res.json().error).toBe("forbidden");
+      expect(res.json()).toMatchObject({
+        error: "forbidden",
+        permission: "business.manage",
+      });
       expect(businessUpsert).not.toHaveBeenCalled();
 
       await app.close();

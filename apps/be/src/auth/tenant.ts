@@ -45,6 +45,13 @@ const lookup = async (
     return null;
   }
 
+  const bound = request.cliSession?.organizationId ?? null;
+  if (bound !== null) {
+    return requested.kind === "explicit" && requested.orgId !== bound
+      ? null
+      : findMembership(userId, bound);
+  }
+
   const orgId = requested.kind === "explicit" ? requested.orgId : null;
   const found = await findMembership(userId, orgId);
   if (found) {

@@ -2,7 +2,15 @@ import { clearUserCache } from "@auth/user-store";
 import { developerRoutes } from "@routes/developer";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { initApp } from "@/server";
-import { actAs, ORG_ID, OTHER_ORG_ID } from "@/test-support/tenancy";
+import {
+  actAs,
+  ORG_ID,
+  OTHER_ORG_ID,
+  OTHER_PROJECT_ID,
+  PRODUCTION_ENV_ID,
+  PROJECT_ID,
+  SANDBOX_ENV_ID,
+} from "@/test-support/tenancy";
 
 const {
   authenticateRequest,
@@ -16,6 +24,7 @@ const {
   tenancy: {
     membership: { findFirst: vi.fn(), create: vi.fn() },
     auditLog: { create: vi.fn() },
+    project: { findFirst: vi.fn() },
   },
   authenticateRequest: vi.fn(),
   getUser: vi.fn(),
@@ -92,6 +101,9 @@ const STORED_KEY = {
   name: "CI",
   prefix: "4mica_sk_ab12",
   last4: "wxyz",
+  scopes: ["PAYMENTS_WRITE", "CUSTOMERS_READ", "RESOURCE_READ"],
+  serviceAccountId: null,
+  environment: { kind: "SANDBOX" },
   lastUsedAt: null,
   expiresAt: null,
   revokedAt: null,
@@ -147,8 +159,11 @@ describe("developer routes", () => {
     expect(res.statusCode).toBe(200);
     expect(apiKey.findMany.mock.calls[0][0].where).toEqual({
       organizationId: ORG_ID,
+      projectId: PROJECT_ID,
+      environmentId: SANDBOX_ENV_ID,
       listingId: null,
       agentId: null,
+      serviceAccountId: null,
     });
     await app.close();
   });
@@ -208,8 +223,11 @@ describe("developer routes", () => {
     expect(apiKey.updateMany.mock.calls[0][0].where).toEqual({
       id: "key_1",
       organizationId: ORG_ID,
+      projectId: PROJECT_ID,
+      environmentId: SANDBOX_ENV_ID,
       listingId: null,
       agentId: null,
+      serviceAccountId: null,
     });
 
     await app.inject({
@@ -220,8 +238,11 @@ describe("developer routes", () => {
     expect(apiKey.deleteMany.mock.calls[0][0].where).toEqual({
       id: "key_1",
       organizationId: ORG_ID,
+      projectId: PROJECT_ID,
+      environmentId: SANDBOX_ENV_ID,
       listingId: null,
       agentId: null,
+      serviceAccountId: null,
     });
 
     await app.close();
@@ -260,6 +281,8 @@ describe("developer routes", () => {
     });
     expect(webhook.create.mock.calls[0][0].data).toMatchObject({
       organizationId: ORG_ID,
+      projectId: PROJECT_ID,
+      environmentId: SANDBOX_ENV_ID,
       createdById: USER_ID,
     });
 
@@ -482,5 +505,131 @@ describe("developer routes", () => {
     expect(apiKey.create).not.toHaveBeenCalled();
 
     await app.close();
+  });
+  describe("projects, environments and scopes", () => {
+    it("mints a sandbox key with every scope by default", async () => {
+      const app = await initApp([{ plugin: developerRoutes }]);
+      const res = await app.inject({
+        method: "POST",
+        url: "/me/api-keys",
+        headers: AUTH,
+        payload: { name: "CI" },
+      });
+
+      expect(res.statusCode).toBe(201);
+      expect(res.json().plaintext).toMatch(/^4mica_sk_test_/);
+      expect(res.json().apiKey).toMatchObject({
+        environment: "SANDBOX",
+        serviceAccountId: null,
+      });
+      expect(apiKey.create.mock.calls[0][0].data).toMatchObject({
+        projectId: PROJECT_ID,
+        environmentId: SANDBOX_ENV_ID,
+        scopes: ["PAYMENTS_WRITE", "CUSTOMERS_READ", "RESOURCE_READ"],
+      });
+      await app.close();
+    });
+
+    it("mints a live key in production with the scopes asked for", async () => {
+      const app = await initApp([{ plugin: developerRoutes }]);
+      const res = await app.inject({
+        method: "POST",
+        url: "/me/api-keys",
+        headers: { ...AUTH, "x-environment": "production" },
+        payload: { name: "CI", scopes: ["PAYMENTS_WRITE", "PAYMENTS_WRITE"] },
+      });
+
+      expect(res.statusCode).toBe(201);
+      expect(res.json().plaintext).toMatch(/^4mica_sk_live_/);
+      expect(apiKey.create.mock.calls[0][0].data).toMatchObject({
+        environmentId: PRODUCTION_ENV_ID,
+        scopes: ["PAYMENTS_WRITE"],
+      });
+      await app.close();
+    });
+
+    it("rejects an empty or unknown scope list", async () => {
+      const app = await initApp([{ plugin: developerRoutes }]);
+      for (const scopes of [[], ["ADMIN"]]) {
+        const res = await app.inject({
+          method: "POST",
+          url: "/me/api-keys",
+          headers: AUTH,
+          payload: { name: "CI", scopes },
+        });
+        expect(res.statusCode).toBe(400);
+      }
+      expect(apiKey.create).not.toHaveBeenCalled();
+      await app.close();
+    });
+
+    it("scopes webhooks to the active project and environment", async () => {
+      const app = await initApp([{ plugin: developerRoutes }]);
+      await app.inject({
+        method: "GET",
+        url: "/me/webhooks",
+        headers: { ...AUTH, "x-environment": "production" },
+      });
+
+      expect(webhook.findMany.mock.calls[0][0].where).toEqual({
+        organizationId: ORG_ID,
+        projectId: PROJECT_ID,
+        environmentId: PRODUCTION_ENV_ID,
+      });
+      await app.close();
+    });
+
+    it("404s on a project the caller cannot see", async () => {
+      const app = await initApp([{ plugin: developerRoutes }]);
+      for (const url of ["/me/api-keys", "/me/webhooks"]) {
+        const res = await app.inject({
+          method: "GET",
+          url,
+          headers: { ...AUTH, "x-project-id": OTHER_PROJECT_ID },
+        });
+        expect(res.statusCode, url).toBe(404);
+      }
+      expect(apiKey.findMany).not.toHaveBeenCalled();
+      expect(webhook.findMany).not.toHaveBeenCalled();
+      await app.close();
+    });
+
+    it("lets a viewer read keys and webhooks but change neither", async () => {
+      actAs(tenancy, "VIEWER");
+      const app = await initApp([{ plugin: developerRoutes }]);
+
+      for (const url of ["/me/api-keys", "/me/webhooks"]) {
+        const res = await app.inject({ method: "GET", url, headers: AUTH });
+        expect(res.statusCode, url).toBe(200);
+      }
+
+      const key = await app.inject({
+        method: "POST",
+        url: "/me/api-keys",
+        headers: AUTH,
+        payload: { name: "CI" },
+      });
+      expect(key.statusCode).toBe(403);
+      expect(key.json()).toMatchObject({
+        error: "forbidden",
+        permission: "keys.manage",
+      });
+
+      const hook = await app.inject({
+        method: "POST",
+        url: "/me/webhooks",
+        headers: AUTH,
+        payload: {
+          url: "https://example.com/hook",
+          events: ["payment.succeeded"],
+        },
+      });
+      expect(hook.statusCode).toBe(403);
+      expect(hook.json().permission).toBe("resources.write");
+
+      expect(apiKey.create).not.toHaveBeenCalled();
+      expect(webhook.create).not.toHaveBeenCalled();
+      await app.close();
+    });
   });
 });

@@ -14,6 +14,17 @@ import type {
   UpdateCustomerIdentityInput,
 } from "./schema";
 
+export interface CustomerScope {
+  orgId: string;
+  projectId: string;
+}
+
+const customerWhere = (scope: CustomerScope) => ({
+  organizationId: scope.orgId,
+  projectId: scope.projectId,
+  deletedAt: null,
+});
+
 export const CUSTOMER_IDENTITY_SELECT = {
   id: true,
   type: true,
@@ -213,14 +224,15 @@ interface SpendRow {
 }
 
 const filterFor = (
-  orgId: string,
+  scope: CustomerScope,
   query: Pick<
     ListCustomersQuery,
     "q" | "type" | "status" | "network" | "source"
   >,
 ): Prisma.Sql => {
   const clauses: Prisma.Sql[] = [
-    Prisma.sql`c.organization_id = ${orgId}`,
+    Prisma.sql`c.organization_id = ${scope.orgId}`,
+    Prisma.sql`c.project_id = ${scope.projectId}`,
     Prisma.sql`c.deleted_at IS NULL`,
   ];
 
@@ -445,7 +457,7 @@ const quotaUsageFor = async (
 };
 
 export const listCustomers = async (
-  orgId: string,
+  scope: CustomerScope,
   query: ListCustomersQuery,
 ): Promise<{
   items: CustomerRow[];
@@ -453,8 +465,9 @@ export const listCustomers = async (
   page: number;
   limit: number;
 }> => {
+  const { orgId } = scope;
   const addresses = await walletAddressesFor(orgId);
-  const filter = filterFor(orgId, query);
+  const filter = filterFor(scope, query);
   const skip = (query.page - 1) * query.limit;
 
   const owned =
@@ -508,7 +521,11 @@ export const listCustomers = async (
 
   const [rows, spend] = await Promise.all([
     prisma.customer.findMany({
-      where: { id: { in: pageIds }, organizationId: orgId },
+      where: {
+        id: { in: pageIds },
+        organizationId: orgId,
+        projectId: scope.projectId,
+      },
       select: CUSTOMER_SELECT,
     }),
     spendFor(orgId, pageIds, addresses),
@@ -524,11 +541,11 @@ export const listCustomers = async (
 };
 
 export const getCustomer = async (
-  orgId: string,
+  scope: CustomerScope,
   id: string,
 ): Promise<CustomerRow | null> => {
   const row = await prisma.customer.findFirst({
-    where: { id, organizationId: orgId, deletedAt: null },
+    where: { id, ...customerWhere(scope) },
     select: CUSTOMER_SELECT,
   });
 
@@ -536,6 +553,7 @@ export const getCustomer = async (
     return null;
   }
 
+  const { orgId } = scope;
   const addresses = await walletAddressesFor(orgId);
   const [spend, quota] = await Promise.all([
     spendFor(orgId, [row.id], addresses),
@@ -546,11 +564,11 @@ export const getCustomer = async (
 };
 
 export const ownsCustomer = async (
-  orgId: string,
+  scope: CustomerScope,
   id: string,
 ): Promise<boolean> => {
   const row = await prisma.customer.findFirst({
-    where: { id, organizationId: orgId, deletedAt: null },
+    where: { id, ...customerWhere(scope) },
     select: { id: true },
   });
 
@@ -579,13 +597,15 @@ const toIdentityData = (input: CustomerIdentityInput) =>
       };
 
 export const createCustomer = async (
-  orgId: string,
+  scope: CustomerScope,
   userId: string,
   data: CreateCustomerInput,
 ): Promise<CustomerRow> => {
+  const { orgId } = scope;
   const row = await prisma.customer.create({
     data: {
       organizationId: orgId,
+      projectId: scope.projectId,
       createdById: userId,
       name: data.name,
       email: data.email ?? null,
@@ -612,32 +632,36 @@ export const createCustomer = async (
 };
 
 export const updateCustomer = async (
-  orgId: string,
+  scope: CustomerScope,
   id: string,
   data: Prisma.CustomerUpdateManyMutationInput,
 ): Promise<CustomerRow | null> => {
   const { count } = await prisma.customer.updateMany({
-    where: { id, organizationId: orgId, deletedAt: null },
+    where: { id, ...customerWhere(scope) },
     data,
   });
 
-  return count > 0 ? getCustomer(orgId, id) : null;
+  return count > 0 ? getCustomer(scope, id) : null;
 };
 
 export const addIdentity = async (
-  orgId: string,
+  scope: CustomerScope,
   customerId: string,
   input: CustomerIdentityInput,
 ): Promise<CustomerRow | null> => {
   await prisma.customerPaymentIdentity.create({
-    data: { organizationId: orgId, customerId, ...toIdentityData(input) },
+    data: {
+      organizationId: scope.orgId,
+      customerId,
+      ...toIdentityData(input),
+    },
   });
 
-  return getCustomer(orgId, customerId);
+  return getCustomer(scope, customerId);
 };
 
 export const setCustomerStatus = async (
-  orgId: string,
+  scope: CustomerScope,
   id: string,
   input: SetCustomerStatusInput,
 ): Promise<CustomerRow | null> => {
@@ -657,15 +681,15 @@ export const setCustomerStatus = async (
           };
 
   const { count } = await prisma.customer.updateMany({
-    where: { id, organizationId: orgId, deletedAt: null },
+    where: { id, ...customerWhere(scope) },
     data,
   });
 
-  return count > 0 ? getCustomer(orgId, id) : null;
+  return count > 0 ? getCustomer(scope, id) : null;
 };
 
 export const setCustomerPolicy = async (
-  orgId: string,
+  scope: CustomerScope,
   id: string,
   input: SetCustomerPolicyInput,
 ): Promise<CustomerRow | null> => {
@@ -676,23 +700,23 @@ export const setCustomerPolicy = async (
   }
 
   const { count } = await prisma.customer.updateMany({
-    where: { id, organizationId: orgId, deletedAt: null },
+    where: { id, ...customerWhere(scope) },
     data,
   });
 
-  return count > 0 ? getCustomer(orgId, id) : null;
+  return count > 0 ? getCustomer(scope, id) : null;
 };
 
 export const resetCustomerUsage = async (
-  orgId: string,
+  scope: CustomerScope,
   id: string,
 ): Promise<CustomerRow | null> => {
   const { count } = await prisma.customer.updateMany({
-    where: { id, organizationId: orgId, deletedAt: null },
+    where: { id, ...customerWhere(scope) },
     data: { quotaResetAt: new Date() },
   });
 
-  return count > 0 ? getCustomer(orgId, id) : null;
+  return count > 0 ? getCustomer(scope, id) : null;
 };
 
 export interface CreditBalance {
@@ -986,7 +1010,7 @@ export interface ResolvedPayer {
 }
 
 export const resolveCustomerForPayer = async (
-  orgId: string,
+  scope: CustomerScope,
   network: string,
   address: string,
   at = new Date(),
@@ -994,11 +1018,11 @@ export const resolveCustomerForPayer = async (
 ): Promise<ResolvedPayer | null> => {
   const identity = await db.customerPaymentIdentity.findFirst({
     where: {
-      organizationId: orgId,
+      organizationId: scope.orgId,
       type: "WALLET",
       address,
       network: network as never,
-      customer: { deletedAt: null },
+      customer: { deletedAt: null, projectId: scope.projectId },
       AND: [
         { OR: [{ validFrom: null }, { validFrom: { lte: at } }] },
         { OR: [{ validUntil: null }, { validUntil: { gt: at } }] },
@@ -1055,6 +1079,7 @@ export const redeemPaymentBenefits = async (
         where: { id: paymentId },
         select: {
           reqId: true,
+          projectId: true,
           payerAddress: true,
           network: true,
           couponCode: true,
@@ -1072,8 +1097,12 @@ export const redeemPaymentBenefits = async (
         creditDrawn: "0",
       };
 
+      if (!payment.projectId) {
+        return redemption;
+      }
+
       const resolved = await resolveCustomerForPayer(
-        orgId,
+        { orgId, projectId: payment.projectId },
         payment.network,
         payment.payerAddress,
         payment.createdAt,
@@ -1211,7 +1240,7 @@ export const quotaRemainingFor = async (
 };
 
 export const updateIdentity = async (
-  orgId: string,
+  scope: CustomerScope,
   customerId: string,
   identityId: string,
   input: UpdateCustomerIdentityInput,
@@ -1232,11 +1261,11 @@ export const updateIdentity = async (
   }
 
   const { count } = await prisma.customerPaymentIdentity.updateMany({
-    where: { id: identityId, customerId, organizationId: orgId },
+    where: { id: identityId, customerId, organizationId: scope.orgId },
     data,
   });
 
-  return count > 0 ? getCustomer(orgId, customerId) : null;
+  return count > 0 ? getCustomer(scope, customerId) : null;
 };
 
 export const removeIdentity = async (
@@ -1252,11 +1281,11 @@ export const removeIdentity = async (
 };
 
 export const softDeleteCustomer = async (
-  orgId: string,
+  scope: CustomerScope,
   id: string,
 ): Promise<boolean> => {
   const row = await prisma.customer.findFirst({
-    where: { id, organizationId: orgId, deletedAt: null },
+    where: { id, ...customerWhere(scope) },
     select: { id: true },
   });
 
@@ -1278,11 +1307,11 @@ export const softDeleteCustomer = async (
 };
 
 export const batchSoftDeleteCustomers = async (
-  orgId: string,
+  scope: CustomerScope,
   ids: string[],
 ): Promise<{ deleted: string[]; notFound: string[] }> => {
   const owned = await prisma.customer.findMany({
-    where: { id: { in: ids }, organizationId: orgId, deletedAt: null },
+    where: { id: { in: ids }, ...customerWhere(scope) },
     select: { id: true },
   });
 

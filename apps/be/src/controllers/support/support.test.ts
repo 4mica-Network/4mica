@@ -450,8 +450,8 @@ describe("support routes", () => {
     await app.close();
   });
 
-  it("lets a member open a request in their organization", async () => {
-    actAs(tenancy, "MEMBER");
+  it("lets a developer open a request in their organization", async () => {
+    actAs(tenancy, "DEVELOPER");
     const app = await initApp([{ plugin: supportRoutes }]);
 
     const res = await app.inject({
@@ -466,6 +466,60 @@ describe("support routes", () => {
     });
 
     expect(res.statusCode).toBe(201);
+
+    await app.close();
+  });
+
+  it("lets a viewer read support requests", async () => {
+    actAs(tenancy, "VIEWER");
+    const app = await initApp([{ plugin: supportRoutes }]);
+
+    const list = await app.inject({
+      method: "GET",
+      url: "/me/support-requests",
+      headers: AUTH,
+    });
+    const one = await app.inject({
+      method: "GET",
+      url: `/me/support-requests/${REQUEST_ID}`,
+      headers: AUTH,
+    });
+
+    expect(list.statusCode).toBe(200);
+    expect(one.statusCode).toBe(200);
+
+    await app.close();
+  });
+
+  it("refuses a viewer opening or replying to a request", async () => {
+    actAs(tenancy, "VIEWER");
+    const app = await initApp([{ plugin: supportRoutes }]);
+
+    const created = await app.inject({
+      method: "POST",
+      url: "/me/support-requests",
+      headers: AUTH,
+      payload: {
+        subject: "Payments stuck",
+        category: "PAYMENTS",
+        description: "Two payments have been pending for an hour.",
+      },
+    });
+    const replied = await app.inject({
+      method: "POST",
+      url: `/me/support-requests/${REQUEST_ID}/messages`,
+      headers: AUTH,
+      payload: { body: "Any update?" },
+    });
+
+    expect(created.statusCode).toBe(403);
+    expect(created.json()).toMatchObject({
+      error: "forbidden",
+      permission: "resources.write",
+    });
+    expect(replied.statusCode).toBe(403);
+    expect(supportRequest.create).not.toHaveBeenCalled();
+    expect(supportMessage.create).not.toHaveBeenCalled();
 
     await app.close();
   });

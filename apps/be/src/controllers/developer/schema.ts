@@ -1,3 +1,4 @@
+import type { ApiKeyScope } from "@4mica/db";
 import {
   futureTimestamp,
   publicHttpsUrl,
@@ -27,8 +28,21 @@ const eventList = v.pipe(
 
 const webhookUrl = publicHttpsUrl(2048);
 
+export const API_KEY_SCOPES = [
+  "PAYMENTS_WRITE",
+  "CUSTOMERS_READ",
+  "RESOURCE_READ",
+] as const satisfies readonly ApiKeyScope[];
+
+export const apiKeyScopes = v.pipe(
+  v.array(v.picklist(API_KEY_SCOPES)),
+  v.minLength(1, "select at least one scope"),
+  v.transform((scopes): ApiKeyScope[] => [...new Set(scopes)]),
+);
+
 export const CreateApiKeySchema = v.object({
   name,
+  scopes: v.optional(apiKeyScopes),
   expiresAt: v.optional(v.nullable(futureTimestamp)),
 });
 

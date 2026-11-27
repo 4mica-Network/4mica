@@ -8,8 +8,10 @@ import {
   getCurrentCliSessionHandler,
   getDeviceRequestHandler,
   listCliSessionsHandler,
+  listOrganizationCliSessionsHandler,
   revokeCliSessionHandler,
   revokeCurrentCliSessionHandler,
+  revokeOrganizationCliSessionHandler,
 } from "@controllers/cli/index";
 import {
   publicSensitiveRateLimit,
@@ -33,6 +35,43 @@ const idParamSchema = {
   type: "object",
   required: ["id"],
   properties: { id: idParam },
+} as const;
+
+const organizationSchema = {
+  type: "object",
+  nullable: true,
+  required: ["id"],
+  properties: {
+    id: { type: "string" },
+    name: { type: "string" },
+    handle: { type: "string", nullable: true },
+  },
+} as const;
+
+const boundSessionSchema = {
+  ...cliSessionResponseSchema,
+  properties: {
+    ...cliSessionResponseSchema.properties,
+    organization: organizationSchema,
+  },
+} as const;
+
+const organizationSessionSchema = {
+  ...boundSessionSchema,
+  properties: {
+    ...boundSessionSchema.properties,
+    user: {
+      type: "object",
+      required: ["id"],
+      properties: {
+        id: { type: "string" },
+        name: { type: "string", nullable: true },
+        username: { type: "string", nullable: true },
+        email: { type: "string", nullable: true },
+        avatarUrl: { type: "string", nullable: true },
+      },
+    },
+  },
 } as const;
 
 const userCodeBodySchema = {
@@ -63,6 +102,7 @@ export const cliRoutes: FastifyPluginCallback = (app, _opts, done) => {
           properties: {
             client_name: { type: "string", maxLength: 120 },
             scope: { type: "string", maxLength: 200 },
+            organization: { type: "string", maxLength: 64 },
           },
         },
         response: {
@@ -103,7 +143,13 @@ export const cliRoutes: FastifyPluginCallback = (app, _opts, done) => {
         security: [{ cliTokenAuth: [] }],
         response: {
           ...limitedResponses,
-          200: cliCurrentSessionResponseSchema,
+          200: {
+            ...cliCurrentSessionResponseSchema,
+            properties: {
+              ...cliCurrentSessionResponseSchema.properties,
+              organization: organizationSchema,
+            },
+          },
           401: errorResponseSchema,
           403: errorResponseSchema,
         },
@@ -141,7 +187,13 @@ export const cliRoutes: FastifyPluginCallback = (app, _opts, done) => {
         querystring: userCodeBodySchema,
         response: {
           ...limitedResponses,
-          200: cliDeviceRequestResponseSchema,
+          200: {
+            ...cliDeviceRequestResponseSchema,
+            properties: {
+              ...cliDeviceRequestResponseSchema.properties,
+              organization: organizationSchema,
+            },
+          },
           401: errorResponseSchema,
           404: errorResponseSchema,
         },
@@ -157,10 +209,13 @@ export const cliRoutes: FastifyPluginCallback = (app, _opts, done) => {
       schema: {
         tags: ["cli"],
         summary: "Approve a CLI sign-in for the signed-in account",
+        description:
+          "An organizationId binds the session to that organization, which the approver must belong to. A sign-in that asked for an organization is always bound to it.",
         security: [{ bearerAuth: [] }],
         response: {
           ...limitedResponses,
           204: { type: "null" },
+          400: errorResponseSchema,
           401: errorResponseSchema,
           404: errorResponseSchema,
         },
@@ -198,7 +253,7 @@ export const cliRoutes: FastifyPluginCallback = (app, _opts, done) => {
         security: [{ bearerAuth: [] }],
         response: {
           ...limitedResponses,
-          200: { type: "array", items: cliSessionResponseSchema },
+          200: { type: "array", items: boundSessionSchema },
           401: errorResponseSchema,
         },
       },
@@ -217,9 +272,16 @@ export const cliRoutes: FastifyPluginCallback = (app, _opts, done) => {
         security: [{ bearerAuth: [] }],
         response: {
           ...limitedResponses,
-          201: createdCliTokenResponseSchema,
+          201: {
+            ...createdCliTokenResponseSchema,
+            properties: {
+              ...createdCliTokenResponseSchema.properties,
+              session: boundSessionSchema,
+            },
+          },
           400: errorResponseSchema,
           401: errorResponseSchema,
+          404: errorResponseSchema,
         },
       },
     },
@@ -244,6 +306,53 @@ export const cliRoutes: FastifyPluginCallback = (app, _opts, done) => {
       },
     },
     revokeCliSessionHandler,
+  );
+
+  app.get(
+    "/me/organization/cli-sessions",
+    {
+      ...base,
+      schema: {
+        tags: ["cli"],
+        summary: "List the live CLI sessions bound to the active organization",
+        security: [{ bearerAuth: [] }],
+        response: {
+          ...limitedResponses,
+          200: {
+            type: "object",
+            required: ["items"],
+            properties: {
+              items: { type: "array", items: organizationSessionSchema },
+            },
+          },
+          401: errorResponseSchema,
+          403: errorResponseSchema,
+          404: errorResponseSchema,
+        },
+      },
+    },
+    listOrganizationCliSessionsHandler,
+  );
+
+  app.post(
+    "/me/organization/cli-sessions/:id/revoke",
+    {
+      ...strict,
+      schema: {
+        tags: ["cli"],
+        summary: "Revoke a CLI session bound to the active organization",
+        security: [{ bearerAuth: [] }],
+        params: idParamSchema,
+        response: {
+          ...limitedResponses,
+          204: { type: "null" },
+          401: errorResponseSchema,
+          403: errorResponseSchema,
+          404: errorResponseSchema,
+        },
+      },
+    },
+    revokeOrganizationCliSessionHandler,
   );
 
   done();

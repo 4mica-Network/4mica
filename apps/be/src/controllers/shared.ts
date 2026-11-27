@@ -1,5 +1,11 @@
 import { prisma } from "@4mica/db";
-import { can, type Permission } from "@auth/permissions";
+import {
+  can,
+  isWrite,
+  type Permission,
+  type ProjectPermission,
+} from "@auth/permissions";
+import { type ProjectScope, resolveProject } from "@auth/project";
 import { resolveTenant, type Tenant } from "@auth/tenant";
 import { type AuditEntry, writeAudit } from "@controllers/audit/repository";
 import type { SellerWalletResult } from "@controllers/wallets/repository";
@@ -35,13 +41,33 @@ export const requireUserId = (
   return request.user.id;
 };
 
-/**
- * Resolves the organization the request acts in and checks the caller's role
- * against `permission`. The organization comes from the `X-Org-Id` header but
- * is only honoured when the session's user is a member, so the header selects
- * among the caller's own tenants and never reaches anyone else's. An unknown
- * or foreign organization answers 404, exactly like a foreign resource.
- */
+const recordDenied = (
+  request: FastifyRequest,
+  orgId: string,
+  userId: string,
+  permission: string,
+  projectId?: string,
+) => {
+  void Promise.resolve()
+    .then(() =>
+      writeAudit(prisma, {
+        orgId,
+        actorUserId: userId,
+        action: "authz.denied",
+        ...(projectId ? { targetType: "project", targetId: projectId } : {}),
+        metadata: {
+          permission,
+          method: request.method,
+          route: request.routeOptions.url ?? null,
+        },
+        ip: request.ip,
+      }),
+    )
+    .catch((error: unknown) => {
+      appLogger.warn("Could not record denied request", { error });
+    });
+};
+
 export const requireTenant = async (
   request: FastifyRequest,
   reply: FastifyReply,
@@ -59,23 +85,7 @@ export const requireTenant = async (
   }
 
   if (!can(tenant.role, permission)) {
-    void Promise.resolve()
-      .then(() =>
-        writeAudit(prisma, {
-          orgId: tenant.orgId,
-          actorUserId: userId,
-          action: "authz.denied",
-          metadata: {
-            permission,
-            method: request.method,
-            route: request.routeOptions.url ?? null,
-          },
-          ip: request.ip,
-        }),
-      )
-      .catch((error: unknown) => {
-        appLogger.warn("Could not record denied request", { error });
-      });
+    recordDenied(request, tenant.orgId, userId, permission);
 
     reply.code(403).send({
       error: "forbidden",
@@ -87,6 +97,92 @@ export const requireTenant = async (
 
   return tenant;
 };
+
+export const requireProject = async (
+  request: FastifyRequest,
+  reply: FastifyReply,
+  permission: ProjectPermission,
+): Promise<ProjectScope | null> => {
+  const userId = requireUserId(request, reply);
+  if (!userId) {
+    return null;
+  }
+
+  const tenant = await resolveTenant(request, userId);
+  if (!tenant) {
+    notFound(reply, "organization");
+    return null;
+  }
+
+  const scope = await resolveProject(request, tenant);
+  if (!scope) {
+    notFound(reply, "project");
+    return null;
+  }
+
+  if (scope.permissions.includes(permission)) {
+    return scope;
+  }
+
+  recordDenied(request, scope.orgId, userId, permission, scope.projectId);
+
+  if (scope.archived && isWrite(permission)) {
+    reply.code(409).send({
+      error: "project_archived",
+      message: "This project is archived. Unarchive it to make changes.",
+    });
+    return null;
+  }
+
+  if (
+    scope.environment === "PRODUCTION" &&
+    scope.restrictProduction &&
+    isWrite(permission)
+  ) {
+    reply.code(403).send({
+      error: "production_restricted",
+      message: "Only project admins can change production in this project.",
+      permission,
+    });
+    return null;
+  }
+
+  reply.code(403).send({
+    error: "forbidden",
+    message: "Your role in this project does not allow that.",
+    permission,
+  });
+  return null;
+};
+
+export const auditProject = (
+  request: FastifyRequest,
+  scope: ProjectScope,
+  entry: Omit<AuditEntry, "orgId" | "actorUserId" | "ip">,
+) =>
+  audit(
+    request,
+    {
+      orgId: scope.orgId,
+      userId: scope.userId,
+      role: scope.orgRole,
+      personal: false,
+    },
+    {
+      ...entry,
+      metadata: {
+        projectId: scope.projectId,
+        environment: scope.environment,
+        ...(entry.metadata &&
+        typeof entry.metadata === "object" &&
+        !Array.isArray(entry.metadata)
+          ? (entry.metadata as Record<string, unknown>)
+          : entry.metadata === undefined
+            ? {}
+            : { value: entry.metadata }),
+      } as AuditEntry["metadata"],
+    },
+  );
 
 export const audit = async (
   request: FastifyRequest,

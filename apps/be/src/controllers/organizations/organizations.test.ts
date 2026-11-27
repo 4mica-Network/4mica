@@ -1,3 +1,4 @@
+import type { OrgRole } from "@4mica/db";
 import { clearUserCache } from "@auth/user-store";
 import { organizationRoutes } from "@routes/organizations";
 import { hashSecret } from "@utils/secrets";
@@ -22,6 +23,7 @@ const { authenticateRequest, getUser, db } = vi.hoisted(() => {
       delete: vi.fn(),
     },
     auditLog: { create: vi.fn(), findMany: vi.fn() },
+    projectMembership: { deleteMany: vi.fn() },
     organization: {
       findFirst: vi.fn(),
       create: vi.fn(),
@@ -108,7 +110,7 @@ const memberRow = (userId: string, role: string) => ({
   },
 });
 
-const actInTeam = (role: "OWNER" | "ADMIN" | "MEMBER") => {
+const actInTeam = (role: OrgRole) => {
   actAs(db, role);
   db.membership.findFirst.mockImplementation(async () =>
     membershipRow(role, ORG_ID, false),
@@ -118,7 +120,7 @@ const actInTeam = (role: "OWNER" | "ADMIN" | "MEMBER") => {
 const invitationByToken = (over: Record<string, unknown> = {}) => ({
   id: INVITATION_ID,
   email: "ada@example.com",
-  role: "MEMBER",
+  role: "DEVELOPER",
   expiresAt: new Date(Date.now() + 86_400_000),
   acceptedAt: null,
   declinedAt: null,
@@ -175,7 +177,11 @@ describe("organization routes", () => {
           role: "OWNER",
           organization: orgRow({ id: OTHER_ORG_ID, personal: true }),
         },
-        { role: "MEMBER", organization: orgRow() },
+        { role: "DEVELOPER", organization: orgRow() },
+        {
+          role: "VIEWER",
+          organization: orgRow({ id: "019fce62-0000-7000-8000-0000000000c9" }),
+        },
       ]);
       db.user.findUnique.mockResolvedValue({ defaultOrganizationId: null });
       const instance = await app();
@@ -191,9 +197,18 @@ describe("organization routes", () => {
       expect(body.defaultId).toBe(OTHER_ORG_ID);
       expect(body.items[1]).toMatchObject({
         id: ORG_ID,
-        role: "MEMBER",
+        role: "DEVELOPER",
         memberCount: 2,
-        permissions: ["resources.write", "resources.read", "payments.read"],
+        permissions: [
+          "projects.create",
+          "resources.write",
+          "resources.read",
+          "payments.read",
+        ],
+      });
+      expect(body.items[2]).toMatchObject({
+        role: "VIEWER",
+        permissions: ["resources.read", "payments.read"],
       });
       expect(db.membership.findMany.mock.calls[0][0].where).toMatchObject({
         userId: USER_ID,
@@ -259,6 +274,15 @@ describe("organization routes", () => {
         name: "Acme",
         handle: "acme",
         memberships: { create: { userId: USER_ID, role: "OWNER" } },
+        projects: {
+          create: {
+            slug: "default",
+            isDefault: true,
+            environments: {
+              create: [{ kind: "SANDBOX" }, { kind: "PRODUCTION" }],
+            },
+          },
+        },
       });
       expect(auditActions()).toEqual(["org.created"]);
 
@@ -391,8 +415,11 @@ describe("organization routes", () => {
   });
 
   describe("members", () => {
-    it("forbids a plain member from changing roles", async () => {
-      actInTeam("MEMBER");
+    it.each([
+      "DEVELOPER",
+      "VIEWER",
+    ] as const)("forbids a %s from changing roles", async (role) => {
+      actInTeam(role);
       const instance = await app();
 
       const res = await instance.inject({
@@ -412,7 +439,7 @@ describe("organization routes", () => {
       actInTeam("ADMIN");
       db.$queryRaw.mockResolvedValue([{ id: "m1" }]);
       db.membership.findUnique.mockResolvedValue(
-        memberRow(OTHER_USER_ID, "MEMBER"),
+        memberRow(OTHER_USER_ID, "DEVELOPER"),
       );
       const instance = await app();
 
@@ -472,7 +499,7 @@ describe("organization routes", () => {
       actInTeam("OWNER");
       db.$queryRaw.mockResolvedValue([{ id: "m1" }]);
       db.membership.findUnique.mockResolvedValue(
-        memberRow(OTHER_USER_ID, "MEMBER"),
+        memberRow(OTHER_USER_ID, "DEVELOPER"),
       );
       db.membership.update.mockResolvedValue(memberRow(OTHER_USER_ID, "ADMIN"));
       const instance = await app();
@@ -501,7 +528,7 @@ describe("organization routes", () => {
         actorUserId: USER_ID,
         action: "member.role_changed",
         targetId: OTHER_USER_ID,
-        metadata: { from: "MEMBER", to: "ADMIN" },
+        metadata: { from: "DEVELOPER", to: "ADMIN" },
       });
 
       await instance.close();
@@ -511,7 +538,7 @@ describe("organization routes", () => {
       actInTeam("ADMIN");
       db.$queryRaw.mockResolvedValue([{ id: "m1" }]);
       db.membership.findUnique.mockResolvedValue(
-        memberRow(OTHER_USER_ID, "MEMBER"),
+        memberRow(OTHER_USER_ID, "DEVELOPER"),
       );
       const instance = await app();
 
@@ -523,6 +550,9 @@ describe("organization routes", () => {
 
       expect(res.statusCode).toBe(204);
       expect(db.membership.delete).toHaveBeenCalledOnce();
+      expect(db.projectMembership.deleteMany.mock.calls[0][0]).toEqual({
+        where: { userId: OTHER_USER_ID, project: { organizationId: ORG_ID } },
+      });
       expect(auditActions()).toEqual(["member.removed"]);
 
       await instance.close();
@@ -595,6 +625,63 @@ describe("organization routes", () => {
       await instance.close();
     });
 
+    it.each([
+      [undefined, "DEVELOPER"],
+      ["DEVELOPER", "DEVELOPER"],
+      ["VIEWER", "VIEWER"],
+    ] as const)("invites with role %s as %s", async (requested, stored) => {
+      actInTeam("ADMIN");
+      db.membership.findMany.mockResolvedValue([]);
+      db.membership.findFirst.mockImplementation(async () => ({
+        ...membershipRow("ADMIN", ORG_ID, false),
+        organization: { ...orgRow() },
+      }));
+      db.invitation.create.mockImplementation(
+        async ({ data }: { data: { email: string; role: string } }) => ({
+          id: INVITATION_ID,
+          email: data.email,
+          role: data.role,
+          expiresAt: new Date(Date.now() + 7 * 86_400_000),
+          createdAt: new Date(),
+          invitedBy: { id: USER_ID, name: "Ada Lovelace" },
+        }),
+      );
+      const instance = await app();
+
+      const res = await instance.inject({
+        method: "POST",
+        url: "/me/organization/invitations",
+        headers: TEAM,
+        payload: {
+          emails: ["grace@example.com"],
+          ...(requested ? { role: requested } : {}),
+        },
+      });
+
+      expect(res.statusCode).toBe(201);
+      expect(res.json().items[0].role).toBe(stored);
+      expect(db.invitation.create.mock.calls[0][0].data.role).toBe(stored);
+
+      await instance.close();
+    });
+
+    it("rejects the retired MEMBER role", async () => {
+      actInTeam("OWNER");
+      const instance = await app();
+
+      const res = await instance.inject({
+        method: "POST",
+        url: "/me/organization/invitations",
+        headers: TEAM,
+        payload: { emails: ["grace@example.com"], role: "MEMBER" },
+      });
+
+      expect(res.statusCode).toBe(400);
+      expect(db.invitation.create).not.toHaveBeenCalled();
+
+      await instance.close();
+    });
+
     it("rejects inviting someone who is already a member", async () => {
       actInTeam("OWNER");
       db.membership.findMany.mockResolvedValue([
@@ -633,7 +720,7 @@ describe("organization routes", () => {
         async ({ data }: { data: { email: string } }) => ({
           id: INVITATION_ID,
           email: data.email,
-          role: "MEMBER",
+          role: "DEVELOPER",
           expiresAt: new Date(Date.now() + 7 * 86_400_000),
           createdAt: new Date(),
           invitedBy: { id: USER_ID, name: "Ada Lovelace" },
@@ -796,8 +883,11 @@ describe("organization routes", () => {
   });
 
   describe("audit log", () => {
-    it("is hidden from plain members", async () => {
-      actInTeam("MEMBER");
+    it.each([
+      "DEVELOPER",
+      "VIEWER",
+    ] as const)("is hidden from a %s", async (role) => {
+      actInTeam(role);
       const instance = await app();
 
       const res = await instance.inject({

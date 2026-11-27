@@ -280,7 +280,7 @@ describe("wallet routes", () => {
   });
 
   it("lets a member read wallets but not manage them", async () => {
-    actAs(tenancy, "MEMBER");
+    actAs(tenancy, "DEVELOPER");
     const app = await initApp([{ plugin: walletRoutes }]);
 
     const list = await app.inject({
@@ -663,6 +663,65 @@ describe("wallet routes", () => {
       }
 
       expect(wallet.findMany).not.toHaveBeenCalled();
+      await app.close();
+    });
+
+    it("shows only the active environment's networks", async () => {
+      const app = await initApp([{ plugin: walletRoutes }]);
+
+      const sandbox = await app.inject({
+        method: "GET",
+        url: "/me/wallets",
+        headers: AUTH,
+      });
+      expect(sandbox.json().items[0].environment).toBe("SANDBOX");
+      expect(wallet.findMany.mock.calls[0][0].where.network).toEqual({
+        in: ["BASE_SEPOLIA", "ETHEREUM_SEPOLIA"],
+      });
+
+      await app.inject({
+        method: "GET",
+        url: "/me/wallets",
+        headers: { ...AUTH, "x-environment": "Production" },
+      });
+      expect(wallet.findMany.mock.calls[1][0].where.network).toEqual({
+        in: ["BASE"],
+      });
+
+      await app.inject({
+        method: "GET",
+        url: "/me/wallets?network=BASE",
+        headers: AUTH,
+      });
+      expect(wallet.findMany.mock.calls[2][0].where.network).toEqual({
+        in: [],
+      });
+      await app.close();
+    });
+
+    it("404s on an unknown environment", async () => {
+      const app = await initApp([{ plugin: walletRoutes }]);
+      const res = await app.inject({
+        method: "GET",
+        url: "/me/wallets",
+        headers: { ...AUTH, "x-environment": "staging" },
+      });
+
+      expect(res.statusCode).toBe(404);
+      expect(wallet.findMany).not.toHaveBeenCalled();
+      await app.close();
+    });
+
+    it("reports a mainnet wallet as production", async () => {
+      wallet.findFirst.mockResolvedValue({ ...STORED_WALLET, network: "BASE" });
+      const app = await initApp([{ plugin: walletRoutes }]);
+      const res = await app.inject({
+        method: "GET",
+        url: `/me/wallets/${WALLET_ID}`,
+        headers: AUTH,
+      });
+
+      expect(res.json().environment).toBe("PRODUCTION");
       await app.close();
     });
 

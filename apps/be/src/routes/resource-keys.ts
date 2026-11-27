@@ -32,6 +32,14 @@ const keyParamSchema = {
   properties: { id: idParam, keyId: idParam },
 } as const;
 
+const scopeErrorResponseSchema = {
+  ...errorResponseSchema,
+  properties: {
+    ...errorResponseSchema.properties,
+    scope: { type: "string" },
+  },
+} as const;
+
 interface Surface {
   kind: ResourceKind;
   prefix: string;
@@ -155,7 +163,7 @@ export const resourceKeyRoutes: FastifyPluginCallback = (app, _opts, done) => {
           ...limitedResponses,
           200: resourceContextResponseSchema,
           401: errorResponseSchema,
-          403: errorResponseSchema,
+          403: scopeErrorResponseSchema,
           404: errorResponseSchema,
         },
       },

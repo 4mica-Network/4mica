@@ -183,6 +183,32 @@ describe("balance routes", () => {
     expect(wallet.findMany).not.toHaveBeenCalled();
   });
 
+  it("reads nothing when core's chain is outside the active environment", async () => {
+    const res = await read({ "x-environment": "production" });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ network: null, wallets: [] });
+    expect(wallet.findMany).not.toHaveBeenCalled();
+  });
+
+  it("reads mainnet wallets in production when core runs on mainnet", async () => {
+    getCoreClient.mockResolvedValue(coreOn(8453));
+
+    const sandbox = await read();
+    expect(sandbox.json()).toEqual({ network: null, wallets: [] });
+
+    const production = await read({ "x-environment": "production" });
+    expect(production.json().network).toBe("BASE");
+    expect(wallet.findMany.mock.calls[0][0].where.network).toBe("BASE");
+  });
+
+  it("404s on an unknown environment", async () => {
+    const res = await read({ "x-environment": "staging" });
+
+    expect(res.statusCode).toBe(404);
+    expect(getCoreClient).not.toHaveBeenCalled();
+  });
+
   it("answers 503 when core is not configured", async () => {
     getCoreClient.mockResolvedValue(null);
 

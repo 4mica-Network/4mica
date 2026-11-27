@@ -1,6 +1,8 @@
+import { prisma } from "@4mica/db";
 import { clearUserCache } from "@auth/user-store";
 import { cliRoutes } from "@routes/cli";
 import { developerRoutes } from "@routes/developer";
+import { organizationRoutes } from "@routes/organizations";
 import { walletRoutes } from "@routes/wallets";
 import { hashSecret } from "@utils/secrets";
 import type { FastifyInstance } from "fastify";
@@ -18,6 +20,8 @@ const { authenticateRequest, getUser, db } = vi.hoisted(() => ({
     users: [] as Record<string, unknown>[],
     requests: [] as Record<string, unknown>[],
     sessions: [] as Record<string, unknown>[],
+    orgs: [] as Record<string, unknown>[],
+    memberships: [] as Record<string, unknown>[],
   },
 }));
 
@@ -113,14 +117,84 @@ vi.mock("@4mica/db", () => {
   cliDeviceRequest.findUnique = vi.fn(withUser(cliDeviceRequest.findUnique));
   cliSession.findUnique = vi.fn(withUser(cliSession.findUnique));
 
+  const orgOf = (id: unknown) =>
+    db.orgs.find((org) => org.id === id && org.deletedAt === null) ?? null;
+
+  const decorate = (row: Row) => ({
+    ...row,
+    organization: orgOf(row.organizationId),
+    user: db.users.find((user) => user.id === row.userId) ?? null,
+  });
+
+  const membershipOf = (userId: unknown, organizationId: unknown) =>
+    db.memberships.find(
+      (row) => row.userId === userId && row.organizationId === organizationId,
+    );
+
   const prisma = {
     cliDeviceRequest,
-    cliSession,
+    cliSession: {
+      ...cliSession,
+      create: vi.fn(async (args: { data: Row }) =>
+        decorate(await cliSession.create(args)),
+      ),
+      findMany: vi.fn(async (args: { where: Row }) =>
+        (await cliSession.findMany(args)).map(decorate),
+      ),
+    },
+    organization: {
+      findFirst: vi.fn(async ({ where }: { where: Row }) => {
+        const { deletedAt: _deleted, ...rest } = where;
+        return (
+          db.orgs.find((org) => org.deletedAt === null && matches(org, rest)) ??
+          null
+        );
+      }),
+    },
     membership: {
-      findFirst: vi.fn(async ({ where }: { where: { userId: string } }) => ({
-        role: "OWNER",
-        organization: { id: `org_${where.userId}`, personal: true },
-      })),
+      findFirst: vi.fn(
+        async ({
+          where,
+        }: {
+          where: { userId: string; organization: { id?: string } };
+        }) => {
+          const wanted = where.organization.id;
+          if (wanted === undefined) {
+            return {
+              role: "OWNER",
+              organization: { id: `org_${where.userId}`, personal: true },
+            };
+          }
+          const found = membershipOf(where.userId, wanted);
+          return found && orgOf(wanted)
+            ? {
+                role: found.role,
+                organization: { id: wanted, personal: false },
+              }
+            : null;
+        },
+      ),
+      findMany: vi.fn(async ({ where }: { where: { userId: string } }) =>
+        db.memberships
+          .filter((row) => row.userId === where.userId)
+          .flatMap((row) => {
+            const org = orgOf(row.organizationId);
+            return org
+              ? [
+                  {
+                    role: row.role,
+                    organization: {
+                      ...org,
+                      avatarUrl: null,
+                      personal: false,
+                      createdAt: new Date(),
+                      _count: { memberships: 1 },
+                    },
+                  },
+                ]
+              : [];
+          }),
+      ),
     },
     auditLog: { create: vi.fn(async () => ({ id: "audit" })) },
     user: {
@@ -149,6 +223,8 @@ vi.mock("@4mica/db", () => {
 
 const USER_ID = "019fce62-0000-7000-8000-000000000000";
 const SESSION_AUTH = { authorization: "Bearer clerk-session" };
+const ACME = "019fce62-0000-7000-8000-0000000000ac";
+const GLOBEX = "019fce62-0000-7000-8000-0000000000b0";
 
 const signedIn = () => ({
   isAuthenticated: true,
@@ -207,6 +283,17 @@ describe("cli sign-in", () => {
     db.requests.length = 0;
     db.sessions.length = 0;
     db.users.length = 0;
+    db.orgs.length = 0;
+    db.memberships.length = 0;
+    db.orgs.push(
+      { id: ACME, name: "Acme", handle: "acme", deletedAt: null },
+      { id: GLOBEX, name: "Globex", handle: "globex", deletedAt: null },
+    );
+    db.memberships.push({
+      userId: USER_ID,
+      organizationId: ACME,
+      role: "ADMIN",
+    });
     db.users.push({
       id: USER_ID,
       clerkUserId: "user_123",
@@ -225,6 +312,7 @@ describe("cli sign-in", () => {
       { plugin: cliRoutes },
       { plugin: walletRoutes },
       { plugin: developerRoutes },
+      { plugin: organizationRoutes },
     ]);
   });
 
@@ -367,6 +455,7 @@ describe("cli sign-in", () => {
         userId: USER_ID,
         clientName: "ada-laptop",
         scopes: ["account:read"],
+        organizationId: null,
       });
 
       expect(redeemed).toBeNull();
@@ -739,6 +828,278 @@ describe("cli sign-in", () => {
       });
       expect(response.statusCode).toBe(404);
       expect(db.sessions[0].revokedAt).toBeNull();
+    });
+  });
+  describe("organization binding", () => {
+    const startFor = async (organization: string) =>
+      (
+        await post("/v1/cli/device/code", {
+          client_name: "ada-laptop",
+          organization,
+        })
+      ).json() as { device_code: string; user_code: string };
+
+    const approveIn = (userCode: string, organizationId?: string) =>
+      post(
+        "/me/cli/device/approve",
+        { userCode, ...(organizationId ? { organizationId } : {}) },
+        SESSION_AUTH,
+      );
+
+    const signInTo = async (organizationId: string) => {
+      const login = await startLogin();
+      await approveIn(login.user_code, organizationId);
+      return (await poll(login.device_code)).json().access_token as string;
+    };
+
+    const get = (url: string, headers: Record<string, string>) =>
+      app.inject({ method: "GET", url, headers });
+
+    it("binds a session to the organization the approver picks", async () => {
+      const login = await startLogin();
+      expect((await approveIn(login.user_code, ACME)).statusCode).toBe(204);
+      const token = (await poll(login.device_code)).json().access_token;
+
+      expect(db.sessions[0].organizationId).toBe(ACME);
+      const session = await get("/v1/cli/session", asCli(token));
+      expect(session.json().organization).toEqual({
+        id: ACME,
+        name: "Acme",
+        handle: "acme",
+      });
+    });
+
+    it("leaves a session unbound when no organization is picked", async () => {
+      const token = await signIn();
+
+      expect(db.sessions[0].organizationId).toBeNull();
+      const session = await get("/v1/cli/session", asCli(token));
+      expect(session.json().organization).toBeNull();
+    });
+
+    it("will not bind a session to an organization the approver is not in", async () => {
+      const login = await startLogin();
+
+      const response = await approveIn(login.user_code, GLOBEX);
+      expect(response.statusCode).toBe(404);
+      expect(db.requests[0].status).toBe("PENDING");
+    });
+
+    it("carries the organization the CLI asked for to the approval page and the session", async () => {
+      const login = await startFor("ACME");
+
+      const shown = await get(
+        `/me/cli/device?userCode=${login.user_code}`,
+        SESSION_AUTH,
+      );
+      expect(shown.json().organization).toEqual({
+        id: ACME,
+        name: "Acme",
+        handle: "acme",
+      });
+      expect(shown.json()).not.toHaveProperty("organizationId");
+
+      expect((await approveIn(login.user_code)).statusCode).toBe(204);
+      await poll(login.device_code);
+      expect(db.sessions[0].organizationId).toBe(ACME);
+    });
+
+    it("will not approve a requested organization for some other one", async () => {
+      const login = await startFor("acme");
+      db.memberships.push({
+        userId: USER_ID,
+        organizationId: GLOBEX,
+        role: "OWNER",
+      });
+
+      const response = await approveIn(login.user_code, GLOBEX);
+      expect(response.statusCode).toBe(400);
+      expect(response.json().error).toBe("organization_mismatch");
+    });
+
+    it("refuses an organization the CLI names that does not exist", async () => {
+      const response = await post("/v1/cli/device/code", {
+        organization: "nobody",
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json().error).toBe("invalid_request");
+      expect(db.requests).toHaveLength(0);
+    });
+
+    it("acts in the bound organization, and only there", async () => {
+      const token = await signInTo(ACME);
+      const wallets = vi.mocked(prisma.wallet.findMany);
+      wallets.mockClear();
+
+      const implicit = await get("/me/wallets", asCli(token));
+      expect(implicit.statusCode).toBe(200);
+      expect(wallets.mock.calls[0]?.[0]?.where).toMatchObject({
+        organizationId: ACME,
+      });
+
+      const same = await get("/me/wallets", {
+        ...asCli(token),
+        "x-org-id": ACME,
+      });
+      expect(same.statusCode).toBe(200);
+
+      const personal = await get("/me/wallets", {
+        ...asCli(token),
+        "x-org-id": GLOBEX,
+      });
+      expect(personal.statusCode).toBe(404);
+    });
+
+    it("stops working in an organization the user has left", async () => {
+      const token = await signInTo(ACME);
+      db.memberships.length = 0;
+
+      const response = await get("/me/wallets", asCli(token));
+      expect(response.statusCode).toBe(404);
+    });
+
+    it("lists only the bound organization", async () => {
+      db.memberships.push({
+        userId: USER_ID,
+        organizationId: GLOBEX,
+        role: "OWNER",
+      });
+      const bound = await signInTo(ACME);
+      const unbound = await signIn();
+
+      const fromBound = await get("/me/organizations", asCli(bound));
+      expect(fromBound.statusCode).toBe(200);
+      expect(
+        fromBound.json().items.map((org: { id: string }) => org.id),
+      ).toEqual([ACME]);
+      expect(fromBound.json().defaultId).toBe(ACME);
+
+      const fromUnbound = await get("/me/organizations", asCli(unbound));
+      expect(fromUnbound.json().items).toHaveLength(2);
+
+      const fromDashboard = await get("/me/organizations", SESSION_AUTH);
+      expect(fromDashboard.json().items).toHaveLength(2);
+    });
+
+    it("needs account:read to list organizations", async () => {
+      const token = await signInTo(ACME);
+      db.sessions[0].scopes = ["wallets:read"];
+
+      const response = await get("/me/organizations", asCli(token));
+      expect(response.statusCode).toBe(403);
+    });
+
+    it("binds a CI token to an organization its maker belongs to", async () => {
+      const created = await post(
+        "/me/cli/sessions",
+        { name: "deploy", organizationId: ACME },
+        SESSION_AUTH,
+      );
+      expect(created.statusCode).toBe(201);
+      expect(created.json().session.organization).toMatchObject({ id: ACME });
+
+      const refused = await post(
+        "/me/cli/sessions",
+        { name: "deploy", organizationId: GLOBEX },
+        SESSION_AUTH,
+      );
+      expect(refused.statusCode).toBe(404);
+      expect(db.sessions).toHaveLength(1);
+    });
+
+    it("shows the bound organization in the account's session list", async () => {
+      await signInTo(ACME);
+
+      const listed = await get("/me/cli/sessions", SESSION_AUTH);
+      expect(listed.json()[0].organization).toMatchObject({
+        id: ACME,
+        handle: "acme",
+      });
+    });
+
+    describe("for organization admins", () => {
+      const inAcme = { ...SESSION_AUTH, "x-org-id": ACME };
+
+      it("lists the live sessions bound to the organization, with their users", async () => {
+        await signInTo(ACME);
+        await signIn();
+
+        const response = await get("/me/organization/cli-sessions", inAcme);
+        expect(response.statusCode).toBe(200);
+        expect(response.json().items).toHaveLength(1);
+        expect(response.json().items[0]).toMatchObject({
+          name: "ada-laptop",
+          organization: { id: ACME },
+          user: { id: USER_ID, email: "ada@example.com" },
+        });
+        expect(response.body).not.toContain("hashedToken");
+      });
+
+      it("revokes one, and records it", async () => {
+        const token = await signInTo(ACME);
+        const audit = vi.mocked(prisma.auditLog.create);
+        audit.mockClear();
+
+        const response = await post(
+          `/me/organization/cli-sessions/${db.sessions[0].id}/revoke`,
+          {},
+          inAcme,
+        );
+        expect(response.statusCode).toBe(204);
+        expect(audit).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({
+              organizationId: ACME,
+              action: "cli_session.revoked",
+              targetType: "cli_session",
+              targetId: db.sessions[0].id,
+            }),
+          }),
+        );
+
+        const after = await get("/v1/cli/session", asCli(token));
+        expect(after.statusCode).toBe(401);
+      });
+
+      it("cannot reach a session bound to another organization", async () => {
+        await signIn();
+
+        const response = await post(
+          `/me/organization/cli-sessions/${db.sessions[0].id}/revoke`,
+          {},
+          inAcme,
+        );
+        expect(response.statusCode).toBe(404);
+        expect(db.sessions[0].revokedAt).toBeNull();
+      });
+
+      it("are the only ones who can", async () => {
+        await signInTo(ACME);
+        db.memberships[0].role = "DEVELOPER";
+
+        const listed = await get("/me/organization/cli-sessions", inAcme);
+        expect(listed.statusCode).toBe(403);
+
+        const revoked = await post(
+          `/me/organization/cli-sessions/${db.sessions[0].id}/revoke`,
+          {},
+          inAcme,
+        );
+        expect(revoked.statusCode).toBe(403);
+        expect(db.sessions[0].revokedAt).toBeNull();
+      });
+
+      it("cannot do it with a CLI token", async () => {
+        const token = await signInTo(ACME);
+        authenticateRequest.mockResolvedValue(signedOut());
+
+        const response = await get("/me/organization/cli-sessions", {
+          ...asCli(token),
+          "x-org-id": ACME,
+        });
+        expect(response.statusCode).toBe(401);
+      });
     });
   });
 });

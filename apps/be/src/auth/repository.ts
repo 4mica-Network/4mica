@@ -1,5 +1,6 @@
 import type { AuthIdentity } from "@4mica/auth";
 import { prisma } from "@4mica/db";
+import { defaultProjectCreate } from "@utils/default-project";
 import { isUniqueViolation } from "@utils/prisma-errors";
 import type { Tenant } from "./tenant";
 
@@ -75,6 +76,7 @@ export const upsertUser = (
               personal: true,
               handle: username,
               ...(identity.name !== null ? { name: identity.name } : {}),
+              projects: { create: defaultProjectCreate() },
             },
           },
         },
@@ -98,7 +100,14 @@ export const findApiKeyByHash = (hashedKey: string) =>
       agentId: true,
       revokedAt: true,
       expiresAt: true,
+      projectId: true,
+      environmentId: true,
+      serviceAccountId: true,
+      scopes: true,
       organization: { select: { deletedAt: true } },
+      project: { select: { deletedAt: true, archivedAt: true } },
+      environment: { select: { kind: true } },
+      serviceAccount: { select: { suspendedAt: true, deletedAt: true } },
       listing: { select: { deletedAt: true } },
       agent: { select: { deletedAt: true } },
     },
@@ -167,7 +176,12 @@ export const ensurePersonalOrganization = async (
         role: "OWNER",
         user: { connect: { id: userId } },
         organization: {
-          create: { personal: true, handle, name: user.name },
+          create: {
+            personal: true,
+            handle,
+            name: user.name,
+            projects: { create: defaultProjectCreate() },
+          },
         },
       },
       select: MEMBERSHIP_SELECT,
@@ -191,6 +205,7 @@ export const findCliSessionByHash = (hashedToken: string) =>
       kind: true,
       name: true,
       scopes: true,
+      organizationId: true,
       revokedAt: true,
       expiresAt: true,
       lastUsedAt: true,
@@ -221,3 +236,26 @@ export const touchCliSession = async (
     data: { lastUsedAt: new Date(now) },
   });
 };
+
+export const findProjectForMember = (
+  orgId: string,
+  userId: string,
+  projectId: string | undefined,
+) =>
+  prisma.project.findFirst({
+    where: {
+      organizationId: orgId,
+      deletedAt: null,
+      ...(projectId ? { id: projectId } : { isDefault: true }),
+    },
+    select: {
+      id: true,
+      slug: true,
+      isDefault: true,
+      restricted: true,
+      restrictProduction: true,
+      archivedAt: true,
+      members: { where: { userId }, select: { role: true } },
+      environments: { select: { id: true, kind: true } },
+    },
+  });

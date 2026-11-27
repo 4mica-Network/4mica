@@ -6,7 +6,7 @@ import {
 import { email, singleLine } from "@controllers/schema-primitives";
 import * as v from "valibot";
 
-export const ORG_ROLES = ["OWNER", "ADMIN", "MEMBER"] as const;
+export const ORG_ROLES = ["OWNER", "ADMIN", "DEVELOPER", "VIEWER"] as const;
 export const MAX_INVITES_PER_REQUEST = 20;
 export const INVITATION_TTL_DAYS = 7;
 export const AUDIT_PAGE_MAX = 100;
@@ -56,7 +56,7 @@ export const InviteMembersSchema = v.object({
     v.maxLength(MAX_INVITES_PER_REQUEST),
     v.transform((values) => [...new Set(values)]),
   ),
-  role: v.optional(RoleSchema, "MEMBER"),
+  role: v.optional(RoleSchema, "DEVELOPER"),
 });
 
 export const ListAuditLogsQuerySchema = v.object({

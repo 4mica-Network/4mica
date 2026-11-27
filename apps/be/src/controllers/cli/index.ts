@@ -5,10 +5,13 @@ import {
   isCliScope,
   withRequiredScope,
 } from "@auth/cli-token";
+import { findMembership } from "@auth/repository";
 import {
+  audit,
   invalidBody,
   notFound,
   parseBody,
+  requireTenant,
   requireUserId,
 } from "@controllers/shared";
 import { appLogger } from "@logger/index";
@@ -23,12 +26,17 @@ import {
   decideDeviceRequest,
   findAccountSummary,
   findDeviceRequestByCode,
+  findOrganizationByReference,
+  findOrganizationSummary,
   findPendingDeviceRequest,
   listCliSessions,
+  listOrganizationCliSessions,
   redeemDeviceRequest,
   revokeCliSession,
+  revokeOrganizationCliSession,
 } from "./repository";
 import {
+  ApproveDeviceSchema,
   CreateCliTokenSchema,
   CreateDeviceCodeSchema,
   DEVICE_GRANT_TYPE,
@@ -67,9 +75,21 @@ export const createDeviceCodeHandler: RouteHandler = async (request, reply) => {
     );
   }
 
+  const organization = parsed.data.organization
+    ? await findOrganizationByReference(parsed.data.organization)
+    : null;
+  if (parsed.data.organization && !organization) {
+    return grantError(
+      reply,
+      "invalid_request",
+      `No organization is called ${parsed.data.organization}.`,
+    );
+  }
+
   const created = await createDeviceRequest({
     clientName: parsed.data.client_name,
     requestIp: request.ip,
+    organizationId: organization?.id ?? null,
     scopes: withRequiredScope(
       requested.length > 0 ? (requested as CliScope[]) : DEFAULT_DEVICE_SCOPES,
     ),
@@ -165,6 +185,7 @@ export const deviceTokenHandler: RouteHandler = async (request, reply) => {
     userId: found.userId,
     clientName: found.clientName,
     scopes: found.scopes,
+    organizationId: found.organizationId,
   });
 
   if (!redeemed) {
@@ -212,32 +233,95 @@ export const getDeviceRequestHandler: RouteHandler = async (request, reply) => {
     return unknownCode(reply);
   }
 
+  const { organizationId, ...rest } = pending;
+
   return reply.send({
-    ...pending,
+    ...rest,
     userCode: formatUserCode(pending.userCode),
+    organization: organizationId
+      ? await findOrganizationSummary(organizationId)
+      : null,
   });
 };
 
-const decideHandler =
-  (status: "APPROVED" | "DENIED"): RouteHandler =>
-  async (request, reply) => {
-    const userId = requireUserId(request, reply);
-    if (!userId) {
-      return reply;
-    }
+const mayBind = async (userId: string, organizationId: string | null) =>
+  organizationId === null ||
+  (await findMembership(userId, organizationId)) !== null;
 
-    const userCode = parseUserCode(request.body);
-    if (!userCode || !(await decideDeviceRequest(userId, userCode, status))) {
-      return unknownCode(reply);
-    }
+export const approveDeviceRequestHandler: RouteHandler = async (
+  request,
+  reply,
+) => {
+  const userId = requireUserId(request, reply);
+  if (!userId) {
+    return reply;
+  }
 
-    appLogger.info("CLI sign-in request decided", { userId, status });
+  const userCode = parseUserCode(request.body);
+  if (!userCode) {
+    return unknownCode(reply);
+  }
 
-    return reply.code(204).send();
-  };
+  const parsed = parseBody(ApproveDeviceSchema, request.body);
+  if (!parsed.success) {
+    return invalidBody(reply, parsed.issues);
+  }
 
-export const approveDeviceRequestHandler = decideHandler("APPROVED");
-export const denyDeviceRequestHandler = decideHandler("DENIED");
+  const pending = await findPendingDeviceRequest(userCode);
+  if (!pending) {
+    return unknownCode(reply);
+  }
+
+  const chosen = parsed.data.organizationId?.toLowerCase() ?? null;
+  if (
+    pending.organizationId !== null &&
+    chosen !== null &&
+    chosen !== pending.organizationId
+  ) {
+    return reply.code(400).send({
+      error: "organization_mismatch",
+      message: "This sign-in asked for a different organization.",
+    });
+  }
+
+  const organizationId = pending.organizationId ?? chosen;
+  if (!(await mayBind(userId, organizationId))) {
+    return notFound(reply, "organization");
+  }
+
+  if (
+    !(await decideDeviceRequest(userId, userCode, "APPROVED", organizationId))
+  ) {
+    return unknownCode(reply);
+  }
+
+  appLogger.info("CLI sign-in request decided", {
+    userId,
+    status: "APPROVED",
+    organizationId,
+  });
+
+  return reply.code(204).send();
+};
+
+export const denyDeviceRequestHandler: RouteHandler = async (
+  request,
+  reply,
+) => {
+  const userId = requireUserId(request, reply);
+  if (!userId) {
+    return reply;
+  }
+
+  const userCode = parseUserCode(request.body);
+  if (!userCode || !(await decideDeviceRequest(userId, userCode, "DENIED"))) {
+    return unknownCode(reply);
+  }
+
+  appLogger.info("CLI sign-in request decided", { userId, status: "DENIED" });
+
+  return reply.code(204).send();
+};
 
 export const listCliSessionsHandler: RouteHandler = async (request, reply) => {
   const userId = requireUserId(request, reply);
@@ -259,10 +343,16 @@ export const createCliTokenHandler: RouteHandler = async (request, reply) => {
     return invalidBody(reply, parsed.issues);
   }
 
+  const organizationId = parsed.data.organizationId?.toLowerCase() ?? null;
+  if (!(await mayBind(userId, organizationId))) {
+    return notFound(reply, "organization");
+  }
+
   const { session, plaintext } = await createCliToken(userId, {
     name: parsed.data.name,
     scopes: withRequiredScope(parsed.data.scopes ?? DEFAULT_TOKEN_SCOPES),
     expiresInDays: parsed.data.expiresInDays,
+    organizationId,
   });
   appLogger.info("CLI session created", {
     userId,
@@ -299,12 +389,17 @@ export const getCurrentCliSessionHandler: RouteHandler = async (
     return reply;
   }
 
-  const user = await findAccountSummary(userId);
+  const [user, organization] = await Promise.all([
+    findAccountSummary(userId),
+    session.organizationId
+      ? findOrganizationSummary(session.organizationId)
+      : null,
+  ]);
   if (!user) {
     return notFound(reply, "account");
   }
 
-  return reply.send({ user, session });
+  return reply.send({ user, session, organization });
 };
 
 export const revokeCurrentCliSessionHandler: RouteHandler = async (
@@ -322,6 +417,48 @@ export const revokeCurrentCliSessionHandler: RouteHandler = async (
     userId,
     sessionId: session.id,
     by: "cli",
+  });
+
+  return reply.code(204).send();
+};
+
+export const listOrganizationCliSessionsHandler: RouteHandler = async (
+  request,
+  reply,
+) => {
+  const tenant = await requireTenant(request, reply, "members.manage");
+  if (!tenant) {
+    return reply;
+  }
+
+  return reply.send({ items: await listOrganizationCliSessions(tenant.orgId) });
+};
+
+export const revokeOrganizationCliSessionHandler: RouteHandler = async (
+  request,
+  reply,
+) => {
+  const tenant = await requireTenant(request, reply, "members.manage");
+  if (!tenant) {
+    return reply;
+  }
+
+  const { id } = request.params as { id: string };
+  const revoked = await revokeOrganizationCliSession(tenant.orgId, id);
+  if (!revoked) {
+    return notFound(reply, "CLI session");
+  }
+
+  await audit(request, tenant, {
+    action: "cli_session.revoked",
+    targetType: "cli_session",
+    targetId: id,
+    metadata: { userId: revoked.userId },
+  });
+  appLogger.info("CLI session revoked", {
+    userId: tenant.userId,
+    sessionId: id,
+    by: "organization",
   });
 
   return reply.code(204).send();

@@ -3,7 +3,14 @@ import { clearUserCache } from "@auth/user-store";
 import { customerRoutes } from "@routes/customers";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { initApp } from "@/server";
-import { actAs, ORG_ID, OTHER_ORG_ID } from "@/test-support/tenancy";
+import {
+  actAs,
+  ORG_ID,
+  OTHER_ORG_ID,
+  OTHER_PROJECT_ID,
+  PROJECT_ID,
+  SANDBOX_ENV_ID,
+} from "@/test-support/tenancy";
 
 const {
   authenticateRequest,
@@ -23,6 +30,7 @@ const {
   tenancy: {
     membership: { findFirst: vi.fn(), create: vi.fn() },
     auditLog: { create: vi.fn() },
+    project: { findFirst: vi.fn() },
   },
   authenticateRequest: vi.fn(),
   getUser: vi.fn(),
@@ -175,6 +183,17 @@ const KEY_AUTH = { authorization: `Bearer ${API_KEY}` };
 const storedKey = (over: Record<string, unknown> = {}) => ({
   id: "key_1",
   organizationId: ORG_ID,
+  projectId: PROJECT_ID,
+  environmentId: SANDBOX_ENV_ID,
+  environment: { kind: "SANDBOX" },
+  project: { deletedAt: null, archivedAt: null },
+  serviceAccountId: null,
+  serviceAccount: null,
+  scopes: ["PAYMENTS_WRITE", "CUSTOMERS_READ", "RESOURCE_READ"],
+  listingId: null,
+  agentId: null,
+  listing: null,
+  agent: null,
   revokedAt: null,
   expiresAt: null,
   organization: { deletedAt: null },
@@ -696,8 +715,8 @@ describe("customer routes", () => {
       await instance.close();
     });
 
-    it("lets a member manage customers", async () => {
-      actAs(tenancy, "MEMBER");
+    it("lets a developer manage customers", async () => {
+      actAs(tenancy, "DEVELOPER");
       const instance = await app();
 
       const response = await instance.inject({
@@ -708,6 +727,162 @@ describe("customer routes", () => {
       });
 
       expect(response.statusCode).toBe(201);
+
+      await instance.close();
+    });
+
+    it("404s a project the caller cannot see without reading customers", async () => {
+      const instance = await app();
+
+      for (const [method, url] of [
+        ["GET", "/me/customers"],
+        ["GET", `/me/customers/${CUSTOMER_ID}`],
+        ["POST", `/me/customers/${CUSTOMER_ID}/credit`],
+      ] as const) {
+        const response = await instance.inject({
+          method,
+          url,
+          headers: { ...AUTH, "x-project-id": OTHER_PROJECT_ID },
+          payload: { kind: "PROMOTIONAL", amount: "5" },
+        });
+        expect(response.statusCode, `${method} ${url}`).toBe(404);
+      }
+
+      expect(queryRaw).not.toHaveBeenCalled();
+      expect(customer.findFirst).not.toHaveBeenCalled();
+      expect(customerCreditEntry.create).not.toHaveBeenCalled();
+
+      await instance.close();
+    });
+
+    it("scopes customers to the active project, not the environment", async () => {
+      const instance = await app();
+
+      await instance.inject({
+        method: "GET",
+        url: `/me/customers/${CUSTOMER_ID}`,
+        headers: { ...AUTH, "x-environment": "production" },
+      });
+      const where = customer.findFirst.mock.calls[0][0].where;
+      expect(where).toMatchObject({
+        id: CUSTOMER_ID,
+        organizationId: ORG_ID,
+        projectId: PROJECT_ID,
+      });
+      expect(where).not.toHaveProperty("environmentId");
+
+      await instance.inject({
+        method: "GET",
+        url: "/me/customers",
+        headers: AUTH,
+      });
+      expect(JSON.stringify(rawCall("rank_total"))).toContain(
+        "c.project_id = ",
+      );
+
+      await instance.close();
+    });
+
+    it("writes the project and creator on a new customer", async () => {
+      const instance = await app();
+
+      await instance.inject({
+        method: "POST",
+        url: "/me/customers",
+        headers: AUTH,
+        payload: { name: "Acme Procurement" },
+      });
+
+      expect(customer.create.mock.calls[0][0].data).toMatchObject({
+        organizationId: ORG_ID,
+        projectId: PROJECT_ID,
+        createdById: USER_ID,
+      });
+      expect(
+        tenancy.auditLog.create.mock.calls[0][0].data.metadata,
+      ).toMatchObject({ projectId: PROJECT_ID, environment: "SANDBOX" });
+
+      await instance.close();
+    });
+
+    it("lets a viewer read customers but not change them", async () => {
+      actAs(tenancy, "VIEWER");
+      const instance = await app();
+
+      const list = await instance.inject({
+        method: "GET",
+        url: "/me/customers",
+        headers: AUTH,
+      });
+      expect(list.statusCode).toBe(200);
+
+      for (const [method, url, payload] of [
+        ["POST", "/me/customers", { name: "Acme" }],
+        ["PATCH", `/me/customers/${CUSTOMER_ID}`, { name: "Renamed" }],
+        ["DELETE", `/me/customers/${CUSTOMER_ID}`, undefined],
+        [
+          "POST",
+          `/me/customers/${CUSTOMER_ID}/credit`,
+          { kind: "PROMOTIONAL", amount: "5" },
+        ],
+        [
+          "PATCH",
+          `/me/customers/${CUSTOMER_ID}/coupons/${COUPON_ID}`,
+          { usageLimit: 3 },
+        ],
+      ] as const) {
+        const response = await instance.inject({
+          method,
+          url,
+          headers: AUTH,
+          ...(payload ? { payload } : {}),
+        });
+        expect(response.statusCode, `${method} ${url}`).toBe(403);
+        expect(response.json().permission).toBe("resources.write");
+      }
+
+      expect(customer.create).not.toHaveBeenCalled();
+      expect(customer.updateMany).not.toHaveBeenCalled();
+      expect(customerCreditEntry.create).not.toHaveBeenCalled();
+      expect(customerCoupon.updateMany).not.toHaveBeenCalled();
+
+      await instance.close();
+    });
+
+    it("checks a coupon's or identity's customer is in the active project", async () => {
+      customer.findFirst.mockResolvedValue(null);
+      const instance = await app();
+
+      for (const [method, url, payload] of [
+        [
+          "PATCH",
+          `/me/customers/${CUSTOMER_ID}/coupons/${COUPON_ID}`,
+          { usageLimit: 3 },
+        ],
+        ["DELETE", `/me/customers/${CUSTOMER_ID}/coupons/${COUPON_ID}`],
+        [
+          "PATCH",
+          `/me/customers/${CUSTOMER_ID}/identities/${IDENTITY_ID}`,
+          { blocked: true },
+        ],
+        ["DELETE", `/me/customers/${CUSTOMER_ID}/identities/${IDENTITY_ID}`],
+      ] as const) {
+        const response = await instance.inject({
+          method,
+          url,
+          headers: AUTH,
+          ...(payload ? { payload } : {}),
+        });
+        expect(response.statusCode, `${method} ${url}`).toBe(404);
+      }
+
+      expect(customer.findFirst.mock.calls[0][0].where).toMatchObject({
+        projectId: PROJECT_ID,
+      });
+      expect(customerCoupon.updateMany).not.toHaveBeenCalled();
+      expect(customerCoupon.deleteMany).not.toHaveBeenCalled();
+      expect(customerPaymentIdentity.updateMany).not.toHaveBeenCalled();
+      expect(customerPaymentIdentity.deleteMany).not.toHaveBeenCalled();
 
       await instance.close();
     });
@@ -2182,6 +2357,37 @@ describe("customer routes", () => {
       );
 
       expect(response.statusCode).toBe(400);
+
+      await instance.close();
+    });
+
+    it("only resolves customers of the key's project", async () => {
+      customerPaymentIdentity.findFirst.mockResolvedValue(null);
+
+      const instance = await app();
+      await instance.inject(resolve({}));
+
+      expect(
+        customerPaymentIdentity.findFirst.mock.calls[0][0].where.customer,
+      ).toEqual({ deletedAt: null, projectId: PROJECT_ID });
+
+      await instance.close();
+    });
+
+    it("refuses a key without the CUSTOMERS_READ scope", async () => {
+      apiKey.findUnique.mockResolvedValue(
+        storedKey({ scopes: ["PAYMENTS_WRITE"] }),
+      );
+
+      const instance = await app();
+      const response = await instance.inject(resolve({}));
+
+      expect(response.statusCode).toBe(403);
+      expect(response.json()).toMatchObject({
+        error: "insufficient_scope",
+        scope: "CUSTOMERS_READ",
+      });
+      expect(customerPaymentIdentity.findFirst).not.toHaveBeenCalled();
 
       await instance.close();
     });

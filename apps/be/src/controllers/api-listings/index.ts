@@ -2,17 +2,18 @@ import type { PaymentNetwork } from "@4mica/db";
 import { slugify } from "@4mica/rules";
 import { MAX_OFFSET } from "@controllers/schema-primitives";
 import {
-  audit,
+  auditProject,
   invalidBody,
   notFound,
   parseBody,
-  requireTenant,
+  requireProject,
   sellerWalletError,
 } from "@controllers/shared";
 import { resolveSellerWallet } from "@controllers/wallets/repository";
 import { appLogger } from "@logger/index";
 import { resolvePriceAsset } from "@utils/price-asset";
 import { isUniqueViolation } from "@utils/prisma-errors";
+import { networkAllowed, networkIssue } from "@utils/scope";
 import { nextFreeSlug } from "@utils/slug";
 import type { FastifyReply, RouteHandler } from "fastify";
 import {
@@ -47,8 +48,8 @@ const notPayable = (reply: FastifyReply) =>
   });
 
 export const listApiListingsHandler: RouteHandler = async (request, reply) => {
-  const tenant = await requireTenant(request, reply, "resources.read");
-  if (!tenant) {
+  const scope = await requireProject(request, reply, "resources.read");
+  if (!scope) {
     return reply;
   }
 
@@ -63,24 +64,24 @@ export const listApiListingsHandler: RouteHandler = async (request, reply) => {
     ]);
   }
 
-  return reply.send(await listApiListings(tenant.orgId, parsed.data));
+  return reply.send(await listApiListings(scope, parsed.data));
 };
 
 export const getApiListingHandler: RouteHandler = async (request, reply) => {
-  const tenant = await requireTenant(request, reply, "resources.read");
-  if (!tenant) {
+  const scope = await requireProject(request, reply, "resources.read");
+  if (!scope) {
     return reply;
   }
 
   const { id } = request.params as { id: string };
-  const listing = await getApiListing(tenant.orgId, id);
+  const listing = await getApiListing(scope, id);
 
   return listing ? reply.send(listing) : notFound(reply, "listing");
 };
 
 export const createApiListingHandler: RouteHandler = async (request, reply) => {
-  const tenant = await requireTenant(request, reply, "resources.write");
-  if (!tenant) {
+  const scope = await requireProject(request, reply, "resources.write");
+  if (!scope) {
     return reply;
   }
 
@@ -96,9 +97,12 @@ export const createApiListingHandler: RouteHandler = async (request, reply) => {
   let payToAddress: string | null = null;
 
   if (data.walletId) {
-    const resolved = await resolveSellerWallet(tenant.orgId, data.walletId);
+    const resolved = await resolveSellerWallet(scope.orgId, data.walletId);
     if (!resolved.ok) {
       return sellerWalletError(reply, resolved);
+    }
+    if (!networkAllowed(scope, resolved.wallet.network)) {
+      return invalidBody(reply, [networkIssue(scope)]);
     }
     walletId = resolved.wallet.id;
     network = resolved.wallet.network;
@@ -114,7 +118,7 @@ export const createApiListingHandler: RouteHandler = async (request, reply) => {
     return notPayable(reply);
   }
 
-  const taken = await takenSlugs(tenant.orgId);
+  const taken = await takenSlugs(scope.orgId);
   const requestedSlug = data.slug ?? slugify(data.name);
 
   if (data.slug && taken.has(data.slug)) {
@@ -124,7 +128,7 @@ export const createApiListingHandler: RouteHandler = async (request, reply) => {
   const slug = data.slug ?? nextFreeSlug(requestedSlug, taken);
 
   try {
-    const listing = await createApiListing(tenant.orgId, tenant.userId, {
+    const listing = await createApiListing(scope, scope.userId, {
       slug,
       name: data.name,
       summary: data.summary ?? null,
@@ -146,14 +150,14 @@ export const createApiListingHandler: RouteHandler = async (request, reply) => {
       x402Endpoint: data.x402Endpoint ?? null,
     });
 
-    await audit(request, tenant, {
+    await auditProject(request, scope, {
       action: "api_listing.created",
       targetType: "api_listing",
       targetId: listing.id,
     });
 
     appLogger.info("Listing created", {
-      userId: tenant.userId,
+      userId: scope.userId,
       listingId: listing.id,
       slug: listing.slug,
     });
@@ -163,14 +167,14 @@ export const createApiListingHandler: RouteHandler = async (request, reply) => {
     if (isUniqueViolation(error)) {
       return slugTaken(reply);
     }
-    appLogger.error("Listing create failed", { error, userId: tenant.userId });
+    appLogger.error("Listing create failed", { error, userId: scope.userId });
     throw error;
   }
 };
 
 export const updateApiListingHandler: RouteHandler = async (request, reply) => {
-  const tenant = await requireTenant(request, reply, "resources.write");
-  if (!tenant) {
+  const scope = await requireProject(request, reply, "resources.write");
+  if (!scope) {
     return reply;
   }
 
@@ -180,7 +184,7 @@ export const updateApiListingHandler: RouteHandler = async (request, reply) => {
   }
 
   const { id } = request.params as { id: string };
-  const current = await getApiListing(tenant.orgId, id);
+  const current = await getApiListing(scope, id);
   if (!current) {
     return notFound(reply, "listing");
   }
@@ -195,9 +199,12 @@ export const updateApiListingHandler: RouteHandler = async (request, reply) => {
       data.network = null;
       data.payToAddress = null;
     } else {
-      const resolved = await resolveSellerWallet(tenant.orgId, walletId);
+      const resolved = await resolveSellerWallet(scope.orgId, walletId);
       if (!resolved.ok) {
         return sellerWalletError(reply, resolved);
+      }
+      if (!networkAllowed(scope, resolved.wallet.network)) {
+        return invalidBody(reply, [networkIssue(scope)]);
       }
       data.walletId = resolved.wallet.id;
       data.network = resolved.wallet.network;
@@ -231,10 +238,7 @@ export const updateApiListingHandler: RouteHandler = async (request, reply) => {
       return notPayable(reply);
     }
     if (walletId === undefined && current.walletId) {
-      const resolved = await resolveSellerWallet(
-        tenant.orgId,
-        current.walletId,
-      );
+      const resolved = await resolveSellerWallet(scope.orgId, current.walletId);
       if (!resolved.ok) {
         return sellerWalletError(reply, resolved);
       }
@@ -249,18 +253,18 @@ export const updateApiListingHandler: RouteHandler = async (request, reply) => {
   }
 
   if (next.slug && next.slug !== current.slug) {
-    const taken = await takenSlugs(tenant.orgId);
+    const taken = await takenSlugs(scope.orgId);
     if (taken.has(next.slug)) {
       return slugTaken(reply);
     }
   }
 
   try {
-    const updated = await updateApiListing(tenant.orgId, id, data);
+    const updated = await updateApiListing(scope, id, data);
     if (!updated) {
       return notFound(reply, "listing");
     }
-    await audit(request, tenant, {
+    await auditProject(request, scope, {
       action: "api_listing.updated",
       targetType: "api_listing",
       targetId: id,
@@ -278,13 +282,13 @@ export const publishApiListingHandler: RouteHandler = async (
   request,
   reply,
 ) => {
-  const tenant = await requireTenant(request, reply, "resources.write");
-  if (!tenant) {
+  const scope = await requireProject(request, reply, "resources.write");
+  if (!scope) {
     return reply;
   }
 
   const { id } = request.params as { id: string };
-  const current = await getApiListing(tenant.orgId, id);
+  const current = await getApiListing(scope, id);
   if (!current) {
     return notFound(reply, "listing");
   }
@@ -294,19 +298,19 @@ export const publishApiListingHandler: RouteHandler = async (
   }
 
   if (current.walletId) {
-    const resolved = await resolveSellerWallet(tenant.orgId, current.walletId);
+    const resolved = await resolveSellerWallet(scope.orgId, current.walletId);
     if (!resolved.ok) {
       return sellerWalletError(reply, resolved);
     }
   }
 
-  const updated = await updateApiListing(tenant.orgId, id, {
+  const updated = await updateApiListing(scope, id, {
     visibility: "PUBLIC",
     publishedAt: current.publishedAt ?? new Date(),
   });
 
   if (updated) {
-    await audit(request, tenant, {
+    await auditProject(request, scope, {
       action: "api_listing.published",
       targetType: "api_listing",
       targetId: id,
@@ -314,7 +318,7 @@ export const publishApiListingHandler: RouteHandler = async (
   }
 
   appLogger.info("Listing published", {
-    userId: tenant.userId,
+    userId: scope.userId,
     listingId: id,
     slug: current.slug,
   });
@@ -326,13 +330,13 @@ export const unpublishApiListingHandler: RouteHandler = async (
   request,
   reply,
 ) => {
-  const tenant = await requireTenant(request, reply, "resources.write");
-  if (!tenant) {
+  const scope = await requireProject(request, reply, "resources.write");
+  if (!scope) {
     return reply;
   }
 
   const { id } = request.params as { id: string };
-  const updated = await updateApiListing(tenant.orgId, id, {
+  const updated = await updateApiListing(scope, id, {
     visibility: "PRIVATE",
   });
 
@@ -340,34 +344,34 @@ export const unpublishApiListingHandler: RouteHandler = async (
     return notFound(reply, "listing");
   }
 
-  await audit(request, tenant, {
+  await auditProject(request, scope, {
     action: "api_listing.unpublished",
     targetType: "api_listing",
     targetId: id,
   });
   appLogger.info("Listing unpublished", {
-    userId: tenant.userId,
+    userId: scope.userId,
     listingId: id,
   });
   return reply.send(updated);
 };
 
 export const deleteApiListingHandler: RouteHandler = async (request, reply) => {
-  const tenant = await requireTenant(request, reply, "resources.write");
-  if (!tenant) {
+  const scope = await requireProject(request, reply, "resources.write");
+  if (!scope) {
     return reply;
   }
 
   const { id } = request.params as { id: string };
-  const deleted = await softDeleteApiListing(tenant.orgId, id);
+  const deleted = await softDeleteApiListing(scope, id);
 
   if (deleted) {
-    await audit(request, tenant, {
+    await auditProject(request, scope, {
       action: "api_listing.deleted",
       targetType: "api_listing",
       targetId: id,
     });
-    appLogger.info("Listing removed", { userId: tenant.userId, listingId: id });
+    appLogger.info("Listing removed", { userId: scope.userId, listingId: id });
     return reply.code(204).send();
   }
 
@@ -378,8 +382,8 @@ export const batchDeleteApiListingsHandler: RouteHandler = async (
   request,
   reply,
 ) => {
-  const tenant = await requireTenant(request, reply, "resources.write");
-  if (!tenant) {
+  const scope = await requireProject(request, reply, "resources.write");
+  if (!scope) {
     return reply;
   }
 
@@ -388,19 +392,16 @@ export const batchDeleteApiListingsHandler: RouteHandler = async (
     return invalidBody(reply, parsed.issues);
   }
 
-  const result = await batchSoftDeleteApiListings(
-    tenant.orgId,
-    parsed.data.ids,
-  );
+  const result = await batchSoftDeleteApiListings(scope, parsed.data.ids);
   if (result.deleted.length > 0) {
-    await audit(request, tenant, {
+    await auditProject(request, scope, {
       action: "api_listing.deleted",
       targetType: "api_listing",
       metadata: { ids: result.deleted },
     });
   }
   appLogger.info("Listings removed", {
-    userId: tenant.userId,
+    userId: scope.userId,
     count: result.deleted.length,
   });
 

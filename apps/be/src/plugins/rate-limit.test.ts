@@ -336,9 +336,16 @@ describe("rate limiting", () => {
     apiKeyFind.mockImplementation(async () => ({
       id: "key_1",
       organizationId: "org_1",
+      projectId: "project_1",
+      environmentId: "env_1",
+      serviceAccountId: null,
+      scopes: ["PAYMENTS_WRITE", "CUSTOMERS_READ", "RESOURCE_READ"],
       revokedAt: null,
       expiresAt: null,
       organization: { deletedAt: null },
+      project: { deletedAt: null, archivedAt: null },
+      environment: { kind: "SANDBOX" },
+      serviceAccount: null,
     }));
 
     const app = await loadApp({ apiKey: "2" });

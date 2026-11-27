@@ -13,6 +13,8 @@ export const DEVICE_POLL_INTERVAL_SECS = 5;
 export const DEVICE_SESSION_TTL_MS = 90 * 24 * 60 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 const STALE_REQUEST_MS = 24 * 60 * 60 * 1000;
 const USER_CODE_ATTEMPTS = 5;
 
@@ -26,21 +28,43 @@ export const CLI_SESSION_SELECT = {
   lastUsedAt: true,
   expiresAt: true,
   createdAt: true,
+  organization: { select: { id: true, name: true, handle: true } },
 } as const;
 
 const DEVICE_REQUEST_SELECT = {
   userCode: true,
   clientName: true,
   scopes: true,
+  organizationId: true,
   requestIp: true,
   createdAt: true,
   expiresAt: true,
 } as const;
 
+const ORGANIZATION_SUMMARY = { id: true, name: true, handle: true } as const;
+
+export const findOrganizationSummary = (id: string) =>
+  prisma.organization.findFirst({
+    where: { id, deletedAt: null },
+    select: ORGANIZATION_SUMMARY,
+  });
+
+export const findOrganizationByReference = (reference: string) =>
+  prisma.organization.findFirst({
+    where: {
+      deletedAt: null,
+      ...(UUID.test(reference)
+        ? { id: reference.toLowerCase() }
+        : { handle: reference.toLowerCase() }),
+    },
+    select: ORGANIZATION_SUMMARY,
+  });
+
 export const createDeviceRequest = async (input: {
   clientName: string;
   requestIp: string;
   scopes: CliScope[];
+  organizationId: string | null;
 }) => {
   const deviceCode = generateDeviceCode();
   const now = Date.now();
@@ -57,6 +81,7 @@ export const createDeviceRequest = async (input: {
           userCode: generateUserCode(),
           clientName: input.clientName,
           scopes: input.scopes,
+          organizationId: input.organizationId,
           requestIp: input.requestIp,
           intervalSecs: DEVICE_POLL_INTERVAL_SECS,
           expiresAt: new Date(now + DEVICE_CODE_TTL_MS),
@@ -82,6 +107,7 @@ export const findDeviceRequestByCode = (deviceCode: string) =>
       userId: true,
       clientName: true,
       scopes: true,
+      organizationId: true,
       intervalSecs: true,
       lastPolledAt: true,
       expiresAt: true,
@@ -114,6 +140,7 @@ export const redeemDeviceRequest = (request: {
   userId: string;
   clientName: string;
   scopes: string[];
+  organizationId: string | null;
 }) =>
   prisma.$transaction(async (tx) => {
     const { count } = await tx.cliDeviceRequest.updateMany({
@@ -140,6 +167,7 @@ export const redeemDeviceRequest = (request: {
         last4: secret.last4,
         hashedToken: secret.hash,
         scopes: request.scopes,
+        organizationId: request.organizationId,
         expiresAt: new Date(Date.now() + DEVICE_SESSION_TTL_MS),
       },
       select: CLI_SESSION_SELECT,
@@ -158,10 +186,16 @@ export const decideDeviceRequest = async (
   userId: string,
   userCode: string,
   status: "APPROVED" | "DENIED",
+  organizationId: string | null = null,
 ): Promise<boolean> => {
   const { count } = await prisma.cliDeviceRequest.updateMany({
     where: { userCode, status: "PENDING", expiresAt: { gt: new Date() } },
-    data: { status, userId, decidedAt: new Date() },
+    data: {
+      status,
+      userId,
+      decidedAt: new Date(),
+      ...(status === "APPROVED" ? { organizationId } : {}),
+    },
   });
 
   return count > 0;
@@ -176,7 +210,12 @@ export const listCliSessions = (userId: string) =>
 
 export const createCliToken = async (
   userId: string,
-  input: { name: string; scopes: CliScope[]; expiresInDays: number },
+  input: {
+    name: string;
+    scopes: CliScope[];
+    expiresInDays: number;
+    organizationId: string | null;
+  },
 ) => {
   const secret = generateCliToken();
 
@@ -189,6 +228,7 @@ export const createCliToken = async (
       last4: secret.last4,
       hashedToken: secret.hash,
       scopes: input.scopes,
+      organizationId: input.organizationId,
       expiresAt: new Date(Date.now() + input.expiresInDays * DAY_MS),
     },
     select: CLI_SESSION_SELECT,
@@ -214,3 +254,47 @@ export const findAccountSummary = (userId: string) =>
     where: { id: userId },
     select: { id: true, email: true, name: true, username: true },
   });
+
+const liveIn = (organizationId: string) => ({
+  organizationId,
+  revokedAt: null,
+  expiresAt: { gt: new Date() },
+});
+
+export const listOrganizationCliSessions = (organizationId: string) =>
+  prisma.cliSession.findMany({
+    where: liveIn(organizationId),
+    orderBy: { createdAt: "desc" },
+    select: {
+      ...CLI_SESSION_SELECT,
+      user: {
+        select: {
+          id: true,
+          name: true,
+          username: true,
+          email: true,
+          avatarUrl: true,
+        },
+      },
+    },
+  });
+
+export const revokeOrganizationCliSession = async (
+  organizationId: string,
+  id: string,
+): Promise<{ userId: string } | null> => {
+  const session = await prisma.cliSession.findFirst({
+    where: { id, ...liveIn(organizationId) },
+    select: { userId: true },
+  });
+  if (!session) {
+    return null;
+  }
+
+  const { count } = await prisma.cliSession.updateMany({
+    where: { id, organizationId, revokedAt: null },
+    data: { revokedAt: new Date() },
+  });
+
+  return count > 0 ? session : null;
+};
