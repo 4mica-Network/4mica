@@ -1,21 +1,28 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { prisma } = vi.hoisted(() => ({
-  prisma: {
-    apiListing: { findFirst: vi.fn() },
-    agent: { findFirst: vi.fn() },
-  },
-}));
+const { prisma, tx } = vi.hoisted(() => {
+  const tx = { report: { findFirst: vi.fn(), create: vi.fn() } };
+  return {
+    tx,
+    prisma: {
+      apiListing: { findFirst: vi.fn() },
+      agent: { findFirst: vi.fn() },
+      review: { upsert: vi.fn() },
+      $transaction: vi.fn((run: (client: typeof tx) => unknown) => run(tx)),
+    },
+  };
+});
 
 vi.mock("server-only", () => ({}));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn(), updateTag: vi.fn() }));
 vi.mock("@/services/db", () => ({ prisma }));
 vi.mock("@/services/trust", () => ({
-  hasSettledPayment: vi.fn(),
-  targetOf: vi.fn(),
+  hasSettledPayment: vi.fn().mockResolvedValue(true),
+  targetOf: (kind: string, id: string) =>
+    kind === "listing" ? { listingId: id } : { agentId: id },
 }));
 vi.mock("@/services/viewer", () => ({
-  getViewer: vi.fn().mockResolvedValue({ id: "viewer" }),
+  getViewer: vi.fn().mockResolvedValue({ id: "buyer" }),
 }));
 vi.mock("@/services/writeLimit", () => ({
   allowWrite: vi.fn().mockResolvedValue(true),
@@ -31,30 +38,71 @@ const resource = (kind: "listing" | "agent") => ({
   ref: "weather",
 });
 
+const incompleteTarget = {
+  ownerId: "seller",
+  slug: "weather",
+  owner: { username: "ada" },
+};
+
 beforeEach(() => {
-  prisma.apiListing.findFirst.mockReset().mockResolvedValue(null);
-  prisma.agent.findFirst.mockReset().mockResolvedValue(null);
+  vi.clearAllMocks();
+  prisma.apiListing.findFirst.mockResolvedValue(incompleteTarget);
+  prisma.agent.findFirst.mockResolvedValue(incompleteTarget);
+  prisma.review.upsert.mockResolvedValue({});
+  tx.report.findFirst.mockResolvedValue(null);
+  tx.report.create.mockResolvedValue({});
 });
 
 describe.each([
   ["listing", prisma.apiListing, PAYABLE_LISTING],
   ["agent", prisma.agent, PAYABLE_AGENT],
 ] as const)("a %s that becomes incomplete", (kind, model, complete) => {
-  it.each([
-    ["reported", () => fileReport(resource(kind), { reason: "SPAM" })],
-    ["reviewed", () => submitReview(resource(kind), { rating: 1 })],
-  ])("can still be %s", async (_, call) => {
-    await call();
+  const lookup = () =>
+    (model.findFirst.mock.calls[0]?.[0] as { where: Record<string, unknown> })
+      .where;
 
-    const { where } = model.findFirst.mock.calls[0]?.[0] as {
-      where: Record<string, unknown>;
-    };
+  it("can still be reported", async () => {
+    expect(await fileReport(resource(kind), { reason: "SPAM" })).toEqual({
+      ok: true,
+    });
 
-    expect(where).toMatchObject({
-      visibility: { in: ["PUBLIC", "UNLISTED"] },
+    expect(tx.report.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ reporterId: "buyer", reason: "SPAM" }),
     });
     for (const field of Object.keys(complete)) {
-      expect(where).not.toHaveProperty(field);
+      expect(lookup()).not.toHaveProperty(field);
     }
+  });
+
+  it("can still be reviewed", async () => {
+    expect(await submitReview(resource(kind), { rating: 1 })).toEqual({
+      ok: true,
+    });
+
+    expect(prisma.review.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          authorId: "buyer",
+          rating: 1,
+          verifiedPurchase: true,
+        }),
+      }),
+    );
+    for (const field of Object.keys(complete)) {
+      expect(lookup()).not.toHaveProperty(field);
+    }
+  });
+
+  it("still cannot be reviewed once it is private", async () => {
+    model.findFirst.mockResolvedValue(null);
+
+    expect(await submitReview(resource(kind), { rating: 1 })).toEqual({
+      ok: false,
+      error: "not_found",
+    });
+    expect(lookup()).toMatchObject({
+      visibility: { in: ["PUBLIC", "UNLISTED"] },
+    });
+    expect(prisma.review.upsert).not.toHaveBeenCalled();
   });
 });
