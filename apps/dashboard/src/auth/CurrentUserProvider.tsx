@@ -1,10 +1,15 @@
 import { setAuthTokenProvider, setUnauthorizedHandler } from "@api/client";
 import { useAuth, useClerk } from "@clerk/clerk-react";
 import { fetchConfig } from "@stores/config/actions";
-import { useAppDispatch } from "@stores/hooks";
+import { useAppDispatch, useAppSelector } from "@stores/hooks";
+import { fetchOrganizations } from "@stores/organization/actions";
+import {
+  selectActiveOrganizationId,
+  selectHasResolvedOrganizations,
+} from "@stores/organization/selector";
 import { resetSession } from "@stores/session";
 import { fetchUser } from "@stores/user/actions";
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { Fragment, type ReactNode, useEffect, useRef, useState } from "react";
 import { FullScreenLoader } from "@/auth/FullScreenLoader";
 import { clearVerifyToken } from "@/lib/verifyToken";
 
@@ -13,6 +18,8 @@ export function CurrentUserProvider({ children }: { children: ReactNode }) {
   const { signOut } = useClerk();
   const dispatch = useAppDispatch();
   const [tokenReady, setTokenReady] = useState(false);
+  const organizationsResolved = useAppSelector(selectHasResolvedOrganizations);
+  const activeOrganizationId = useAppSelector(selectActiveOrganizationId);
 
   const getTokenRef = useRef(getToken);
   getTokenRef.current = getToken;
@@ -49,6 +56,7 @@ export function CurrentUserProvider({ children }: { children: ReactNode }) {
       return;
     }
     dispatch(resetSession());
+    dispatch(fetchOrganizations());
     dispatch(fetchUser());
     return () => {
       dispatch(resetSession());
@@ -72,9 +80,11 @@ export function CurrentUserProvider({ children }: { children: ReactNode }) {
     };
   }, [dispatch, isSignedIn, tokenReady]);
 
-  if (!tokenReady) {
+  if (!tokenReady || !organizationsResolved) {
     return <FullScreenLoader />;
   }
 
-  return <>{children}</>;
+  return (
+    <Fragment key={activeOrganizationId ?? "default"}>{children}</Fragment>
+  );
 }

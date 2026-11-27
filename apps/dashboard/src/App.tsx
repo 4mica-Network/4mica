@@ -10,7 +10,7 @@ import { useAppLanguage } from "@/hooks/useAppLanguage";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { SignInPage } from "@/pages/sign-in";
 import { SsoCallbackPage } from "@/pages/sso-callback";
-import { APP_PAGES, SETTINGS_PAGES } from "@/routes";
+import { APP_PAGES, InvitationPage, SETTINGS_PAGES } from "@/routes";
 
 const page = (Component: ComponentType) => (
   <PageBoundary>
@@ -32,6 +32,7 @@ export function App() {
         <Route path="/sso-callback" element={page(SsoCallbackPage)} />
 
         <Route element={<RequireAuth />}>
+          <Route path="invitations/:token" element={page(InvitationPage)} />
           <Route element={<AppShell />}>
             {APP_PAGES.map(({ path, index, component: Component }) =>
               index ? (

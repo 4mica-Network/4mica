@@ -11,6 +11,7 @@ import { FieldRow, Select, SettingRow, SwitchCard } from "@/components/form";
 import { SettingsSection } from "@/components/layout";
 import { SettingsPage } from "@/components/SettingsPage";
 import { useConfigOptions, useTimezoneOptions } from "@/hooks/useConfigOptions";
+import { OrganizationSection } from "./OrganizationSection";
 
 const THEME_LABEL_KEYS: Record<string, string> = {
   dark: "settings.account.themeOption.dark",
@@ -145,6 +146,8 @@ export function AccountSettings() {
           </SettingRow>
         </InstantCard>
       </section>
+
+      <OrganizationSection />
 
       <SettingsSection
         title={t("settings.account.security")}

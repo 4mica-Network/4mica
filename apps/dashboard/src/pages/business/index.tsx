@@ -1,6 +1,8 @@
 import { isPhoneNumber, isWebUrl } from "@4mica/rules";
 import { Card } from "@4mica/ui";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
+import { selectCan } from "@stores/organization/selector";
+import { PERMISSION } from "@stores/organization/type";
 import { updateBusiness } from "@stores/user/actions";
 import {
   selectBusiness,
@@ -22,6 +24,7 @@ import {
   TextInput,
 } from "@/components/form";
 import { SettingsSection } from "@/components/layout";
+import { RoleRestricted } from "@/components/Organization/RoleRestricted";
 import { SettingsPage } from "@/components/SettingsPage";
 import { useBusinessTypeOptions } from "@/hooks/useBusinessTypeOptions";
 import { useConfigOptions, useCountryOptions } from "@/hooks/useConfigOptions";
@@ -56,6 +59,7 @@ export function BusinessSettings() {
   const countries = useCountryOptions();
   const dispatch = useAppDispatch();
   const business = useAppSelector(selectBusiness);
+  const canManage = useAppSelector(selectCan(PERMISSION.BUSINESS_MANAGE));
   const issues = useAppSelector(selectValidationIssues);
   const savingEntity = useAppSelector(selectIsSectionSaving("entity"));
   const savingType = useAppSelector(selectIsSectionSaving("businessType"));
@@ -177,377 +181,379 @@ export function BusinessSettings() {
       titleKey="page.settings.business.title"
       descriptionKey="page.settings.business.description"
     >
-      <div className="flex flex-col gap-3">
-        <Card className="flex items-center justify-between gap-4">
-          <div>
-            <span className="font-medium text-ink-strong text-sm">
-              {t("settings.business.kyb")}
-            </span>
-            <p className="mt-0.5 text-ink-muted text-xs">
-              {t("settings.business.kybHint")}
-            </p>
-          </div>
-          <KybTag
-            status={business?.kybStatus ?? "UNVERIFIED"}
-            label={t(`settings.kyb.${business?.kybStatus ?? "UNVERIFIED"}`)}
-          />
-        </Card>
+      <RoleRestricted allowed={canManage}>
+        <div className="flex flex-col gap-3">
+          <Card className="flex items-center justify-between gap-4">
+            <div>
+              <span className="font-medium text-ink-strong text-sm">
+                {t("settings.business.kyb")}
+              </span>
+              <p className="mt-0.5 text-ink-muted text-xs">
+                {t("settings.business.kybHint")}
+              </p>
+            </div>
+            <KybTag
+              status={business?.kybStatus ?? "UNVERIFIED"}
+              label={t(`settings.kyb.${business?.kybStatus ?? "UNVERIFIED"}`)}
+            />
+          </Card>
 
-        <EditableCard
-          isDirty={entity.isDirty}
-          isInvalid={hasErrors(entityErrors)}
-          isSaving={savingEntity}
-          onSave={() => save(entity.changes, "entity", ["legalName"])}
-          onReset={entity.reset}
+          <EditableCard
+            isDirty={entity.isDirty}
+            isInvalid={hasErrors(entityErrors)}
+            isSaving={savingEntity}
+            onSave={() => save(entity.changes, "entity", ["legalName"])}
+            onReset={entity.reset}
+          >
+            <FieldRow
+              title={t("settings.business.legalName")}
+              description={t("settings.business.legalNameHint")}
+              htmlFor="business-legal-name"
+            >
+              <TextInput
+                id="business-legal-name"
+                autoComplete="organization"
+                required
+                value={entity.draft.legalName}
+                error={fieldErrors.legalName ?? issues.legalName}
+                maxLength={255}
+                onChange={(v) => entity.set("legalName", v)}
+              />
+            </FieldRow>
+            <FieldRow
+              title={t("settings.business.tradingName")}
+              description={t("settings.business.tradingNameHint")}
+              htmlFor="business-trading-name"
+            >
+              <TextInput
+                id="business-trading-name"
+                autoComplete="organization"
+                value={entity.draft.tradingName}
+                error={fieldErrors.tradingName ?? issues.tradingName}
+                maxLength={255}
+                onChange={(v) => entity.set("tradingName", v)}
+              />
+            </FieldRow>
+            <FieldRow
+              title={t("settings.business.industry")}
+              description={t("settings.business.industryHint")}
+              htmlFor="business-industry"
+            >
+              <TextInput
+                id="business-industry"
+                value={entity.draft.industry}
+                error={fieldErrors.industry ?? issues.industry}
+                maxLength={128}
+                onChange={(v) => entity.set("industry", v)}
+              />
+            </FieldRow>
+            <FieldRow
+              title={t("settings.business.description")}
+              description={t("settings.business.descriptionHint")}
+              htmlFor="business-description"
+            >
+              <TextArea
+                id="business-description"
+                value={entity.draft.description}
+                error={fieldErrors.description ?? issues.description}
+                maxLength={2000}
+                onChange={(v) => entity.set("description", v)}
+              />
+            </FieldRow>
+          </EditableCard>
+
+          <InstantCard isSaving={savingType}>
+            <SettingRow
+              title={t("settings.business.type")}
+              description={t("settings.business.typeHint")}
+              htmlFor="business-type"
+              error={issues.businessType}
+            >
+              <Select
+                id="business-type"
+                value={business?.businessType ?? ""}
+                options={businessTypes}
+                onChange={(v) =>
+                  dispatch(
+                    updateBusiness(
+                      { businessType: (v || null) as BusinessType | null },
+                      "businessType",
+                    ),
+                  )
+                }
+              />
+            </SettingRow>
+          </InstantCard>
+        </div>
+
+        <SettingsSection
+          title={t("settings.business.registration")}
+          description={t("settings.business.registrationHint")}
         >
-          <FieldRow
-            title={t("settings.business.legalName")}
-            description={t("settings.business.legalNameHint")}
-            htmlFor="business-legal-name"
+          <EditableCard
+            isDirty={registration.isDirty}
+            isInvalid={hasErrors(registrationErrors)}
+            isSaving={savingRegistration}
+            onSave={() => save(registration.changes, "registration")}
+            onReset={registration.reset}
           >
-            <TextInput
-              id="business-legal-name"
-              autoComplete="organization"
-              required
-              value={entity.draft.legalName}
-              error={fieldErrors.legalName ?? issues.legalName}
-              maxLength={255}
-              onChange={(v) => entity.set("legalName", v)}
-            />
-          </FieldRow>
-          <FieldRow
-            title={t("settings.business.tradingName")}
-            description={t("settings.business.tradingNameHint")}
-            htmlFor="business-trading-name"
-          >
-            <TextInput
-              id="business-trading-name"
-              autoComplete="organization"
-              value={entity.draft.tradingName}
-              error={fieldErrors.tradingName ?? issues.tradingName}
-              maxLength={255}
-              onChange={(v) => entity.set("tradingName", v)}
-            />
-          </FieldRow>
-          <FieldRow
-            title={t("settings.business.industry")}
-            description={t("settings.business.industryHint")}
-            htmlFor="business-industry"
-          >
-            <TextInput
-              id="business-industry"
-              value={entity.draft.industry}
-              error={fieldErrors.industry ?? issues.industry}
-              maxLength={128}
-              onChange={(v) => entity.set("industry", v)}
-            />
-          </FieldRow>
-          <FieldRow
-            title={t("settings.business.description")}
-            description={t("settings.business.descriptionHint")}
-            htmlFor="business-description"
-          >
-            <TextArea
-              id="business-description"
-              value={entity.draft.description}
-              error={fieldErrors.description ?? issues.description}
-              maxLength={2000}
-              onChange={(v) => entity.set("description", v)}
-            />
-          </FieldRow>
-        </EditableCard>
+            <FieldRow
+              title={t("settings.business.registrationNumber")}
+              description={t("settings.business.registrationNumberHint")}
+              htmlFor="business-reg-no"
+            >
+              <TextInput
+                id="business-reg-no"
+                value={registration.draft.registrationNumber}
+                error={
+                  fieldErrors.registrationNumber ?? issues.registrationNumber
+                }
+                maxLength={64}
+                onChange={(v) => registration.set("registrationNumber", v)}
+              />
+            </FieldRow>
+            <FieldRow
+              title={t("settings.business.taxId")}
+              description={t("settings.business.taxIdHint")}
+              htmlFor="business-tax-id"
+            >
+              <TextInput
+                id="business-tax-id"
+                value={registration.draft.taxId}
+                error={fieldErrors.taxId ?? issues.taxId}
+                maxLength={64}
+                onChange={(v) => registration.set("taxId", v)}
+              />
+            </FieldRow>
+            <FieldRow
+              title={t("settings.business.vatNumber")}
+              description={t("settings.business.vatNumberHint")}
+              htmlFor="business-vat"
+            >
+              <TextInput
+                id="business-vat"
+                value={registration.draft.vatNumber}
+                error={fieldErrors.vatNumber ?? issues.vatNumber}
+                maxLength={64}
+                onChange={(v) => registration.set("vatNumber", v)}
+              />
+            </FieldRow>
+          </EditableCard>
+        </SettingsSection>
 
-        <InstantCard isSaving={savingType}>
-          <SettingRow
-            title={t("settings.business.type")}
-            description={t("settings.business.typeHint")}
-            htmlFor="business-type"
-            error={issues.businessType}
-          >
-            <Select
-              id="business-type"
-              value={business?.businessType ?? ""}
-              options={businessTypes}
-              onChange={(v) =>
-                dispatch(
-                  updateBusiness(
-                    { businessType: (v || null) as BusinessType | null },
-                    "businessType",
-                  ),
-                )
-              }
-            />
-          </SettingRow>
-        </InstantCard>
-      </div>
-
-      <SettingsSection
-        title={t("settings.business.registration")}
-        description={t("settings.business.registrationHint")}
-      >
-        <EditableCard
-          isDirty={registration.isDirty}
-          isInvalid={hasErrors(registrationErrors)}
-          isSaving={savingRegistration}
-          onSave={() => save(registration.changes, "registration")}
-          onReset={registration.reset}
+        <SettingsSection
+          title={t("settings.business.contact")}
+          description={t("settings.business.contactHint")}
         >
-          <FieldRow
-            title={t("settings.business.registrationNumber")}
-            description={t("settings.business.registrationNumberHint")}
-            htmlFor="business-reg-no"
+          <EditableCard
+            isDirty={contact.isDirty}
+            isInvalid={hasErrors(contactErrors)}
+            isSaving={savingContact}
+            onSave={() => save(contact.changes, "contact")}
+            onReset={contact.reset}
           >
-            <TextInput
-              id="business-reg-no"
-              value={registration.draft.registrationNumber}
-              error={
-                fieldErrors.registrationNumber ?? issues.registrationNumber
-              }
-              maxLength={64}
-              onChange={(v) => registration.set("registrationNumber", v)}
-            />
-          </FieldRow>
-          <FieldRow
-            title={t("settings.business.taxId")}
-            description={t("settings.business.taxIdHint")}
-            htmlFor="business-tax-id"
-          >
-            <TextInput
-              id="business-tax-id"
-              value={registration.draft.taxId}
-              error={fieldErrors.taxId ?? issues.taxId}
-              maxLength={64}
-              onChange={(v) => registration.set("taxId", v)}
-            />
-          </FieldRow>
-          <FieldRow
-            title={t("settings.business.vatNumber")}
-            description={t("settings.business.vatNumberHint")}
-            htmlFor="business-vat"
-          >
-            <TextInput
-              id="business-vat"
-              value={registration.draft.vatNumber}
-              error={fieldErrors.vatNumber ?? issues.vatNumber}
-              maxLength={64}
-              onChange={(v) => registration.set("vatNumber", v)}
-            />
-          </FieldRow>
-        </EditableCard>
-      </SettingsSection>
+            <FieldRow
+              title={t("settings.business.website")}
+              description={t("settings.business.websiteHint")}
+              htmlFor="business-website"
+            >
+              <TextInput
+                id="business-website"
+                type="url"
+                inputMode="url"
+                autoComplete="url"
+                value={contact.draft.website}
+                error={fieldErrors.website ?? issues.website}
+                maxLength={255}
+                placeholder="https://example.com"
+                onChange={(v) => contact.set("website", v)}
+              />
+            </FieldRow>
+            <FieldRow
+              title={t("settings.business.supportEmail")}
+              description={t("settings.business.supportEmailHint")}
+              htmlFor="business-support-email"
+            >
+              <TextInput
+                id="business-support-email"
+                inputMode="email"
+                autoComplete="email"
+                type="email"
+                value={contact.draft.supportEmail}
+                error={fieldErrors.supportEmail ?? issues.supportEmail}
+                maxLength={255}
+                onChange={(v) => contact.set("supportEmail", v)}
+              />
+            </FieldRow>
+            <FieldRow
+              title={t("settings.business.supportPhone")}
+              description={t("settings.business.supportPhoneHint")}
+              htmlFor="business-support-phone"
+            >
+              <TextInput
+                id="business-support-phone"
+                type="tel"
+                inputMode="tel"
+                autoComplete="tel"
+                value={contact.draft.supportPhone}
+                error={fieldErrors.supportPhone ?? issues.supportPhone}
+                maxLength={20}
+                onChange={(v) => contact.set("supportPhone", v)}
+              />
+            </FieldRow>
+          </EditableCard>
+        </SettingsSection>
 
-      <SettingsSection
-        title={t("settings.business.contact")}
-        description={t("settings.business.contactHint")}
-      >
-        <EditableCard
-          isDirty={contact.isDirty}
-          isInvalid={hasErrors(contactErrors)}
-          isSaving={savingContact}
-          onSave={() => save(contact.changes, "contact")}
-          onReset={contact.reset}
+        <SettingsSection
+          title={t("settings.business.address")}
+          description={t("settings.business.addressHint")}
         >
-          <FieldRow
-            title={t("settings.business.website")}
-            description={t("settings.business.websiteHint")}
-            htmlFor="business-website"
+          <EditableCard
+            isDirty={address.isDirty}
+            isInvalid={hasErrors(addressErrors)}
+            isSaving={savingAddress}
+            onSave={() => save(address.changes, "address")}
+            onReset={address.reset}
           >
-            <TextInput
-              id="business-website"
-              type="url"
-              inputMode="url"
-              autoComplete="url"
-              value={contact.draft.website}
-              error={fieldErrors.website ?? issues.website}
-              maxLength={255}
-              placeholder="https://example.com"
-              onChange={(v) => contact.set("website", v)}
-            />
-          </FieldRow>
-          <FieldRow
-            title={t("settings.business.supportEmail")}
-            description={t("settings.business.supportEmailHint")}
-            htmlFor="business-support-email"
-          >
-            <TextInput
-              id="business-support-email"
-              inputMode="email"
-              autoComplete="email"
-              type="email"
-              value={contact.draft.supportEmail}
-              error={fieldErrors.supportEmail ?? issues.supportEmail}
-              maxLength={255}
-              onChange={(v) => contact.set("supportEmail", v)}
-            />
-          </FieldRow>
-          <FieldRow
-            title={t("settings.business.supportPhone")}
-            description={t("settings.business.supportPhoneHint")}
-            htmlFor="business-support-phone"
-          >
-            <TextInput
-              id="business-support-phone"
-              type="tel"
-              inputMode="tel"
-              autoComplete="tel"
-              value={contact.draft.supportPhone}
-              error={fieldErrors.supportPhone ?? issues.supportPhone}
-              maxLength={20}
-              onChange={(v) => contact.set("supportPhone", v)}
-            />
-          </FieldRow>
-        </EditableCard>
-      </SettingsSection>
+            <FieldRow
+              title={t("settings.business.addressLine1")}
+              description={t("settings.business.addressLine1Hint")}
+              htmlFor="business-address1"
+            >
+              <TextInput
+                id="business-address1"
+                autoComplete="address-line1"
+                value={address.draft.addressLine1}
+                error={fieldErrors.addressLine1 ?? issues.addressLine1}
+                maxLength={255}
+                onChange={(v) => address.set("addressLine1", v)}
+              />
+            </FieldRow>
+            <FieldRow
+              title={t("settings.business.addressLine2")}
+              description={t("settings.business.addressLine2Hint")}
+              htmlFor="business-address2"
+            >
+              <TextInput
+                id="business-address2"
+                autoComplete="address-line2"
+                value={address.draft.addressLine2}
+                error={fieldErrors.addressLine2 ?? issues.addressLine2}
+                maxLength={255}
+                onChange={(v) => address.set("addressLine2", v)}
+              />
+            </FieldRow>
+            <FieldRow
+              title={t("settings.business.city")}
+              description={t("settings.business.cityHint")}
+              htmlFor="business-city"
+            >
+              <TextInput
+                id="business-city"
+                autoComplete="address-level2"
+                value={address.draft.city}
+                error={fieldErrors.city ?? issues.city}
+                maxLength={128}
+                onChange={(v) => address.set("city", v)}
+              />
+            </FieldRow>
+            <FieldRow
+              title={t("settings.business.region")}
+              description={t("settings.business.regionHint")}
+              htmlFor="business-region"
+            >
+              <TextInput
+                id="business-region"
+                autoComplete="address-level1"
+                value={address.draft.region}
+                error={fieldErrors.region ?? issues.region}
+                maxLength={128}
+                onChange={(v) => address.set("region", v)}
+              />
+            </FieldRow>
+            <FieldRow
+              title={t("settings.business.postalCode")}
+              description={t("settings.business.postalCodeHint")}
+              htmlFor="business-postal"
+            >
+              <TextInput
+                id="business-postal"
+                autoComplete="postal-code"
+                value={address.draft.postalCode}
+                error={fieldErrors.postalCode ?? issues.postalCode}
+                maxLength={32}
+                onChange={(v) => address.set("postalCode", v)}
+              />
+            </FieldRow>
+            <FieldRow
+              title={t("settings.business.country")}
+              description={t("settings.business.countryHint")}
+              htmlFor="business-country"
+            >
+              <Select
+                id="business-country"
+                value={address.draft.country}
+                error={fieldErrors.country ?? issues.country}
+                options={countries}
+                hasSearch
+                onChange={(v) => address.set("country", v)}
+              />
+            </FieldRow>
+          </EditableCard>
+        </SettingsSection>
 
-      <SettingsSection
-        title={t("settings.business.address")}
-        description={t("settings.business.addressHint")}
-      >
-        <EditableCard
-          isDirty={address.isDirty}
-          isInvalid={hasErrors(addressErrors)}
-          isSaving={savingAddress}
-          onSave={() => save(address.changes, "address")}
-          onReset={address.reset}
+        <SettingsSection
+          title={t("settings.business.payouts")}
+          description={t("settings.business.payoutsHint")}
         >
-          <FieldRow
-            title={t("settings.business.addressLine1")}
-            description={t("settings.business.addressLine1Hint")}
-            htmlFor="business-address1"
-          >
-            <TextInput
-              id="business-address1"
-              autoComplete="address-line1"
-              value={address.draft.addressLine1}
-              error={fieldErrors.addressLine1 ?? issues.addressLine1}
-              maxLength={255}
-              onChange={(v) => address.set("addressLine1", v)}
-            />
-          </FieldRow>
-          <FieldRow
-            title={t("settings.business.addressLine2")}
-            description={t("settings.business.addressLine2Hint")}
-            htmlFor="business-address2"
-          >
-            <TextInput
-              id="business-address2"
-              autoComplete="address-line2"
-              value={address.draft.addressLine2}
-              error={fieldErrors.addressLine2 ?? issues.addressLine2}
-              maxLength={255}
-              onChange={(v) => address.set("addressLine2", v)}
-            />
-          </FieldRow>
-          <FieldRow
-            title={t("settings.business.city")}
-            description={t("settings.business.cityHint")}
-            htmlFor="business-city"
-          >
-            <TextInput
-              id="business-city"
-              autoComplete="address-level2"
-              value={address.draft.city}
-              error={fieldErrors.city ?? issues.city}
-              maxLength={128}
-              onChange={(v) => address.set("city", v)}
-            />
-          </FieldRow>
-          <FieldRow
-            title={t("settings.business.region")}
-            description={t("settings.business.regionHint")}
-            htmlFor="business-region"
-          >
-            <TextInput
-              id="business-region"
-              autoComplete="address-level1"
-              value={address.draft.region}
-              error={fieldErrors.region ?? issues.region}
-              maxLength={128}
-              onChange={(v) => address.set("region", v)}
-            />
-          </FieldRow>
-          <FieldRow
-            title={t("settings.business.postalCode")}
-            description={t("settings.business.postalCodeHint")}
-            htmlFor="business-postal"
-          >
-            <TextInput
-              id="business-postal"
-              autoComplete="postal-code"
-              value={address.draft.postalCode}
-              error={fieldErrors.postalCode ?? issues.postalCode}
-              maxLength={32}
-              onChange={(v) => address.set("postalCode", v)}
-            />
-          </FieldRow>
-          <FieldRow
-            title={t("settings.business.country")}
-            description={t("settings.business.countryHint")}
-            htmlFor="business-country"
-          >
-            <Select
-              id="business-country"
-              value={address.draft.country}
-              error={fieldErrors.country ?? issues.country}
-              options={countries}
-              hasSearch
-              onChange={(v) => address.set("country", v)}
-            />
-          </FieldRow>
-        </EditableCard>
-      </SettingsSection>
+          <InstantCard isSaving={savingCurrency}>
+            <SettingRow
+              title={t("settings.business.payoutCurrency")}
+              description={t("settings.business.payoutCurrencyHint")}
+              htmlFor="business-currency"
+              error={issues.payoutCurrency}
+            >
+              <Select
+                id="business-currency"
+                value={business?.payoutCurrency ?? "USD"}
+                options={currencies}
+                hasSearch
+                onChange={(v) =>
+                  dispatch(
+                    updateBusiness({ payoutCurrency: v }, "payoutCurrency"),
+                  )
+                }
+              />
+            </SettingRow>
+          </InstantCard>
 
-      <SettingsSection
-        title={t("settings.business.payouts")}
-        description={t("settings.business.payoutsHint")}
-      >
-        <InstantCard isSaving={savingCurrency}>
-          <SettingRow
-            title={t("settings.business.payoutCurrency")}
-            description={t("settings.business.payoutCurrencyHint")}
-            htmlFor="business-currency"
-            error={issues.payoutCurrency}
+          <EditableCard
+            isDirty={descriptor.isDirty}
+            isInvalid={hasErrors(descriptorErrors)}
+            isSaving={savingDescriptor}
+            onSave={() => save(descriptor.changes, "descriptor")}
+            onReset={descriptor.reset}
           >
-            <Select
-              id="business-currency"
-              value={business?.payoutCurrency ?? "USD"}
-              options={currencies}
-              hasSearch
-              onChange={(v) =>
-                dispatch(
-                  updateBusiness({ payoutCurrency: v }, "payoutCurrency"),
-                )
-              }
-            />
-          </SettingRow>
-        </InstantCard>
-
-        <EditableCard
-          isDirty={descriptor.isDirty}
-          isInvalid={hasErrors(descriptorErrors)}
-          isSaving={savingDescriptor}
-          onSave={() => save(descriptor.changes, "descriptor")}
-          onReset={descriptor.reset}
-        >
-          <FieldRow
-            title={t("settings.business.statementDescriptor")}
-            description={t("settings.business.statementDescriptorHint")}
-            htmlFor="business-descriptor"
-          >
-            <TextInput
-              id="business-descriptor"
-              value={descriptor.draft.statementDescriptor}
-              error={
-                fieldErrors.statementDescriptor ?? issues.statementDescriptor
-              }
-              maxLength={22}
-              onChange={(v) =>
-                descriptor.set("statementDescriptor", v.slice(0, 22))
-              }
-            />
-          </FieldRow>
-        </EditableCard>
-      </SettingsSection>
+            <FieldRow
+              title={t("settings.business.statementDescriptor")}
+              description={t("settings.business.statementDescriptorHint")}
+              htmlFor="business-descriptor"
+            >
+              <TextInput
+                id="business-descriptor"
+                value={descriptor.draft.statementDescriptor}
+                error={
+                  fieldErrors.statementDescriptor ?? issues.statementDescriptor
+                }
+                maxLength={22}
+                onChange={(v) =>
+                  descriptor.set("statementDescriptor", v.slice(0, 22))
+                }
+              />
+            </FieldRow>
+          </EditableCard>
+        </SettingsSection>
+      </RoleRestricted>
     </SettingsPage>
   );
 }

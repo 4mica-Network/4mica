@@ -35,6 +35,7 @@ describe("lazy stores", () => {
     expect(Object.keys(store.getState()).sort()).toEqual([
       "banner",
       "config",
+      "organization",
       "user",
     ]);
   });

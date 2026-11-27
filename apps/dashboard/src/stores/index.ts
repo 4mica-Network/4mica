@@ -1,3 +1,4 @@
+import { setRequestHeadersProvider } from "@4mica/http";
 import {
   applyMiddleware,
   combineReducers,
@@ -6,6 +7,7 @@ import {
   type Reducer,
 } from "redux";
 import createSagaMiddleware from "redux-saga";
+import { all } from "redux-saga/effects";
 import type agentReducer from "./agent/reducer";
 import type apiListingReducer from "./apiListing/reducer";
 import type balanceReducer from "./balance/reducer";
@@ -16,12 +18,16 @@ import configReducer from "./config/reducer";
 import configSaga from "./config/saga";
 import type customerReducer from "./customer/reducer";
 import type developerReducer from "./developer/reducer";
+import organizationReducer from "./organization/reducer";
+import organizationSaga from "./organization/saga";
+import { organizationHeaders } from "./organization/selector";
 import type paymentReducer from "./payment/reducer";
 import { onStoreRegistered } from "./registry";
 import type resourceKeyReducer from "./resourceKey/reducer";
 import { sessionScoped } from "./rootSaga";
 import { withSessionReset } from "./session";
 import type supportReducer from "./support/reducer";
+import type teamReducer from "./team/reducer";
 import type trustReducer from "./trust/reducer";
 import userReducer from "./user/reducer";
 import userSaga from "./user/saga";
@@ -31,6 +37,7 @@ const eagerReducers = {
   user: userReducer,
   config: configReducer,
   banner: bannerReducer,
+  organization: organizationReducer,
 };
 
 export interface LazyReducers {
@@ -45,6 +52,7 @@ export interface LazyReducers {
   resourceKey: typeof resourceKeyReducer;
   compliance: typeof complianceReducer;
   support: typeof supportReducer;
+  team: typeof teamReducer;
 }
 
 type AllReducers = typeof eagerReducers & LazyReducers;
@@ -76,6 +84,11 @@ export const store = createStore(
 );
 
 sagaMiddleware.run(sessionScoped, [...userSaga, ...configSaga, ...bannerSaga]);
+sagaMiddleware.run(function* () {
+  yield all(organizationSaga);
+});
+
+setRequestHeadersProvider(() => organizationHeaders(store.getState()));
 
 onStoreRegistered(({ name, reducer, watchers }) => {
   Object.assign(lazyReducers, { [name]: reducer });

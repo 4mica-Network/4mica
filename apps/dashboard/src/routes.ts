@@ -41,6 +41,9 @@ const ComplianceSettings = lazyPage("pages/compliance", () =>
 const CustomerDetail = lazyPage("pages/customer-detail", () =>
   import("@/pages/customer-detail").then((page) => page.CustomerDetail),
 );
+const AuditLogSettings = lazyPage("pages/audit-log", () =>
+  import("@/pages/audit-log").then((page) => page.AuditLogSettings),
+);
 const Customers = lazyPage("pages/customers", () =>
   import("@/pages/customers").then((page) => page.Customers),
 );
@@ -55,6 +58,9 @@ const Help = lazyPage("pages/help", () =>
 );
 const HelpRequestDetail = lazyPage("pages/help-request", () =>
   import("@/pages/help-request").then((page) => page.HelpRequestDetail),
+);
+export const InvitationPage = lazyPage("pages/invitation", () =>
+  import("@/pages/invitation").then((page) => page.InvitationPage),
 );
 const NotificationSettings = lazyPage("pages/notification", () =>
   import("@/pages/notification").then((page) => page.NotificationSettings),
@@ -118,6 +124,7 @@ export const SETTINGS_PAGES: SettingsRouteMeta[] = [
   { path: "plans", component: PlansSettings },
   { path: "compliance", component: ComplianceSettings },
   { path: "developer", component: DeveloperSettings },
+  { path: "audit-log", component: AuditLogSettings },
 ];
 
 export const pageAt = (to: string): ComponentType | undefined => {

@@ -6,6 +6,8 @@ import {
 import { Button, Checkbox, cn, Tag, Tooltip } from "@4mica/ui";
 import { useCopyToClipboard } from "@4mica/ui/hooks";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
+import { selectCan } from "@stores/organization/selector";
+import { PERMISSION } from "@stores/organization/type";
 import {
   selectIsWalletPending,
   selectIsWalletSelected,
@@ -48,6 +50,7 @@ export function WalletRow({
     selectIsWalletPending(walletPendingKeys.row(wallet.id)),
   );
   const isSelected = useAppSelector(selectIsWalletSelected(wallet.id));
+  const canManage = useAppSelector(selectCan(PERMISSION.WALLETS_MANAGE));
 
   const { copied, copy } = useCopyToClipboard();
 
@@ -147,6 +150,7 @@ export function WalletRow({
         >
           <RowActionsMenu.Item
             icon={Pencil}
+            disabled={!canManage}
             onSelect={() => onEdit(wallet)}
             data-testid={`wallet-edit-${wallet.id}`}
           >
@@ -160,7 +164,7 @@ export function WalletRow({
             {t("wallet.row.viewOnExplorer")}
           </RowActionsMenu.ExternalItem>
 
-          {!wallet.isDefault && wallet.status === "ACTIVE" && (
+          {canManage && !wallet.isDefault && wallet.status === "ACTIVE" && (
             <RowActionsMenu.Item
               icon={Check}
               onSelect={() =>
@@ -174,7 +178,7 @@ export function WalletRow({
             </RowActionsMenu.Item>
           )}
 
-          {wallet.status !== "RETIRED" && (
+          {canManage && wallet.status !== "RETIRED" && (
             <RowActionsMenu.Item
               icon={wallet.status === "ACTIVE" ? Pause : Play}
               onSelect={() =>
@@ -198,6 +202,7 @@ export function WalletRow({
           <RowActionsMenu.Item
             icon={Trash2}
             tone="danger"
+            disabled={!canManage}
             onSelect={() => onDelete(wallet)}
             data-testid={`wallet-delete-${wallet.id}`}
           >

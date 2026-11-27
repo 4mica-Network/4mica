@@ -31,7 +31,11 @@ vi.mock("@clerk/clerk-react", () => ({
   useAuth,
   useClerk: () => ({ signOut }),
 }));
-vi.mock("@stores/hooks", () => ({ useAppDispatch: () => dispatch }));
+vi.mock("@stores/hooks", () => ({
+  useAppDispatch: () => dispatch,
+  useAppSelector: (selector: (state: unknown) => unknown) =>
+    selector({ organization: { status: "loaded", activeId: "org_1" } }),
+}));
 vi.mock("@stores/user/actions", () => ({
   fetchUser: () => ({ type: "FETCH_USER_REQUESTED" }),
 }));

@@ -17,6 +17,8 @@ import type {
 } from "@stores/compliance/type";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import type { RootState } from "@stores/index";
+import { selectCan } from "@stores/organization/selector";
+import { PERMISSION } from "@stores/organization/type";
 import { blankFieldsToNull, formatDate } from "@utils/format";
 import { useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
@@ -31,6 +33,7 @@ import {
 } from "@/components/form";
 import { RetryState } from "@/components/LoadFailure";
 import { SettingsSection } from "@/components/layout";
+import { RoleRestricted } from "@/components/Organization/RoleRestricted";
 import { PageSpinner } from "@/components/PageSpinner";
 import { SettingsPage } from "@/components/SettingsPage";
 import {
@@ -74,6 +77,7 @@ export function ComplianceSettings() {
     "compliance.fundsSource",
   );
   const profile = useAppSelector(selectComplianceProfile);
+  const canManage = useAppSelector(selectCan(PERMISSION.BUSINESS_MANAGE));
   const issues = useAppSelector(selectComplianceIssues);
   const locked = useAppSelector(selectIsComplianceLocked);
   const isLoading = useAppSelector(selectIsComplianceLoading);
@@ -212,7 +216,7 @@ export function ComplianceSettings() {
           onRetry={() => dispatch(fetchCompliance())}
         />
       ) : (
-        <>
+        <RoleRestricted allowed={canManage}>
           <ReviewCard />
 
           <SettingsSection
@@ -668,7 +672,7 @@ export function ComplianceSettings() {
               </FieldRow>
             </EditableCard>
           </SettingsSection>
-        </>
+        </RoleRestricted>
       )}
     </SettingsPage>
   );

@@ -1,3 +1,4 @@
+import { PERMISSION, type Permission } from "@stores/organization/type";
 import {
   BadgeCheck,
   Bell,
@@ -9,6 +10,7 @@ import {
   CreditCard,
   House,
   type LucideIcon,
+  ScrollText,
   Settings,
   ShieldCheck,
   SlidersHorizontal,
@@ -21,6 +23,7 @@ export interface NavItem {
   labelKey: string;
   icon: LucideIcon;
   end?: boolean;
+  permission?: Permission;
 }
 
 export interface NavSection {
@@ -61,4 +64,10 @@ export const SETTINGS_NAV: NavItem[] = [
   { to: "/settings/plans", labelKey: "nav.plans", icon: CreditCard },
   { to: "/settings/compliance", labelKey: "nav.compliance", icon: ShieldCheck },
   { to: "/settings/developer", labelKey: "nav.developer", icon: Code },
+  {
+    to: "/settings/audit-log",
+    labelKey: "nav.auditLog",
+    icon: ScrollText,
+    permission: PERMISSION.AUDIT_READ,
+  },
 ];

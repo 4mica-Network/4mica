@@ -2,6 +2,10 @@ import { Avatar, cn, Dropdown, Tooltip } from "@4mica/ui";
 import { useCopyToClipboard } from "@4mica/ui/hooks";
 import { useClerk, useUser } from "@clerk/clerk-react";
 import { useAppSelector } from "@stores/hooks";
+import {
+  allows,
+  selectActiveOrganization,
+} from "@stores/organization/selector";
 import { selectUser } from "@stores/user/selector";
 import { m } from "framer-motion";
 import {
@@ -17,6 +21,8 @@ import {
 import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
+import { CreateOrganizationModal } from "@/components/Organization/CreateOrganizationModal";
+import { OrganizationSwitcher } from "@/components/Organization/OrganizationSwitcher";
 import { SidebarBanners } from "@/components/SidebarBanners";
 import { links } from "@/lib/links";
 import { FOOTER_ITEMS, NAV_SECTIONS, type NavItem, SETTINGS_NAV } from "@/nav";
@@ -168,10 +174,12 @@ function AvatarMenu({ collapsed }: { collapsed: boolean }) {
   const { t } = useTranslation();
   const { signOut } = useClerk();
   const [open, setOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
   const anchorRef = useRef<HTMLButtonElement>(null);
   const menuId = useId();
 
   const displayName = useDisplayName();
+  const organization = useAppSelector(selectActiveOrganization);
 
   return (
     <>
@@ -197,8 +205,18 @@ function AvatarMenu({ collapsed }: { collapsed: boolean }) {
             collapsed ? "opacity-0" : "opacity-100",
           )}
         >
-          <span className="min-w-0 truncate font-medium text-ink-strong text-sm">
-            {displayName}
+          <span className="flex min-w-0 flex-1 flex-col">
+            <span className="min-w-0 truncate font-medium text-ink-strong text-sm">
+              {displayName}
+            </span>
+            {organization && (
+              <span
+                className="min-w-0 truncate text-2xs text-ink-subtle"
+                data-testid="active-organization"
+              >
+                {organization.name}
+              </span>
+            )}
           </span>
           <m.span
             animate={{ rotate: open ? 180 : 0 }}
@@ -220,6 +238,10 @@ function AvatarMenu({ collapsed }: { collapsed: boolean }) {
         className="min-w-50 bg-surface-deep p-1"
       >
         <div id={menuId} role="menu" aria-label={displayName}>
+          <OrganizationSwitcher
+            onDone={() => setOpen(false)}
+            onCreate={() => setCreating(true)}
+          />
           <NavLink
             to="/settings/profile"
             role="menuitem"
@@ -243,6 +265,11 @@ function AvatarMenu({ collapsed }: { collapsed: boolean }) {
           </button>
         </div>
       </Dropdown>
+
+      <CreateOrganizationModal
+        isOpen={creating}
+        onClose={() => setCreating(false)}
+      />
     </>
   );
 }
@@ -296,6 +323,10 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
   };
 
   const [settled, setSettled] = useState(!collapsed);
+  const organization = useAppSelector(selectActiveOrganization);
+  const settingsNav = SETTINGS_NAV.filter(
+    (item) => !item.permission || allows(organization, item.permission),
+  );
 
   useEffect(() => {
     if (collapsed) {
@@ -335,7 +366,7 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
 
       <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto overflow-x-hidden px-3 pb-3">
         {inSettings
-          ? SETTINGS_NAV.map((item) => (
+          ? settingsNav.map((item) => (
               <NavRow key={item.to} item={item} collapsed={collapsed} />
             ))
           : NAV_SECTIONS.map((section, i) => (

@@ -1,5 +1,7 @@
-import { Button, EmptyState, Pagination } from "@4mica/ui";
+import { Button, EmptyState, Pagination, Tooltip } from "@4mica/ui";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
+import { selectCan } from "@stores/organization/selector";
+import { PERMISSION } from "@stores/organization/type";
 import {
   batchDeleteWallets,
   deleteWallet,
@@ -41,6 +43,8 @@ export function Wallet() {
   const isLoading = useAppSelector(selectIsWalletsLoading);
   const hasLoaded = useAppSelector(selectHasLoadedWallets);
   const error = useAppSelector(selectWalletError);
+  const canManage = useAppSelector(selectCan(PERMISSION.WALLETS_MANAGE));
+  const restricted = canManage ? undefined : t("organization.restricted");
 
   usePageTitle(t("page.wallet.title"));
 
@@ -81,19 +85,24 @@ export function Wallet() {
           </p>
         </div>
 
-        <Button
-          type="button"
-          intent="invert"
-          size="sm"
-          className="btn-no-lift shrink-0"
-          onClick={() => setIsCreateOpen(true)}
-          data-testid="wallet-create-button"
-        >
-          <span className="flex items-center gap-1.5 text-sm">
-            <Plus className="h-4 w-4" />
-            {t("wallet.create.cta")}
+        <Tooltip title={restricted} disabled={canManage} placement="bottom">
+          <span className="shrink-0">
+            <Button
+              type="button"
+              intent="invert"
+              size="sm"
+              className="btn-no-lift"
+              disabled={!canManage}
+              onClick={() => setIsCreateOpen(true)}
+              data-testid="wallet-create-button"
+            >
+              <span className="flex items-center gap-1.5 text-sm">
+                <Plus className="h-4 w-4" />
+                {t("wallet.create.cta")}
+              </span>
+            </Button>
           </span>
-        </Button>
+        </Tooltip>
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col gap-4">
@@ -137,6 +146,8 @@ export function Wallet() {
                     intent="invert"
                     size="sm"
                     className="btn-no-lift"
+                    disabled={!canManage}
+                    title={restricted}
                     onClick={() => setIsCreateOpen(true)}
                     data-testid="wallet-empty-create"
                   >

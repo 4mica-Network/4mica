@@ -6,7 +6,6 @@ import { createStore } from "redux";
 import { describe, expect, it } from "vitest";
 import "@/i18n";
 import { PlansSettings } from "@/pages/plans";
-import { TeamSettings } from "@/pages/team";
 
 const renderPage = (page: React.ReactNode) =>
   render(
@@ -16,12 +15,6 @@ const renderPage = (page: React.ReactNode) =>
   );
 
 describe.each([
-  [
-    "team",
-    <TeamSettings key="team" />,
-    "Team",
-    "Team management is on its way",
-  ],
   [
     "plans",
     <PlansSettings key="plans" />,
