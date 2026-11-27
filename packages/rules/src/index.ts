@@ -5,9 +5,13 @@ export {
 } from "./assets";
 export { formatPrice, trimAmount } from "./format";
 export {
+  ENVIRONMENT_KINDS,
+  type EnvironmentKind,
+  environmentForNetwork,
   explorerAddressUrl,
   type NativeCurrency,
   networkForChainId,
+  networksForEnvironment,
   PAYMENT_NETWORK_IDS,
   PAYMENT_NETWORKS,
   type PaymentNetwork,
