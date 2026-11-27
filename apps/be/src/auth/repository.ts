@@ -92,3 +92,21 @@ export const findApiKeyByHash = (hashedKey: string) =>
 
 export const touchApiKey = (id: string) =>
   prisma.apiKey.update({ where: { id }, data: { lastUsedAt: new Date() } });
+
+export const findCliSessionByHash = (hashedToken: string) =>
+  prisma.cliSession.findUnique({
+    where: { hashedToken },
+    select: {
+      id: true,
+      kind: true,
+      name: true,
+      scopes: true,
+      revokedAt: true,
+      expiresAt: true,
+      createdAt: true,
+      user: { select: USER_FIELDS },
+    },
+  });
+
+export const touchCliSession = (id: string) =>
+  prisma.cliSession.update({ where: { id }, data: { lastUsedAt: new Date() } });

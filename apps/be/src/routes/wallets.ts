@@ -10,7 +10,7 @@ import {
 import { revalidateOnWrite } from "@plugins/playground-revalidate";
 import { sensitiveRateLimit } from "@plugins/rate-limit";
 import type { FastifyPluginCallback } from "fastify";
-import { guards } from "./guards";
+import { cliGuards, guards } from "./guards";
 import {
   batchDeleteResponseSchema,
   errorResponseSchema,
@@ -56,14 +56,27 @@ export const walletRoutes: FastifyPluginCallback = (app, _opts, done) => {
 
   const publicWrite = { ...strict, onResponse: revalidateOnWrite };
 
+  // The CLI links and unlinks the wallets it holds keys for, so these four
+  // also take a CLI token. Every other wallet route stays dashboard-only.
+  const read = cliGuards(app, "wallets:read");
+  const write = cliGuards(app, "wallets:write");
+  const strictWrite = {
+    onRequest: write.onRequest,
+    preHandler: [...write.preHandler, sensitiveRateLimit(app)],
+  };
+  const sessionSecurity: Record<string, string[]>[] = [
+    { bearerAuth: [] },
+    { cliTokenAuth: [] },
+  ];
+
   app.get(
     "/me/wallets",
     {
-      ...base,
+      ...read,
       schema: {
         tags: ["wallets"],
         summary: "List the account's wallets",
-        security: [{ bearerAuth: [] }],
+        security: sessionSecurity,
         querystring: listQuerySchema,
         response: {
           ...limitedResponses,
@@ -99,13 +112,13 @@ export const walletRoutes: FastifyPluginCallback = (app, _opts, done) => {
   app.post(
     "/me/wallets/siwe-nonce",
     {
-      ...strict,
+      ...strictWrite,
       schema: {
         tags: ["wallets"],
         summary: "Start linking a wallet: get a message to sign",
         description:
           "Issues a single-use EIP-4361 challenge for any valid address. It deliberately does not reveal whether the address is already linked — that would make this an address-enumeration oracle.",
-        security: [{ bearerAuth: [] }],
+        security: sessionSecurity,
         response: {
           ...limitedResponses,
           201: walletNonceResponseSchema,
@@ -120,13 +133,13 @@ export const walletRoutes: FastifyPluginCallback = (app, _opts, done) => {
   app.post(
     "/me/wallets",
     {
-      ...strict,
+      ...strictWrite,
       schema: {
         tags: ["wallets"],
         summary: "Link a wallet by proving control of its address",
         description:
           "Verifies the signature over the challenge issued by /me/wallets/siwe-nonce. Externally owned accounts only; contract wallets are rejected with invalid_signature.",
-        security: [{ bearerAuth: [] }],
+        security: sessionSecurity,
         response: {
           ...limitedResponses,
           201: walletResponseSchema,
@@ -166,11 +179,12 @@ export const walletRoutes: FastifyPluginCallback = (app, _opts, done) => {
   app.delete(
     "/me/wallets/:id",
     {
-      ...publicWrite,
+      ...strictWrite,
+      onResponse: revalidateOnWrite,
       schema: {
         tags: ["wallets"],
         summary: "Remove a wallet",
-        security: [{ bearerAuth: [] }],
+        security: sessionSecurity,
         params: idParamSchema,
         response: {
           ...limitedResponses,

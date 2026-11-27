@@ -226,6 +226,8 @@ model User {
   wallets                        Wallet[]
   supportRequests                SupportRequest[]
   walletNonces                   WalletNonce[]
+  cliSessions                    CliSession[]
+  cliDeviceRequests              CliDeviceRequest[]
   reportedPayments               Payment[]
   customers                      Customer[]
   customerIdentities             CustomerPaymentIdentity[]
@@ -813,6 +815,65 @@ model WalletNonce {
   @@index([userId])
   @@index([expiresAt])
   @@map("wallet_nonces")
+}
+
+enum CliSessionKind {
+  DEVICE
+  TOKEN
+}
+
+/// A credential the 4mica CLI holds for one account. Only the SHA-256 of the
+/// token is stored; the plaintext is handed out once, when it is minted.
+model CliSession {
+  id          String         @id @default(uuid(7))
+  userId      String         @map("user_id")
+  kind        CliSessionKind
+  name        String         @db.VarChar(120)
+  prefix      String         @db.VarChar(32)
+  last4       String         @db.VarChar(4)
+  hashedToken String         @unique @map("hashed_token")
+  scopes      String[]
+  lastUsedAt  DateTime?      @map("last_used_at")
+  expiresAt   DateTime       @map("expires_at")
+  revokedAt   DateTime?      @map("revoked_at")
+  createdAt   DateTime       @default(now()) @map("created_at")
+  updatedAt   DateTime       @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("cli_sessions")
+}
+
+enum CliDeviceRequestStatus {
+  PENDING
+  APPROVED
+  DENIED
+}
+
+/// One run of `4mica auth login` waiting for its owner to approve it in the
+/// dashboard (RFC 8628). The device code is stored hashed, like a token.
+model CliDeviceRequest {
+  id             String                 @id @default(uuid(7))
+  deviceCodeHash String                 @unique @map("device_code_hash")
+  userCode       String                 @unique @map("user_code") @db.VarChar(16)
+  clientName     String                 @map("client_name") @db.VarChar(120)
+  scopes         String[]
+  status         CliDeviceRequestStatus @default(PENDING)
+  userId         String?                @map("user_id")
+  requestIp      String?                @map("request_ip") @db.VarChar(64)
+  intervalSecs   Int                    @map("interval_secs")
+  lastPolledAt   DateTime?              @map("last_polled_at")
+  expiresAt      DateTime               @map("expires_at")
+  decidedAt      DateTime?              @map("decided_at")
+  consumedAt     DateTime?              @map("consumed_at")
+  createdAt      DateTime               @default(now()) @map("created_at")
+
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("cli_device_requests")
 }
 
 enum ReportReason {
