@@ -189,6 +189,26 @@ describe("HttpClient", () => {
     expect(onUnauthorized).toHaveBeenCalledTimes(1);
   });
 
+  it("hands the rejection body to the unauthorized handler", async () => {
+    setAuthTokenProvider(async () => "tok");
+    const onUnauthorized = vi.fn();
+    setUnauthorizedHandler(onUnauthorized);
+    fetchMock.mockImplementation(async () =>
+      json({ error: "session_too_old", message: "Sign in again." }, 401),
+    );
+
+    const error = await client.get("/me").catch((e: unknown) => e);
+
+    expect(onUnauthorized).toHaveBeenCalledWith({
+      error: "session_too_old",
+      message: "Sign in again.",
+    });
+    expect((error as HttpError).body).toEqual({
+      error: "session_too_old",
+      message: "Sign in again.",
+    });
+  });
+
   it("does not retry or report a 401 on a request it did not authenticate", async () => {
     setAuthTokenProvider(() => "tok");
     const onUnauthorized = vi.fn();

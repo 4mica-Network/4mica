@@ -233,7 +233,12 @@ export class HttpClient {
         response = await send();
       }
       if (response.status === 401) {
-        notifyUnauthorized();
+        notifyUnauthorized(
+          await response
+            .clone()
+            .json()
+            .catch(() => null),
+        );
       }
     }
 
