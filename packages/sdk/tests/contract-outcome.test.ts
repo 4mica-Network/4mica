@@ -38,6 +38,10 @@ function node(overrides: Record<string, Handler> = {}) {
     eth_getTransactionCount: () => ({ result: "0x0" }),
     eth_estimateGas: () => ({ result: "0x186a0" }),
     eth_blockNumber: () => ({ result: "0x1" }),
+    eth_getBlockByNumber: () => ({
+      result: { number: "0x1", baseFeePerGas: "0x3b9aca00" },
+    }),
+    eth_maxPriorityFeePerGas: () => ({ result: "0x3b9aca00" }),
     eth_sendRawTransaction: () => ({ result: HASH }),
     eth_getTransactionReceipt: () => ({ result: null }),
     // An allowance of zero, for `approveErc20`'s own read.

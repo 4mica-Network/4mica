@@ -10,7 +10,6 @@ import {
   HttpRequestError,
   http,
   InternalRpcError,
-  parseGwei,
   RpcRequestError,
   TimeoutError,
 } from "viem";
@@ -265,8 +264,6 @@ function wrapViemError(
 }
 
 const DEFAULT_CLEARING_GAS_LIMIT = 1_000_000n;
-const DEFAULT_MAX_FEE_PER_GAS = parseGwei("0.1");
-const DEFAULT_MAX_PRIORITY_FEE_PER_GAS = parseGwei("0.1");
 const DEFAULT_RECEIPT_TIMEOUT_MS = 60_000;
 const DEFAULT_RECEIPT_POLLING_INTERVAL_MS = 2_000;
 
@@ -366,13 +363,6 @@ export class ContractGateway {
       () => undefined,
     );
     return run;
-  }
-
-  private defaultFeeParams() {
-    return {
-      maxFeePerGas: DEFAULT_MAX_FEE_PER_GAS,
-      maxPriorityFeePerGas: DEFAULT_MAX_PRIORITY_FEE_PER_GAS,
-    } as const;
   }
 
   private splitWaitOptions(waitOptions?: TxReceiptWaitOptions): {
@@ -501,7 +491,7 @@ export class ContractGateway {
 
     const sendApprove = async (value: bigint) => {
       const hash = await this.enqueueTx(() =>
-        erc20.write.approve([spenderAddress, value], this.defaultFeeParams()),
+        erc20.write.approve([spenderAddress, value]),
       );
       return this.waitChecked(hash, receipt);
     };
@@ -589,10 +579,10 @@ export class ContractGateway {
     if (erc20Token) {
       try {
         hash = await this.enqueueTx(() =>
-          this.contract.write.depositStablecoin(
-            [erc20Token as Hex, parsedAmount],
-            this.defaultFeeParams(),
-          ),
+          this.contract.write.depositStablecoin([
+            erc20Token as Hex,
+            parsedAmount,
+          ]),
         );
       } catch (error) {
         throw wrapViemError(error, "depositStablecoin failed");
@@ -602,7 +592,6 @@ export class ContractGateway {
         hash = await this.enqueueTx(() =>
           this.contract.write.deposit({
             value: parsedAmount,
-            ...this.defaultFeeParams(),
           }),
         );
       } catch (error) {
@@ -779,17 +768,11 @@ export class ContractGateway {
     try {
       if (erc20Token) {
         hash = await this.enqueueTx(() =>
-          this.contract.write.requestWithdrawal(
-            [erc20Token as Hex, value],
-            this.defaultFeeParams(),
-          ),
+          this.contract.write.requestWithdrawal([erc20Token as Hex, value]),
         );
       } else {
         hash = await this.enqueueTx(() =>
-          this.contract.write.requestWithdrawal(
-            [value],
-            this.defaultFeeParams(),
-          ),
+          this.contract.write.requestWithdrawal([value]),
         );
       }
     } catch (error) {
@@ -808,14 +791,11 @@ export class ContractGateway {
     try {
       if (erc20Token) {
         hash = await this.enqueueTx(() =>
-          this.contract.write.cancelWithdrawal(
-            [erc20Token as Hex],
-            this.defaultFeeParams(),
-          ),
+          this.contract.write.cancelWithdrawal([erc20Token as Hex]),
         );
       } else {
         hash = await this.enqueueTx(() =>
-          this.contract.write.cancelWithdrawal(this.defaultFeeParams()),
+          this.contract.write.cancelWithdrawal(),
         );
       }
     } catch (error) {
@@ -834,14 +814,11 @@ export class ContractGateway {
     try {
       if (erc20Token) {
         hash = await this.enqueueTx(() =>
-          this.contract.write.finalizeWithdrawal(
-            [erc20Token as Hex],
-            this.defaultFeeParams(),
-          ),
+          this.contract.write.finalizeWithdrawal([erc20Token as Hex]),
         );
       } else {
         hash = await this.enqueueTx(() =>
-          this.contract.write.finalizeWithdrawal(this.defaultFeeParams()),
+          this.contract.write.finalizeWithdrawal(),
         );
       }
     } catch (error) {
@@ -882,7 +859,6 @@ export class ContractGateway {
         return ch.write.payNetDebit(args, {
           value: payableValue,
           gas: gasLimit,
-          ...this.defaultFeeParams(),
         });
       });
     } catch (error) {
@@ -925,7 +901,6 @@ export class ContractGateway {
         });
         return ch.write.claimNetCreditFor(args, {
           gas: gasLimit,
-          ...this.defaultFeeParams(),
         });
       });
     } catch (error) {
