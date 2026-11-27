@@ -12,19 +12,24 @@ export function VisibilityTag({
   visibility,
   complete = true,
 }: VisibilityTagProps) {
-  if (!complete) {
-    return (
-      <Tag
-        size="sm"
-        variant="warning"
-        icon={<CircleAlert aria-hidden="true" className="h-3 w-3" />}
-        title={messages.visibility.incompleteHint}
-      >
-        {messages.visibility.incomplete}
-      </Tag>
-    );
-  }
+  return (
+    <>
+      {!complete && (
+        <Tag
+          size="sm"
+          variant="warning"
+          icon={<CircleAlert aria-hidden="true" className="h-3 w-3" />}
+          title={messages.visibility.incompleteHint}
+        >
+          {messages.visibility.incomplete}
+        </Tag>
+      )}
+      <AudienceTag visibility={visibility} />
+    </>
+  );
+}
 
+function AudienceTag({ visibility }: { visibility: Visibility }) {
   if (visibility === "PUBLIC") {
     return null;
   }

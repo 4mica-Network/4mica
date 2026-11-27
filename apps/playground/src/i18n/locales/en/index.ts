@@ -218,7 +218,7 @@ export const en = {
     sellerHeading: "Server setup",
     sellerIncompleteTitle: "Finish setting up",
     sellerIncompleteLead:
-      "Customers can't find or pay for this {{kind}} yet. It stays off your public profile, the directory and search until it has:",
+      "Customers can't open or pay for this {{kind}} yet, whatever its visibility. Once it has these, its visibility decides who can see it:",
     sellerIncompleteKind: { listing: "API", agent: "agent" },
     sellerGap: {
       wallet: "A receiving wallet, so payments have somewhere to go",
@@ -342,7 +342,7 @@ export const en = {
     privateHint: "Only visible to you.",
     incomplete: "Incomplete",
     incompleteHint:
-      "Hidden from customers until it has a receiving wallet, an endpoint URL and a price.",
+      "Hidden from customers until it has a receiving wallet, an endpoint URL and a price, whatever its visibility.",
   },
 
   owner: {
