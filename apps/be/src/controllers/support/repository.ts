@@ -60,10 +60,10 @@ const orderFor = (
 };
 
 const whereFor = (
-  ownerId: string,
+  orgId: string,
   query: ListSupportRequestsQuery,
 ): Prisma.SupportRequestWhereInput => {
-  const where: Prisma.SupportRequestWhereInput = { ownerId };
+  const where: Prisma.SupportRequestWhereInput = { organizationId: orgId };
 
   if (query.status) {
     where.status = query.status;
@@ -87,7 +87,7 @@ const whereFor = (
 };
 
 export const listSupportRequests = async (
-  ownerId: string,
+  orgId: string,
   query: ListSupportRequestsQuery,
 ): Promise<{
   items: SupportRequestRow[];
@@ -95,7 +95,7 @@ export const listSupportRequests = async (
   page: number;
   limit: number;
 }> => {
-  const where = whereFor(ownerId, query);
+  const where = whereFor(orgId, query);
   const skip = (query.page - 1) * query.limit;
 
   const [items, total] = await prisma.$transaction([
@@ -112,9 +112,9 @@ export const listSupportRequests = async (
   return { items, total, page: query.page, limit: query.limit };
 };
 
-export const getSupportRequest = (ownerId: string, id: string) =>
+export const getSupportRequest = (orgId: string, id: string) =>
   prisma.supportRequest.findFirst({
-    where: { id, ownerId },
+    where: { id, organizationId: orgId },
     select: {
       ...SUPPORT_REQUEST_SELECT,
       messages: {
@@ -125,12 +125,14 @@ export const getSupportRequest = (ownerId: string, id: string) =>
   });
 
 export const createSupportRequest = (
-  ownerId: string,
+  orgId: string,
+  userId: string,
   data: CreateSupportRequestInput,
 ) =>
   prisma.supportRequest.create({
     data: {
-      ownerId,
+      organizationId: orgId,
+      createdById: userId,
       subject: data.subject,
       category: data.category,
       priority: data.priority,
@@ -184,21 +186,21 @@ export const addCustomerMessage = (
   });
 
 export const deleteSupportRequest = async (
-  ownerId: string,
+  orgId: string,
   id: string,
 ): Promise<boolean> => {
   const { count } = await prisma.supportRequest.deleteMany({
-    where: { id, ownerId },
+    where: { id, organizationId: orgId },
   });
   return count > 0;
 };
 
 export const batchDeleteSupportRequests = async (
-  ownerId: string,
+  orgId: string,
   ids: string[],
 ): Promise<{ deleted: string[]; notFound: string[] }> => {
   const owned = await prisma.supportRequest.findMany({
-    where: { id: { in: ids }, ownerId },
+    where: { id: { in: ids }, organizationId: orgId },
     select: { id: true },
   });
 
@@ -206,7 +208,7 @@ export const batchDeleteSupportRequests = async (
 
   if (deleted.length > 0) {
     await prisma.supportRequest.deleteMany({
-      where: { id: { in: deleted }, ownerId },
+      where: { id: { in: deleted }, organizationId: orgId },
     });
   }
 
@@ -228,19 +230,19 @@ const median = (values: number[]): number | null => {
     : sorted[middle];
 };
 
-export const getSupportStats = async (ownerId: string) => {
+export const getSupportStats = async (orgId: string) => {
   const [active, awaitingYou, resolved, responded] = await prisma.$transaction([
     prisma.supportRequest.count({
-      where: { ownerId, status: { in: [...ACTIVE_STATUSES] } },
+      where: { organizationId: orgId, status: { in: [...ACTIVE_STATUSES] } },
     }),
     prisma.supportRequest.count({
-      where: { ownerId, status: "WAITING_ON_CUSTOMER" },
+      where: { organizationId: orgId, status: "WAITING_ON_CUSTOMER" },
     }),
     prisma.supportRequest.count({
-      where: { ownerId, status: { in: [...DONE_STATUSES] } },
+      where: { organizationId: orgId, status: { in: [...DONE_STATUSES] } },
     }),
     prisma.supportRequest.findMany({
-      where: { ownerId, firstRespondedAt: { not: null } },
+      where: { organizationId: orgId, firstRespondedAt: { not: null } },
       orderBy: { createdAt: "desc" },
       take: RESPONSE_SAMPLE_SIZE,
       select: { createdAt: true, firstRespondedAt: true },

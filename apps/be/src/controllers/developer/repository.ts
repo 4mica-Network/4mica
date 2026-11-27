@@ -35,22 +35,24 @@ export const WEBHOOK_SELECT = {
 
 const ACCOUNT_KEY = { listingId: null, agentId: null } as const;
 
-export const listApiKeys = (ownerId: string) =>
+export const listApiKeys = (orgId: string) =>
   prisma.apiKey.findMany({
-    where: { ownerId, ...ACCOUNT_KEY },
+    where: { organizationId: orgId, ...ACCOUNT_KEY },
     orderBy: { createdAt: "desc" },
     select: API_KEY_SELECT,
   });
 
 export const createApiKey = async (
-  ownerId: string,
+  orgId: string,
+  userId: string,
   data: CreateApiKeyInput,
 ) => {
   const secret = generateApiKey();
 
   const apiKey = await prisma.apiKey.create({
     data: {
-      ownerId,
+      organizationId: orgId,
+      createdById: userId,
       name: data.name,
       prefix: secret.prefix,
       last4: secret.last4,
@@ -64,12 +66,12 @@ export const createApiKey = async (
 };
 
 export const updateApiKey = async (
-  ownerId: string,
+  orgId: string,
   id: string,
   data: UpdateApiKeyInput,
 ) => {
   const { count } = await prisma.apiKey.updateMany({
-    where: { id, ownerId, ...ACCOUNT_KEY },
+    where: { id, organizationId: orgId, ...ACCOUNT_KEY },
     data,
   });
 
@@ -80,9 +82,9 @@ export const updateApiKey = async (
   return prisma.apiKey.findUnique({ where: { id }, select: API_KEY_SELECT });
 };
 
-export const revokeApiKey = async (ownerId: string, id: string) => {
+export const revokeApiKey = async (orgId: string, id: string) => {
   const { count } = await prisma.apiKey.updateMany({
-    where: { id, ownerId, ...ACCOUNT_KEY, revokedAt: null },
+    where: { id, organizationId: orgId, ...ACCOUNT_KEY, revokedAt: null },
     data: { revokedAt: new Date() },
   });
 
@@ -93,29 +95,31 @@ export const revokeApiKey = async (ownerId: string, id: string) => {
   return prisma.apiKey.findUnique({ where: { id }, select: API_KEY_SELECT });
 };
 
-export const deleteApiKey = async (ownerId: string, id: string) => {
+export const deleteApiKey = async (orgId: string, id: string) => {
   const { count } = await prisma.apiKey.deleteMany({
-    where: { id, ownerId, ...ACCOUNT_KEY },
+    where: { id, organizationId: orgId, ...ACCOUNT_KEY },
   });
   return count > 0;
 };
 
-export const listWebhooks = (ownerId: string) =>
+export const listWebhooks = (orgId: string) =>
   prisma.webhook.findMany({
-    where: { ownerId },
+    where: { organizationId: orgId },
     orderBy: { createdAt: "desc" },
     select: WEBHOOK_SELECT,
   });
 
 export const createWebhook = async (
-  ownerId: string,
+  orgId: string,
+  userId: string,
   data: CreateWebhookInput,
 ) => {
   const secret = generateWebhookSecret();
 
   const webhook = await prisma.webhook.create({
     data: {
-      ownerId,
+      organizationId: orgId,
+      createdById: userId,
       url: data.url,
       description: data.description ?? null,
       events: data.events,
@@ -129,12 +133,12 @@ export const createWebhook = async (
 };
 
 export const updateWebhook = async (
-  ownerId: string,
+  orgId: string,
   id: string,
   data: UpdateWebhookInput,
 ) => {
   const { count } = await prisma.webhook.updateMany({
-    where: { id, ownerId },
+    where: { id, organizationId: orgId },
     data,
   });
 
@@ -145,11 +149,11 @@ export const updateWebhook = async (
   return prisma.webhook.findUnique({ where: { id }, select: WEBHOOK_SELECT });
 };
 
-export const rotateWebhookSecret = async (ownerId: string, id: string) => {
+export const rotateWebhookSecret = async (orgId: string, id: string) => {
   const secret = generateWebhookSecret();
 
   const { count } = await prisma.webhook.updateMany({
-    where: { id, ownerId },
+    where: { id, organizationId: orgId },
     data: { secretHash: secret.hash, secretPrefix: secret.prefix },
   });
 
@@ -165,7 +169,9 @@ export const rotateWebhookSecret = async (ownerId: string, id: string) => {
   return webhook ? { webhook, plaintext: secret.plaintext } : null;
 };
 
-export const deleteWebhook = async (ownerId: string, id: string) => {
-  const { count } = await prisma.webhook.deleteMany({ where: { id, ownerId } });
+export const deleteWebhook = async (orgId: string, id: string) => {
+  const { count } = await prisma.webhook.deleteMany({
+    where: { id, organizationId: orgId },
+  });
   return count > 0;
 };

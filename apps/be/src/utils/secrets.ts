@@ -47,3 +47,8 @@ export const generateEmailVerificationToken = (): GeneratedSecret =>
 
 export const generateWalletNonce = (): string =>
   randomBytes(32).toString("base64url");
+
+const INVITATION_PREFIX = "4mica_inv";
+
+export const generateInvitationToken = (): GeneratedSecret =>
+  generate(INVITATION_PREFIX);

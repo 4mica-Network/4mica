@@ -3,6 +3,7 @@ import { resourceKeyRoutes } from "@routes/resource-keys";
 import { hashSecret } from "@utils/secrets";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { initApp } from "@/server";
+import { actAs, ORG_ID, OTHER_ORG_ID } from "@/test-support/tenancy";
 
 const {
   authenticateRequest,
@@ -14,7 +15,12 @@ const {
   agent,
   resourcePolicy,
   faqItem,
+  tenancy,
 } = vi.hoisted(() => ({
+  tenancy: {
+    membership: { findFirst: vi.fn(), create: vi.fn() },
+    auditLog: { create: vi.fn() },
+  },
   authenticateRequest: vi.fn(),
   getUser: vi.fn(),
   findUnique: vi.fn(),
@@ -39,6 +45,7 @@ vi.mock("@clerk/backend", () => ({
 
 vi.mock("@4mica/db", () => ({
   prisma: {
+    ...tenancy,
     user: { findUnique, upsert, update: vi.fn() },
     business: { findUnique: vi.fn(), upsert: vi.fn() },
     apiKey,
@@ -104,12 +111,12 @@ const STORED_KEY = {
 
 const storedKey = (over: Record<string, unknown> = {}) => ({
   id: KEY_ID,
-  ownerId: USER_ID,
+  organizationId: ORG_ID,
   listingId: null,
   agentId: null,
   revokedAt: null,
   expiresAt: null,
-  owner: { banned: false, locked: false, deletedAt: null },
+  organization: { deletedAt: null },
   listing: null,
   agent: null,
   ...over,
@@ -199,6 +206,7 @@ describe("resource key routes", () => {
       }
     }
     clearUserCache();
+    actAs(tenancy);
 
     authenticateRequest.mockResolvedValue(signedIn());
     upsert.mockResolvedValue(AUTH_USER);
@@ -245,7 +253,7 @@ describe("resource key routes", () => {
       });
       expect(apiListing.findFirst.mock.calls[0][0].where).toEqual({
         id: LISTING_ID,
-        ownerId: USER_ID,
+        organizationId: ORG_ID,
         deletedAt: null,
       });
       await instance.close();
@@ -293,11 +301,48 @@ describe("resource key routes", () => {
       expect(created).not.toHaveProperty("hashedKey");
 
       const data = apiKey.create.mock.calls[0][0].data;
-      expect(data.ownerId).toBe(USER_ID);
+      expect(data.organizationId).toBe(ORG_ID);
+      expect(data.createdById).toBe(USER_ID);
       expect(data.listingId).toBe(LISTING_ID);
       expect(data).not.toHaveProperty("agentId");
       expect(data.hashedKey).toBe(hashSecret(plaintext));
       expect(JSON.stringify(data)).not.toContain(plaintext);
+      await instance.close();
+    });
+
+    it("audits creation without the secret", async () => {
+      const instance = await app();
+
+      const res = await instance.inject({
+        method: "POST",
+        url: `/me/api-listings/${LISTING_ID}/keys`,
+        headers: AUTH,
+        payload: { name: "Production" },
+      });
+
+      const entry = tenancy.auditLog.create.mock.calls[0][0].data;
+      expect(entry).toMatchObject({
+        organizationId: ORG_ID,
+        actorUserId: USER_ID,
+        action: "api_key.created",
+        targetId: KEY_ID,
+      });
+      expect(JSON.stringify(entry)).not.toContain(res.json().plaintext);
+      await instance.close();
+    });
+
+    it("404s and probes nothing for an organization the caller is not in", async () => {
+      const instance = await app();
+
+      const res = await instance.inject({
+        method: "GET",
+        url: `/me/api-listings/${LISTING_ID}/keys`,
+        headers: { ...AUTH, "x-org-id": OTHER_ORG_ID },
+      });
+
+      expect(res.statusCode).toBe(404);
+      expect(apiListing.findFirst).not.toHaveBeenCalled();
+      expect(apiKey.findMany).not.toHaveBeenCalled();
       await instance.close();
     });
 
@@ -347,6 +392,10 @@ describe("resource key routes", () => {
         id: KEY_ID,
         agentId: AGENT_ID,
         revokedAt: null,
+      });
+      expect(tenancy.auditLog.create.mock.calls[0][0].data).toMatchObject({
+        action: "api_key.revoked",
+        targetId: KEY_ID,
       });
       await instance.close();
     });
@@ -475,7 +524,7 @@ describe("resource key routes", () => {
 
       expect(apiListing.findFirst.mock.calls[0][0].where).toEqual({
         id: LISTING_ID,
-        ownerId: USER_ID,
+        organizationId: ORG_ID,
         deletedAt: null,
       });
       expect(resourcePolicy.findFirst.mock.calls[0][0].where).toEqual({

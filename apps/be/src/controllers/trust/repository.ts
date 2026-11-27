@@ -10,19 +10,19 @@ export type ResourceKind = "listing" | "agent";
 
 export const ownsResource = async (
   kind: ResourceKind,
-  ownerId: string,
+  orgId: string,
   id: string,
 ): Promise<boolean> => {
   if (kind === "listing") {
     const row = await prisma.apiListing.findFirst({
-      where: { id, ownerId, deletedAt: null },
+      where: { id, organizationId: orgId, deletedAt: null },
       select: { id: true },
     });
     return row !== null;
   }
 
   const row = await prisma.agent.findFirst({
-    where: { id, ownerId, deletedAt: null },
+    where: { id, organizationId: orgId, deletedAt: null },
     select: { id: true },
   });
   return row !== null;

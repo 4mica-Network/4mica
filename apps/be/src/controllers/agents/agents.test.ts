@@ -2,23 +2,35 @@ import { clearUserCache } from "@auth/user-store";
 import { agentRoutes } from "@routes/agents";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { initApp } from "@/server";
+import { actAs, ORG_ID, OTHER_ORG_ID } from "@/test-support/tenancy";
 
-const { authenticateRequest, getUser, findUnique, upsert, agent, wallet } =
-  vi.hoisted(() => ({
-    authenticateRequest: vi.fn(),
-    getUser: vi.fn(),
-    findUnique: vi.fn(),
-    upsert: vi.fn(),
-    agent: {
-      findMany: vi.fn(),
-      findFirst: vi.fn(),
-      count: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
-      updateMany: vi.fn(),
-    },
-    wallet: { findFirst: vi.fn() },
-  }));
+const {
+  authenticateRequest,
+  getUser,
+  findUnique,
+  upsert,
+  agent,
+  wallet,
+  tenancy,
+} = vi.hoisted(() => ({
+  tenancy: {
+    membership: { findFirst: vi.fn(), create: vi.fn() },
+    auditLog: { create: vi.fn() },
+  },
+  authenticateRequest: vi.fn(),
+  getUser: vi.fn(),
+  findUnique: vi.fn(),
+  upsert: vi.fn(),
+  agent: {
+    findMany: vi.fn(),
+    findFirst: vi.fn(),
+    count: vi.fn(),
+    create: vi.fn(),
+    update: vi.fn(),
+    updateMany: vi.fn(),
+  },
+  wallet: { findFirst: vi.fn() },
+}));
 
 vi.mock("@clerk/backend", () => ({
   createClerkClient: vi.fn(() => ({ authenticateRequest, users: { getUser } })),
@@ -26,6 +38,7 @@ vi.mock("@clerk/backend", () => ({
 
 vi.mock("@4mica/db", () => ({
   prisma: {
+    ...tenancy,
     agent,
     user: { findUnique, upsert, update: vi.fn() },
     business: { findUnique: vi.fn(), upsert: vi.fn() },
@@ -146,6 +159,7 @@ describe("agent routes", () => {
       }
     }
     clearUserCache();
+    actAs(tenancy);
 
     authenticateRequest.mockResolvedValue(signedIn());
     upsert.mockResolvedValue(AUTH_USER);
@@ -702,7 +716,7 @@ describe("agent routes", () => {
 
     await instance.inject({ method: "GET", url: "/me/agents", headers: AUTH });
     expect(agent.findMany.mock.calls[0][0].where).toMatchObject({
-      ownerId: USER_ID,
+      organizationId: ORG_ID,
       deletedAt: null,
     });
 
@@ -713,8 +727,82 @@ describe("agent routes", () => {
     });
     expect(agent.findFirst.mock.calls[0][0].where).toMatchObject({
       id: AGENT_ID,
-      ownerId: USER_ID,
+      organizationId: ORG_ID,
       deletedAt: null,
+    });
+
+    await instance.close();
+  });
+
+  it("acts in the organization named by X-Org-Id when the caller belongs to it", async () => {
+    actAs(tenancy, "MEMBER", OTHER_ORG_ID);
+    const instance = await app();
+
+    const res = await instance.inject({
+      method: "GET",
+      url: "/me/agents",
+      headers: { ...AUTH, "x-org-id": OTHER_ORG_ID },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(agent.findMany.mock.calls[0][0].where).toMatchObject({
+      organizationId: OTHER_ORG_ID,
+    });
+
+    await instance.close();
+  });
+
+  it("404s and reads nothing for an organization the caller is not in", async () => {
+    const instance = await app();
+
+    const res = await instance.inject({
+      method: "GET",
+      url: "/me/agents",
+      headers: { ...AUTH, "x-org-id": OTHER_ORG_ID },
+    });
+
+    expect(res.statusCode).toBe(404);
+    expect(agent.findMany).not.toHaveBeenCalled();
+
+    await instance.close();
+  });
+
+  it("404s on a malformed X-Org-Id without querying", async () => {
+    const instance = await app();
+
+    const res = await instance.inject({
+      method: "GET",
+      url: "/me/agents",
+      headers: { ...AUTH, "x-org-id": "not-a-uuid" },
+    });
+
+    expect(res.statusCode).toBe(404);
+    expect(tenancy.membership.findFirst).not.toHaveBeenCalled();
+
+    await instance.close();
+  });
+
+  it("records the creator and audits the creation", async () => {
+    agent.findMany.mockResolvedValue([]);
+    const instance = await app();
+
+    const res = await instance.inject({
+      method: "POST",
+      url: "/me/agents",
+      headers: AUTH,
+      payload: { name: "Atlas Research Agent", network: "BASE_SEPOLIA" },
+    });
+
+    expect(res.statusCode).toBe(201);
+    expect(agent.create.mock.calls[0][0].data).toMatchObject({
+      organizationId: ORG_ID,
+      createdById: USER_ID,
+    });
+    expect(tenancy.auditLog.create.mock.calls[0][0].data).toMatchObject({
+      organizationId: ORG_ID,
+      actorUserId: USER_ID,
+      action: "agent.created",
+      targetId: AGENT_ID,
     });
 
     await instance.close();

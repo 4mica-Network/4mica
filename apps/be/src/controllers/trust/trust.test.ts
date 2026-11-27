@@ -2,6 +2,7 @@ import { clearUserCache } from "@auth/user-store";
 import { trustRoutes } from "@routes/trust";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { initApp } from "@/server";
+import { actAs, ORG_ID, OTHER_ORG_ID } from "@/test-support/tenancy";
 
 const {
   authenticateRequest,
@@ -14,7 +15,12 @@ const {
   review,
   report,
   faqItem,
+  tenancy,
 } = vi.hoisted(() => ({
+  tenancy: {
+    membership: { findFirst: vi.fn(), create: vi.fn() },
+    auditLog: { create: vi.fn() },
+  },
   authenticateRequest: vi.fn(),
   getUser: vi.fn(),
   findUnique: vi.fn(),
@@ -54,6 +60,7 @@ vi.mock("@clerk/backend", () => ({
 
 vi.mock("@4mica/db", () => ({
   prisma: {
+    ...tenancy,
     user: { findUnique, upsert, update: vi.fn() },
     business: { findUnique: vi.fn(), upsert: vi.fn() },
     apiListing,
@@ -106,6 +113,7 @@ const app = () => initApp([{ plugin: trustRoutes }]);
 beforeEach(() => {
   vi.clearAllMocks();
   clearUserCache();
+  actAs(tenancy);
   authenticateRequest.mockResolvedValue(signedIn());
   findUnique.mockResolvedValue(AUTH_USER);
   upsert.mockResolvedValue(AUTH_USER);
@@ -140,9 +148,23 @@ describe("ownership", () => {
 
     expect(apiListing.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: LISTING_ID, ownerId: USER_ID, deletedAt: null },
+        where: { id: LISTING_ID, organizationId: ORG_ID, deletedAt: null },
       }),
     );
+    await instance.close();
+  });
+
+  it("404s and probes nothing for an organization the caller is not in", async () => {
+    const instance = await app();
+
+    const response = await instance.inject({
+      method: "GET",
+      url: `/me/api-listings/${LISTING_ID}/policy`,
+      headers: { ...AUTH, "x-org-id": OTHER_ORG_ID },
+    });
+
+    expect(response.statusCode).toBe(404);
+    expect(apiListing.findFirst).not.toHaveBeenCalled();
     await instance.close();
   });
 
@@ -312,6 +334,12 @@ describe("reviews", () => {
         }),
       }),
     );
+    expect(tenancy.auditLog.create.mock.calls[0][0].data).toMatchObject({
+      organizationId: ORG_ID,
+      actorUserId: USER_ID,
+      action: "review.replied",
+      targetId: REVIEW_ID,
+    });
     await instance.close();
   });
 
@@ -492,7 +520,7 @@ describe("agents share the same surface", () => {
     expect(response.statusCode).toBe(200);
     expect(agent.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: "agent-1", ownerId: USER_ID, deletedAt: null },
+        where: { id: "agent-1", organizationId: ORG_ID, deletedAt: null },
       }),
     );
     expect(apiListing.findFirst).not.toHaveBeenCalled();

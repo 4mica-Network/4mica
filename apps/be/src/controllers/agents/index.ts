@@ -2,10 +2,11 @@ import type { PaymentNetwork } from "@4mica/db";
 import { slugify } from "@4mica/rules";
 import { MAX_OFFSET } from "@controllers/schema-primitives";
 import {
+  audit,
   invalidBody,
   notFound,
   parseBody,
-  requireUserId,
+  requireTenant,
   sellerWalletError,
 } from "@controllers/shared";
 import {
@@ -75,8 +76,8 @@ const uniqueConflict = (reply: FastifyReply, error: unknown) => {
 };
 
 export const listAgentsHandler: RouteHandler = async (request, reply) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const tenant = await requireTenant(request, reply, "resources.read");
+  if (!tenant) {
     return reply;
   }
 
@@ -91,24 +92,24 @@ export const listAgentsHandler: RouteHandler = async (request, reply) => {
     ]);
   }
 
-  return reply.send(await listAgents(userId, parsed.data));
+  return reply.send(await listAgents(tenant.orgId, parsed.data));
 };
 
 export const getAgentHandler: RouteHandler = async (request, reply) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const tenant = await requireTenant(request, reply, "resources.read");
+  if (!tenant) {
     return reply;
   }
 
   const { id } = request.params as { id: string };
-  const agent = await getAgent(userId, id);
+  const agent = await getAgent(tenant.orgId, id);
 
   return agent ? reply.send(agent) : notFound(reply, "agent");
 };
 
 export const createAgentHandler: RouteHandler = async (request, reply) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const tenant = await requireTenant(request, reply, "resources.write");
+  if (!tenant) {
     return reply;
   }
 
@@ -124,7 +125,7 @@ export const createAgentHandler: RouteHandler = async (request, reply) => {
   let walletAddress: string | null = null;
   if (data.payerWalletId) {
     const resolved = await resolvePayerWallet(
-      userId,
+      tenant.orgId,
       data.payerWalletId,
       network,
     );
@@ -138,7 +139,11 @@ export const createAgentHandler: RouteHandler = async (request, reply) => {
   let walletId: string | null = null;
   let payToAddress: string | null = null;
   if (data.walletId) {
-    const resolved = await resolveSellerWallet(userId, data.walletId, network);
+    const resolved = await resolveSellerWallet(
+      tenant.orgId,
+      data.walletId,
+      network,
+    );
     if (!resolved.ok) {
       return sellerWalletError(reply, resolved);
     }
@@ -156,14 +161,14 @@ export const createAgentHandler: RouteHandler = async (request, reply) => {
     return notPayable(reply);
   }
 
-  const taken = await takenSlugs(userId);
+  const taken = await takenSlugs(tenant.orgId);
   if (data.slug && taken.has(data.slug)) {
     return slugTaken(reply);
   }
   const slug = data.slug ?? nextFreeSlug(slugify(data.name), taken);
 
   try {
-    const agent = await createAgent(userId, {
+    const agent = await createAgent(tenant.orgId, tenant.userId, {
       slug,
       name: data.name,
       headline: data.headline ?? null,
@@ -189,8 +194,14 @@ export const createAgentHandler: RouteHandler = async (request, reply) => {
       x402Endpoint: data.x402Endpoint ?? null,
     });
 
+    await audit(request, tenant, {
+      action: "agent.created",
+      targetType: "agent",
+      targetId: agent.id,
+    });
+
     appLogger.info("Agent created", {
-      userId,
+      userId: tenant.userId,
       agentId: agent.id,
       slug: agent.slug,
     });
@@ -200,14 +211,14 @@ export const createAgentHandler: RouteHandler = async (request, reply) => {
     if (isUniqueViolation(error)) {
       return uniqueConflict(reply, error);
     }
-    appLogger.error("Agent create failed", { error, userId });
+    appLogger.error("Agent create failed", { error, userId: tenant.userId });
     throw error;
   }
 };
 
 export const updateAgentHandler: RouteHandler = async (request, reply) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const tenant = await requireTenant(request, reply, "resources.write");
+  if (!tenant) {
     return reply;
   }
 
@@ -217,7 +228,7 @@ export const updateAgentHandler: RouteHandler = async (request, reply) => {
   }
 
   const { id } = request.params as { id: string };
-  const current = await getAgent(userId, id);
+  const current = await getAgent(tenant.orgId, id);
   if (!current) {
     return notFound(reply, "agent");
   }
@@ -265,7 +276,7 @@ export const updateAgentHandler: RouteHandler = async (request, reply) => {
       data.walletAddress = null;
     } else {
       const resolved = await resolvePayerWallet(
-        userId,
+        tenant.orgId,
         payerWalletId,
         effectiveNetwork,
       );
@@ -283,7 +294,7 @@ export const updateAgentHandler: RouteHandler = async (request, reply) => {
       data.payToAddress = null;
     } else {
       const resolved = await resolveSellerWallet(
-        userId,
+        tenant.orgId,
         walletId,
         effectiveNetwork,
       );
@@ -319,7 +330,10 @@ export const updateAgentHandler: RouteHandler = async (request, reply) => {
       return notPayable(reply);
     }
     if (walletId === undefined && current.walletId) {
-      const resolved = await resolveSellerWallet(userId, current.walletId);
+      const resolved = await resolveSellerWallet(
+        tenant.orgId,
+        current.walletId,
+      );
       if (!resolved.ok) {
         return sellerWalletError(reply, resolved);
       }
@@ -334,14 +348,14 @@ export const updateAgentHandler: RouteHandler = async (request, reply) => {
   }
 
   if (next.slug && next.slug !== current.slug) {
-    const taken = await takenSlugs(userId);
+    const taken = await takenSlugs(tenant.orgId);
     if (taken.has(next.slug)) {
       return slugTaken(reply);
     }
   }
 
   try {
-    const updated = await updateAgent(userId, id, data);
+    const updated = await updateAgent(tenant.orgId, id, data);
     return updated ? reply.send(updated) : notFound(reply, "agent");
   } catch (error) {
     if (isUniqueViolation(error)) {
@@ -352,13 +366,13 @@ export const updateAgentHandler: RouteHandler = async (request, reply) => {
 };
 
 export const publishAgentHandler: RouteHandler = async (request, reply) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const tenant = await requireTenant(request, reply, "resources.write");
+  if (!tenant) {
     return reply;
   }
 
   const { id } = request.params as { id: string };
-  const current = await getAgent(userId, id);
+  const current = await getAgent(tenant.orgId, id);
   if (!current) {
     return notFound(reply, "agent");
   }
@@ -372,19 +386,27 @@ export const publishAgentHandler: RouteHandler = async (request, reply) => {
   }
 
   if (current.walletId) {
-    const resolved = await resolveSellerWallet(userId, current.walletId);
+    const resolved = await resolveSellerWallet(tenant.orgId, current.walletId);
     if (!resolved.ok) {
       return sellerWalletError(reply, resolved);
     }
   }
 
-  const updated = await updateAgent(userId, id, {
+  const updated = await updateAgent(tenant.orgId, id, {
     visibility: "PUBLIC",
     publishedAt: current.publishedAt ?? new Date(),
   });
 
+  if (updated) {
+    await audit(request, tenant, {
+      action: "agent.published",
+      targetType: "agent",
+      targetId: id,
+    });
+  }
+
   appLogger.info("Agent published", {
-    userId,
+    userId: tenant.userId,
     agentId: id,
     slug: current.slug,
   });
@@ -392,33 +414,45 @@ export const publishAgentHandler: RouteHandler = async (request, reply) => {
 };
 
 export const unpublishAgentHandler: RouteHandler = async (request, reply) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const tenant = await requireTenant(request, reply, "resources.write");
+  if (!tenant) {
     return reply;
   }
 
   const { id } = request.params as { id: string };
-  const updated = await updateAgent(userId, id, { visibility: "PRIVATE" });
+  const updated = await updateAgent(tenant.orgId, id, {
+    visibility: "PRIVATE",
+  });
 
   if (!updated) {
     return notFound(reply, "agent");
   }
 
-  appLogger.info("Agent unpublished", { userId, agentId: id });
+  await audit(request, tenant, {
+    action: "agent.unpublished",
+    targetType: "agent",
+    targetId: id,
+  });
+  appLogger.info("Agent unpublished", { userId: tenant.userId, agentId: id });
   return reply.send(updated);
 };
 
 export const deleteAgentHandler: RouteHandler = async (request, reply) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const tenant = await requireTenant(request, reply, "resources.write");
+  if (!tenant) {
     return reply;
   }
 
   const { id } = request.params as { id: string };
-  const deleted = await softDeleteAgent(userId, id);
+  const deleted = await softDeleteAgent(tenant.orgId, id);
 
   if (deleted) {
-    appLogger.info("Agent removed", { userId, agentId: id });
+    await audit(request, tenant, {
+      action: "agent.deleted",
+      targetType: "agent",
+      targetId: id,
+    });
+    appLogger.info("Agent removed", { userId: tenant.userId, agentId: id });
     return reply.code(204).send();
   }
 
@@ -429,8 +463,8 @@ export const batchDeleteAgentsHandler: RouteHandler = async (
   request,
   reply,
 ) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const tenant = await requireTenant(request, reply, "resources.write");
+  if (!tenant) {
     return reply;
   }
 
@@ -439,8 +473,18 @@ export const batchDeleteAgentsHandler: RouteHandler = async (
     return invalidBody(reply, parsed.issues);
   }
 
-  const result = await batchSoftDeleteAgents(userId, parsed.data.ids);
-  appLogger.info("Agents removed", { userId, count: result.deleted.length });
+  const result = await batchSoftDeleteAgents(tenant.orgId, parsed.data.ids);
+  if (result.deleted.length > 0) {
+    await audit(request, tenant, {
+      action: "agent.deleted",
+      targetType: "agent",
+      metadata: { ids: result.deleted },
+    });
+  }
+  appLogger.info("Agents removed", {
+    userId: tenant.userId,
+    count: result.deleted.length,
+  });
 
   return reply.send(result);
 };

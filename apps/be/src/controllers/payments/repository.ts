@@ -77,11 +77,9 @@ const toRow = (row: RawPayment, myAddresses: Set<string>): PaymentRow => {
   };
 };
 
-export const walletAddressesFor = async (
-  ownerId: string,
-): Promise<string[]> => {
+export const walletAddressesFor = async (orgId: string): Promise<string[]> => {
   const rows = await prisma.wallet.findMany({
-    where: { ownerId },
+    where: { organizationId: orgId },
     select: { address: true },
   });
 
@@ -90,12 +88,12 @@ export const walletAddressesFor = async (
 
 /** A seller may only report payments into a wallet it has proved it controls. */
 export const ownsRecipientWallet = async (
-  ownerId: string,
+  orgId: string,
   address: string,
   network: ReportPaymentInput["network"],
 ): Promise<boolean> =>
   (await prisma.wallet.findFirst({
-    where: { ownerId, address, network },
+    where: { organizationId: orgId, address, network },
     select: { id: true },
   })) !== null;
 
@@ -162,7 +160,7 @@ const whereFor = (
 };
 
 export const listPayments = async (
-  ownerId: string,
+  orgId: string,
   query: ListPaymentsQuery,
 ): Promise<{
   items: PaymentRow[];
@@ -170,7 +168,7 @@ export const listPayments = async (
   page: number;
   limit: number;
 }> => {
-  const addresses = await walletAddressesFor(ownerId);
+  const addresses = await walletAddressesFor(orgId);
   const scope = query.wallet
     ? addresses.filter((address) => address === query.wallet)
     : addresses;
@@ -254,9 +252,9 @@ const totalsFor = async (
 };
 
 export const paymentSummary = async (
-  ownerId: string,
+  orgId: string,
 ): Promise<PaymentSummary> => {
-  const addresses = await walletAddressesFor(ownerId);
+  const addresses = await walletAddressesFor(orgId);
 
   if (addresses.length === 0) {
     return { sent: emptyTotals(), received: emptyTotals() };
@@ -271,10 +269,10 @@ export const paymentSummary = async (
 };
 
 export const getPayment = async (
-  ownerId: string,
+  orgId: string,
   id: string,
 ): Promise<PaymentRow | null> => {
-  const addresses = await walletAddressesFor(ownerId);
+  const addresses = await walletAddressesFor(orgId);
 
   if (addresses.length === 0) {
     return null;
@@ -300,19 +298,27 @@ export interface ReportResolution {
 }
 
 export const resolveReportTargets = async (
-  ownerId: string,
+  orgId: string,
   data: ReportPaymentInput,
 ): Promise<ReportResolution> => {
   const [listing, agent] = await Promise.all([
     data.listingSlug
       ? prisma.apiListing.findFirst({
-          where: { ownerId, slug: data.listingSlug, deletedAt: null },
+          where: {
+            organizationId: orgId,
+            slug: data.listingSlug,
+            deletedAt: null,
+          },
           select: { id: true },
         })
       : Promise.resolve(null),
     data.agentSlug
       ? prisma.agent.findFirst({
-          where: { ownerId, slug: data.agentSlug, deletedAt: null },
+          where: {
+            organizationId: orgId,
+            slug: data.agentSlug,
+            deletedAt: null,
+          },
           select: { id: true },
         })
       : Promise.resolve(null),
@@ -409,7 +415,7 @@ const isRedeemable = (row: RawPayment): boolean =>
   (row.couponCode !== null || row.creditApplied !== null);
 
 export const reportPayment = async (
-  ownerId: string,
+  orgId: string,
   data: ReportPaymentInput,
   targets: ReportResolution,
 ): Promise<ReportOutcome> => {
@@ -435,7 +441,9 @@ export const reportPayment = async (
   };
 
   const reportedSettledAt = data.settledAt ? new Date(data.settledAt) : null;
-  const where = { ownerId_reqId: { ownerId, reqId: data.reqId } };
+  const where = {
+    organizationId_reqId: { organizationId: orgId, reqId: data.reqId },
+  };
 
   for (let attempt = 0; attempt < 2; attempt += 1) {
     const existing = await prisma.payment.findUnique({
@@ -447,7 +455,7 @@ export const reportPayment = async (
       try {
         const row = await prisma.payment.create({
           data: {
-            ownerId,
+            organizationId: orgId,
             reqId: data.reqId,
             ...identity,
             ...detail,
@@ -607,11 +615,11 @@ const monthKeys = (months: number): string[] => {
 };
 
 export const paymentStats = async (
-  ownerId: string,
+  orgId: string,
   months: number,
 ): Promise<PaymentStats> => {
   const keys = monthKeys(months);
-  const addresses = await walletAddressesFor(ownerId);
+  const addresses = await walletAddressesFor(orgId);
 
   const empty = (): MonthlyBucket[] =>
     keys.map((month) => ({

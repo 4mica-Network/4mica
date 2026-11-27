@@ -2,6 +2,7 @@ import { clearUserCache } from "@auth/user-store";
 import { balanceRoutes } from "@routes/balances";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { initApp } from "@/server";
+import { actAs, ORG_ID, OTHER_ORG_ID } from "@/test-support/tenancy";
 
 const {
   authenticateRequest,
@@ -11,7 +12,12 @@ const {
   getCoreClient,
   getSupportedTokens,
   getUserAssetBalance,
+  tenancy,
 } = vi.hoisted(() => ({
+  tenancy: {
+    membership: { findFirst: vi.fn(), create: vi.fn() },
+    auditLog: { create: vi.fn() },
+  },
   authenticateRequest: vi.fn(),
   getUser: vi.fn(),
   upsert: vi.fn(),
@@ -32,6 +38,7 @@ vi.mock("@clerk/backend", () => ({
 
 vi.mock("@4mica/db", () => ({
   prisma: {
+    ...tenancy,
     wallet,
     user: { findUnique: vi.fn(), upsert, update: vi.fn() },
     business: { findUnique: vi.fn(), upsert: vi.fn() },
@@ -65,12 +72,12 @@ const coreOn = (chainId: number) => ({
 
 const app = () => initApp([{ plugin: balanceRoutes }]);
 
-const read = async () => {
+const read = async (headers: Record<string, string> = {}) => {
   const instance = await app();
   const res = await instance.inject({
     method: "GET",
     url: "/me/balances",
-    headers: AUTH,
+    headers: { ...AUTH, ...headers },
   });
   await instance.close();
   return res;
@@ -89,6 +96,7 @@ describe("balance routes", () => {
       fn.mockReset();
     }
     clearUserCache();
+    actAs(tenancy);
 
     authenticateRequest.mockResolvedValue(signedIn());
     upsert.mockResolvedValue({
@@ -124,7 +132,7 @@ describe("balance routes", () => {
 
     expect(res.statusCode).toBe(200);
     expect(wallet.findMany.mock.calls[0][0].where).toEqual({
-      ownerId: USER_ID,
+      organizationId: ORG_ID,
       network: "BASE_SEPOLIA",
       status: "ACTIVE",
     });
@@ -203,6 +211,14 @@ describe("balance routes", () => {
     const res = await read();
 
     expect(res.statusCode).toBe(401);
+    expect(getCoreClient).not.toHaveBeenCalled();
+  });
+
+  it("404s and reads nothing for an organization the caller is not in", async () => {
+    const res = await read({ "x-org-id": OTHER_ORG_ID });
+
+    expect(res.statusCode).toBe(404);
+    expect(wallet.findMany).not.toHaveBeenCalled();
     expect(getCoreClient).not.toHaveBeenCalled();
   });
 });

@@ -75,22 +75,22 @@ const shapeOwner = <T extends StoredOwner>(owner: T) => ({
   dateOfBirth: toIsoDate(owner.dateOfBirth),
 });
 
-const listStoredOwners = (ownerId: string) =>
+const listStoredOwners = (orgId: string) =>
   prisma.beneficialOwner.findMany({
-    where: { ownerId },
+    where: { organizationId: orgId },
     orderBy: { createdAt: "asc" },
     select: OWNER_SELECT,
   });
 
-export const getComplianceState = async (ownerId: string) => {
+export const getComplianceState = async (orgId: string) => {
   const [profile, owners, business] = await Promise.all([
     prisma.complianceProfile.findUnique({
-      where: { ownerId },
+      where: { organizationId: orgId },
       select: PROFILE_SELECT,
     }),
-    listStoredOwners(ownerId),
+    listStoredOwners(orgId),
     prisma.business.findUnique({
-      where: { ownerId },
+      where: { organizationId: orgId },
       select: READINESS_BUSINESS_SELECT,
     }),
   ]);
@@ -105,9 +105,9 @@ export const getComplianceState = async (ownerId: string) => {
   };
 };
 
-export const isComplianceLocked = async (ownerId: string) => {
+export const isComplianceLocked = async (orgId: string) => {
   const business = await prisma.business.findUnique({
-    where: { ownerId },
+    where: { organizationId: orgId },
     select: { kybStatus: true },
   });
   return business ? LOCKED_STATUSES.has(business.kybStatus) : false;
@@ -125,7 +125,7 @@ const attestation = (
 };
 
 export const updateComplianceProfile = async (
-  ownerId: string,
+  orgId: string,
   data: UpdateComplianceInput,
 ) => {
   const {
@@ -137,7 +137,7 @@ export const updateComplianceProfile = async (
   } = data;
 
   const current = await prisma.complianceProfile.findUnique({
-    where: { ownerId },
+    where: { organizationId: orgId },
     select: {
       sanctionsAttestedAt: true,
       prohibitedAttestedAt: true,
@@ -169,50 +169,57 @@ export const updateComplianceProfile = async (
   };
 
   await prisma.complianceProfile.upsert({
-    where: { ownerId },
-    create: { ...write, ownerId },
+    where: { organizationId: orgId },
+    create: { ...write, organizationId: orgId },
     update: write,
   });
 
-  return getComplianceState(ownerId);
+  return getComplianceState(orgId);
 };
 
-export const listBeneficialOwners = async (ownerId: string) =>
-  (await listStoredOwners(ownerId)).map(shapeOwner);
+export const listBeneficialOwners = async (orgId: string) =>
+  (await listStoredOwners(orgId)).map(shapeOwner);
 
-export const countBeneficialOwners = (ownerId: string) =>
-  prisma.beneficialOwner.count({ where: { ownerId } });
+export const countBeneficialOwners = (orgId: string) =>
+  prisma.beneficialOwner.count({ where: { organizationId: orgId } });
 
 export const ownershipHeldByOthers = async (
-  ownerId: string,
+  orgId: string,
   excludeId?: string,
 ) => {
   const { _sum } = await prisma.beneficialOwner.aggregate({
-    where: { ownerId, ...(excludeId ? { id: { not: excludeId } } : {}) },
+    where: {
+      organizationId: orgId,
+      ...(excludeId ? { id: { not: excludeId } } : {}),
+    },
     _sum: { ownershipPercent: true },
   });
   return _sum.ownershipPercent ?? 0;
 };
 
 export const createBeneficialOwner = async (
-  ownerId: string,
+  orgId: string,
   data: CreateBeneficialOwnerInput,
 ) =>
   shapeOwner(
     await prisma.beneficialOwner.create({
-      data: { ...data, dateOfBirth: fromIsoDate(data.dateOfBirth), ownerId },
+      data: {
+        ...data,
+        dateOfBirth: fromIsoDate(data.dateOfBirth),
+        organizationId: orgId,
+      },
       select: OWNER_SELECT,
     }),
   );
 
 export const updateBeneficialOwner = async (
-  ownerId: string,
+  orgId: string,
   id: string,
   data: UpdateBeneficialOwnerInput,
 ) => {
   const { dateOfBirth, ...fields } = data;
   const { count } = await prisma.beneficialOwner.updateMany({
-    where: { id, ownerId },
+    where: { id, organizationId: orgId },
     data: {
       ...fields,
       ...(dateOfBirth ? { dateOfBirth: fromIsoDate(dateOfBirth) } : {}),
@@ -230,26 +237,26 @@ export const updateBeneficialOwner = async (
   return owner ? shapeOwner(owner) : null;
 };
 
-export const deleteBeneficialOwner = async (ownerId: string, id: string) => {
+export const deleteBeneficialOwner = async (orgId: string, id: string) => {
   const { count } = await prisma.beneficialOwner.deleteMany({
-    where: { id, ownerId },
+    where: { id, organizationId: orgId },
   });
   return count > 0;
 };
 
-export const submitForReview = async (ownerId: string) => {
+export const submitForReview = async (orgId: string) => {
   const now = new Date();
 
   await prisma.$transaction([
     prisma.complianceProfile.update({
-      where: { ownerId },
+      where: { organizationId: orgId },
       data: { submittedAt: now },
     }),
     prisma.business.update({
-      where: { ownerId },
+      where: { organizationId: orgId },
       data: { kybStatus: "PENDING" },
     }),
   ]);
 
-  return getComplianceState(ownerId);
+  return getComplianceState(orgId);
 };

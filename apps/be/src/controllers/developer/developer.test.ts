@@ -2,28 +2,40 @@ import { clearUserCache } from "@auth/user-store";
 import { developerRoutes } from "@routes/developer";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { initApp } from "@/server";
+import { actAs, ORG_ID, OTHER_ORG_ID } from "@/test-support/tenancy";
 
-const { authenticateRequest, getUser, findUnique, upsert, apiKey, webhook } =
-  vi.hoisted(() => ({
-    authenticateRequest: vi.fn(),
-    getUser: vi.fn(),
+const {
+  authenticateRequest,
+  getUser,
+  findUnique,
+  upsert,
+  apiKey,
+  webhook,
+  tenancy,
+} = vi.hoisted(() => ({
+  tenancy: {
+    membership: { findFirst: vi.fn(), create: vi.fn() },
+    auditLog: { create: vi.fn() },
+  },
+  authenticateRequest: vi.fn(),
+  getUser: vi.fn(),
+  findUnique: vi.fn(),
+  upsert: vi.fn(),
+  apiKey: {
+    findMany: vi.fn(),
     findUnique: vi.fn(),
-    upsert: vi.fn(),
-    apiKey: {
-      findMany: vi.fn(),
-      findUnique: vi.fn(),
-      create: vi.fn(),
-      updateMany: vi.fn(),
-      deleteMany: vi.fn(),
-    },
-    webhook: {
-      findMany: vi.fn(),
-      findUnique: vi.fn(),
-      create: vi.fn(),
-      updateMany: vi.fn(),
-      deleteMany: vi.fn(),
-    },
-  }));
+    create: vi.fn(),
+    updateMany: vi.fn(),
+    deleteMany: vi.fn(),
+  },
+  webhook: {
+    findMany: vi.fn(),
+    findUnique: vi.fn(),
+    create: vi.fn(),
+    updateMany: vi.fn(),
+    deleteMany: vi.fn(),
+  },
+}));
 
 vi.mock("@clerk/backend", () => ({
   createClerkClient: vi.fn(() => ({ authenticateRequest, users: { getUser } })),
@@ -31,6 +43,7 @@ vi.mock("@clerk/backend", () => ({
 
 vi.mock("@4mica/db", () => ({
   prisma: {
+    ...tenancy,
     agent: { count: vi.fn() },
     user: { findUnique, upsert, update: vi.fn() },
     business: { findUnique: vi.fn(), upsert: vi.fn() },
@@ -111,6 +124,7 @@ describe("developer routes", () => {
       }
     }
     clearUserCache();
+    actAs(tenancy);
 
     authenticateRequest.mockResolvedValue(signedIn());
     upsert.mockResolvedValue(AUTH_USER);
@@ -132,7 +146,7 @@ describe("developer routes", () => {
 
     expect(res.statusCode).toBe(200);
     expect(apiKey.findMany.mock.calls[0][0].where).toEqual({
-      ownerId: USER_ID,
+      organizationId: ORG_ID,
       listingId: null,
       agentId: null,
     });
@@ -157,7 +171,16 @@ describe("developer routes", () => {
     expect(written.hashedKey).toMatch(/^[a-f0-9]{64}$/);
     expect(written.hashedKey).not.toContain(plaintext);
     expect(JSON.stringify(written)).not.toContain(plaintext);
-    expect(written.ownerId).toBe(USER_ID);
+    expect(written.organizationId).toBe(ORG_ID);
+    expect(written.createdById).toBe(USER_ID);
+    const entry = tenancy.auditLog.create.mock.calls[0][0].data;
+    expect(entry).toMatchObject({
+      organizationId: ORG_ID,
+      actorUserId: USER_ID,
+      action: "api_key.created",
+      targetId: "key_1",
+    });
+    expect(JSON.stringify(entry)).not.toContain(plaintext);
 
     // Listing never exposes the hash.
     const list = await app.inject({
@@ -184,7 +207,7 @@ describe("developer routes", () => {
     });
     expect(apiKey.updateMany.mock.calls[0][0].where).toEqual({
       id: "key_1",
-      ownerId: USER_ID,
+      organizationId: ORG_ID,
       listingId: null,
       agentId: null,
     });
@@ -196,9 +219,95 @@ describe("developer routes", () => {
     });
     expect(apiKey.deleteMany.mock.calls[0][0].where).toEqual({
       id: "key_1",
-      ownerId: USER_ID,
+      organizationId: ORG_ID,
       listingId: null,
       agentId: null,
+    });
+
+    await app.close();
+  });
+
+  it("404s and reads nothing for an organization the caller is not in", async () => {
+    const app = await initApp([{ plugin: developerRoutes }]);
+
+    for (const url of ["/me/api-keys", "/me/webhooks"]) {
+      const res = await app.inject({
+        method: "GET",
+        url,
+        headers: { ...AUTH, "x-org-id": OTHER_ORG_ID },
+      });
+      expect(res.statusCode, url).toBe(404);
+    }
+    expect(apiKey.findMany).not.toHaveBeenCalled();
+    expect(webhook.findMany).not.toHaveBeenCalled();
+
+    await app.close();
+  });
+
+  it("records the webhook's creator and audits its lifecycle", async () => {
+    webhook.updateMany.mockResolvedValue({ count: 1 });
+    webhook.deleteMany.mockResolvedValue({ count: 1 });
+    const app = await initApp([{ plugin: developerRoutes }]);
+
+    const created = await app.inject({
+      method: "POST",
+      url: "/me/webhooks",
+      headers: AUTH,
+      payload: {
+        url: "https://example.com/hook",
+        events: ["payment.succeeded"],
+      },
+    });
+    expect(webhook.create.mock.calls[0][0].data).toMatchObject({
+      organizationId: ORG_ID,
+      createdById: USER_ID,
+    });
+
+    await app.inject({
+      method: "PATCH",
+      url: "/me/webhooks/wh_1",
+      headers: AUTH,
+      payload: { status: "DISABLED" },
+    });
+    const rotated = await app.inject({
+      method: "POST",
+      url: "/me/webhooks/wh_1/rotate-secret",
+      headers: AUTH,
+    });
+    await app.inject({
+      method: "DELETE",
+      url: "/me/webhooks/wh_1",
+      headers: AUTH,
+    });
+
+    const entries = tenancy.auditLog.create.mock.calls.map(([arg]) => arg.data);
+    expect(entries.map((entry) => entry.action)).toEqual([
+      "webhook.created",
+      "webhook.updated",
+      "webhook.secret_rotated",
+      "webhook.deleted",
+    ]);
+    const serialized = JSON.stringify(entries);
+    expect(serialized).not.toContain(created.json().plaintext);
+    expect(serialized).not.toContain(rotated.json().plaintext);
+
+    await app.close();
+  });
+
+  it("audits a key revocation", async () => {
+    apiKey.updateMany.mockResolvedValue({ count: 1 });
+    const app = await initApp([{ plugin: developerRoutes }]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/me/api-keys/key_1/revoke",
+      headers: AUTH,
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(tenancy.auditLog.create.mock.calls[0][0].data).toMatchObject({
+      action: "api_key.revoked",
+      targetId: "key_1",
     });
 
     await app.close();

@@ -1,5 +1,5 @@
 import { networkForChainId, PAYMENT_NETWORKS } from "@4mica/rules";
-import { coreUnavailable, requireUserId } from "@controllers/shared";
+import { coreUnavailable, requireTenant } from "@controllers/shared";
 import { appLogger } from "@logger/index";
 import { getCoreClient } from "@services/core";
 import type { RouteHandler } from "fastify";
@@ -7,8 +7,8 @@ import { zeroAddress } from "viem";
 import { activeWalletsOn } from "./repository";
 
 export const listBalancesHandler: RouteHandler = async (request, reply) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const tenant = await requireTenant(request, reply, "payments.read");
+  if (!tenant) {
     return reply;
   }
 
@@ -24,7 +24,7 @@ export const listBalancesHandler: RouteHandler = async (request, reply) => {
     }
 
     const [wallets, { tokens }] = await Promise.all([
-      activeWalletsOn(userId, network),
+      activeWalletsOn(tenant.orgId, network),
       core.rpc.getSupportedTokens(),
     ]);
 
@@ -73,7 +73,7 @@ export const listBalancesHandler: RouteHandler = async (request, reply) => {
     return reply.send({ network, wallets: rows });
   } catch (error) {
     appLogger.error("Could not read balances from 4mica core", {
-      userId,
+      userId: tenant.userId,
       error,
     });
     return coreUnavailable(reply);

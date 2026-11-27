@@ -136,6 +136,10 @@ export const initApp = async (
           { name: "system", description: "Health and diagnostics" },
           { name: "account", description: "Authenticated user account" },
           {
+            name: "organizations",
+            description: "Organizations, members, invitations and audit log",
+          },
+          {
             name: "compliance",
             description: "KYB details, beneficial owners and review",
           },

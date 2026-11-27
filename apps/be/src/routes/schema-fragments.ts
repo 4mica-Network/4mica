@@ -72,10 +72,10 @@ export const userResponseSchema = {
 export const businessResponseSchema = {
   type: "object",
   nullable: true,
-  required: ["id", "ownerId"],
+  required: ["id", "organizationId"],
   properties: {
     id: str,
-    ownerId: str,
+    organizationId: str,
     legalName: str,
     tradingName: nullStr,
     businessType: {

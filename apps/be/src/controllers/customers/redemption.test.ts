@@ -75,7 +75,7 @@ describe("redeemPaymentBenefits", () => {
     expect(tx.payment.updateMany.mock.calls[0][0]).toMatchObject({
       where: {
         id: PAYMENT,
-        ownerId: OWNER,
+        organizationId: OWNER,
         status: "SETTLED",
         redeemedAt: null,
       },
@@ -90,7 +90,7 @@ describe("redeemPaymentBenefits", () => {
 
     const call = tx.customerCoupon.updateMany.mock.calls[0][0];
     expect(call.where).toMatchObject({
-      ownerId: OWNER,
+      organizationId: OWNER,
       customerId: "customer-1",
       code: "WELCOME10",
       revokedAt: null,
@@ -117,7 +117,7 @@ describe("redeemPaymentBenefits", () => {
 
     const data = tx.customerCreditEntry.create.mock.calls[0][0].data;
     expect(data).toMatchObject({
-      ownerId: OWNER,
+      organizationId: OWNER,
       customerId: "customer-1",
       kind: "ADJUSTMENT",
       reason: "payment 0xabc",
@@ -149,7 +149,7 @@ describe("redeemPaymentBenefits", () => {
 
     const where = tx.customerPaymentIdentity.findFirst.mock.calls[0][0].where;
     expect(where).toMatchObject({
-      ownerId: OWNER,
+      organizationId: OWNER,
       type: "WALLET",
       network: "BASE_SEPOLIA",
     });

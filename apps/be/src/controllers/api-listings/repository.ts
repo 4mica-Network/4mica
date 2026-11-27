@@ -64,10 +64,13 @@ const orderFor = (
 };
 
 const whereFor = (
-  ownerId: string,
+  orgId: string,
   query: ListApiListingsQuery,
 ): Prisma.ApiListingWhereInput => {
-  const where: Prisma.ApiListingWhereInput = { ownerId, deletedAt: null };
+  const where: Prisma.ApiListingWhereInput = {
+    organizationId: orgId,
+    deletedAt: null,
+  };
 
   if (query.visibility) {
     where.visibility = query.visibility;
@@ -89,7 +92,7 @@ const whereFor = (
 };
 
 export const listApiListings = async (
-  ownerId: string,
+  orgId: string,
   query: ListApiListingsQuery,
 ): Promise<{
   items: ApiListingRow[];
@@ -97,7 +100,7 @@ export const listApiListings = async (
   page: number;
   limit: number;
 }> => {
-  const where = whereFor(ownerId, query);
+  const where = whereFor(orgId, query);
   const skip = (query.page - 1) * query.limit;
 
   const [items, total] = await prisma.$transaction([
@@ -120,20 +123,20 @@ export const listApiListings = async (
 };
 
 export const getApiListing = async (
-  ownerId: string,
+  orgId: string,
   id: string,
 ): Promise<ApiListingRow | null> => {
   const row = await prisma.apiListing.findFirst({
-    where: { id, ownerId, deletedAt: null },
+    where: { id, organizationId: orgId, deletedAt: null },
     select: API_LISTING_SELECT,
   });
 
   return row ? toRow(row) : null;
 };
 
-export const takenSlugs = async (ownerId: string): Promise<Set<string>> => {
+export const takenSlugs = async (orgId: string): Promise<Set<string>> => {
   const rows = await prisma.apiListing.findMany({
-    where: { ownerId },
+    where: { organizationId: orgId },
     select: { slug: true },
   });
 
@@ -163,11 +166,12 @@ export interface CreateApiListingData {
 }
 
 export const createApiListing = async (
-  ownerId: string,
+  orgId: string,
+  userId: string,
   data: CreateApiListingData,
 ): Promise<ApiListingRow> => {
   const row = await prisma.apiListing.create({
-    data: { ownerId, ...data },
+    data: { ...data, organizationId: orgId, createdById: userId },
     select: API_LISTING_SELECT,
   });
 
@@ -175,24 +179,24 @@ export const createApiListing = async (
 };
 
 export const updateApiListing = async (
-  ownerId: string,
+  orgId: string,
   id: string,
   data: Prisma.ApiListingUpdateInput,
 ): Promise<ApiListingRow | null> => {
   const { count } = await prisma.apiListing.updateMany({
-    where: { id, ownerId, deletedAt: null },
+    where: { id, organizationId: orgId, deletedAt: null },
     data: data as Prisma.ApiListingUpdateManyMutationInput,
   });
 
-  return count > 0 ? getApiListing(ownerId, id) : null;
+  return count > 0 ? getApiListing(orgId, id) : null;
 };
 
 export const softDeleteApiListing = async (
-  ownerId: string,
+  orgId: string,
   id: string,
 ): Promise<boolean> => {
   const row = await prisma.apiListing.findFirst({
-    where: { id, ownerId, deletedAt: null },
+    where: { id, organizationId: orgId, deletedAt: null },
     select: { id: true, slug: true },
   });
 
@@ -215,11 +219,11 @@ export const softDeleteApiListing = async (
 };
 
 export const batchSoftDeleteApiListings = async (
-  ownerId: string,
+  orgId: string,
   ids: string[],
 ): Promise<{ deleted: string[]; notFound: string[] }> => {
   const owned = await prisma.apiListing.findMany({
-    where: { id: { in: ids }, ownerId, deletedAt: null },
+    where: { id: { in: ids }, organizationId: orgId, deletedAt: null },
     select: { id: true, slug: true },
   });
 

@@ -1,16 +1,26 @@
 import { usernameUnavailableReason } from "@4mica/url";
+import { resolveTenant } from "@auth/tenant";
 import { invalidateUser } from "@auth/user-store";
-import { invalidBody, parseBody, requireUserId } from "@controllers/shared";
+import {
+  audit,
+  invalidBody,
+  parseBody,
+  requireTenant,
+  requireUserId,
+} from "@controllers/shared";
 import { deliverVerification } from "@controllers/verification/index";
 import { appLogger } from "@logger/index";
-import { isUniqueViolation, uniqueViolationTarget } from "@utils/prisma-errors";
+import {
+  isUniqueViolation,
+  uniqueViolationTargets,
+} from "@utils/prisma-errors";
 import type { RouteHandler } from "fastify";
 import type { GenericSchema } from "valibot";
 import {
-  findUsernameOwner,
   getBusiness,
   getProfile,
   getUsername,
+  isUsernameTaken,
   updateUser,
   upsertBusiness,
 } from "./repository";
@@ -30,6 +40,13 @@ type UpdatableUser =
   | UpdateAccountInput
   | UpdateNotificationsInput;
 
+const conflictPath = (error: unknown): string => {
+  const targets = uniqueViolationTargets(error).map((target) =>
+    /handle/.test(target) ? "username" : target,
+  );
+  return [...new Set(targets)].join(", ");
+};
+
 const patchUserHandler =
   (schema: GenericSchema<unknown, UpdatableUser>, path: string): RouteHandler =>
   async (request, reply) => {
@@ -46,7 +63,7 @@ const patchUserHandler =
     try {
       const previous =
         "username" in parsed.data ? await getUsername(userId) : null;
-      const updated = await updateUser(userId, parsed.data);
+      const updated = await updateUser(userId, parsed.data, previous);
       if (previous && previous !== updated.username) {
         request.staleUsernames = [previous];
       }
@@ -76,8 +93,8 @@ const patchUserHandler =
       return reply.send(updated);
     } catch (error) {
       if (isUniqueViolation(error)) {
-        const target = uniqueViolationTarget(error);
-        const message = `That ${target} is already taken.`;
+        const target = conflictPath(error);
+        const message = `That ${target || "field"} is already taken.`;
         return reply.code(409).send({
           error: "conflict",
           message,
@@ -107,8 +124,7 @@ export const checkUsernameHandler: RouteHandler = async (request, reply) => {
     return reply.send({ username, available: false, reason: blocked });
   }
 
-  const owner = await findUsernameOwner(username);
-  const available = owner === null || owner.id === userId;
+  const available = !(await isUsernameTaken(username, userId));
 
   return reply.send({
     username,
@@ -123,9 +139,10 @@ export const getMeHandler: RouteHandler = async (request, reply) => {
     return reply;
   }
 
+  const tenant = await resolveTenant(request, userId);
   const [user, business] = await Promise.all([
     getProfile(userId),
-    getBusiness(userId),
+    tenant ? getBusiness(tenant.orgId) : null,
   ]);
 
   if (!user) {
@@ -154,16 +171,16 @@ export const updateNotificationsHandler = patchUserHandler(
 );
 
 export const getBusinessHandler: RouteHandler = async (request, reply) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const tenant = await requireTenant(request, reply, "resources.read");
+  if (!tenant) {
     return reply;
   }
-  return reply.send(await getBusiness(userId));
+  return reply.send(await getBusiness(tenant.orgId));
 };
 
 export const upsertBusinessHandler: RouteHandler = async (request, reply) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const tenant = await requireTenant(request, reply, "business.manage");
+  if (!tenant) {
     return reply;
   }
 
@@ -172,5 +189,12 @@ export const upsertBusinessHandler: RouteHandler = async (request, reply) => {
     return invalidBody(reply, parsed.issues);
   }
 
-  return reply.send(await upsertBusiness(userId, parsed.data));
+  const business = await upsertBusiness(tenant.orgId, parsed.data);
+  await audit(request, tenant, {
+    action: "business.updated",
+    targetType: "business",
+    targetId: business.id,
+  });
+
+  return reply.send(business);
 };

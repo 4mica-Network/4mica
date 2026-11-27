@@ -1,10 +1,11 @@
-import { requireApiKeyOwner } from "@auth/api-key";
+import { requireApiKeyOrg } from "@auth/api-key";
 import { MAX_OFFSET } from "@controllers/schema-primitives";
 import {
+  audit,
   invalidBody,
   notFound,
   parseBody,
-  requireUserId,
+  requireTenant,
 } from "@controllers/shared";
 import { appLogger } from "@logger/index";
 import { optionalAmountText } from "@utils/amount";
@@ -77,8 +78,8 @@ const identityTaken = (reply: FastifyReply, error: unknown) => {
 };
 
 export const listCustomersHandler: RouteHandler = async (request, reply) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const tenant = await requireTenant(request, reply, "resources.read");
+  if (!tenant) {
     return reply;
   }
 
@@ -93,24 +94,24 @@ export const listCustomersHandler: RouteHandler = async (request, reply) => {
     ]);
   }
 
-  return reply.send(await listCustomers(userId, parsed.data));
+  return reply.send(await listCustomers(tenant.orgId, parsed.data));
 };
 
 export const getCustomerHandler: RouteHandler = async (request, reply) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const tenant = await requireTenant(request, reply, "resources.read");
+  if (!tenant) {
     return reply;
   }
 
   const { id } = request.params as { id: string };
-  const customer = await getCustomer(userId, id);
+  const customer = await getCustomer(tenant.orgId, id);
 
   return customer ? reply.send(customer) : notFound(reply, "customer");
 };
 
 export const createCustomerHandler: RouteHandler = async (request, reply) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const tenant = await requireTenant(request, reply, "resources.write");
+  if (!tenant) {
     return reply;
   }
 
@@ -120,10 +121,20 @@ export const createCustomerHandler: RouteHandler = async (request, reply) => {
   }
 
   try {
-    const customer = await createCustomer(userId, parsed.data);
+    const customer = await createCustomer(
+      tenant.orgId,
+      tenant.userId,
+      parsed.data,
+    );
+
+    await audit(request, tenant, {
+      action: "customer.created",
+      targetType: "customer",
+      targetId: customer.id,
+    });
 
     appLogger.info("Customer created", {
-      userId,
+      userId: tenant.userId,
       customerId: customer.id,
       identities: customer.identities.length,
     });
@@ -133,14 +144,14 @@ export const createCustomerHandler: RouteHandler = async (request, reply) => {
     if (isUniqueViolation(error)) {
       return identityTaken(reply, error);
     }
-    appLogger.error("Customer create failed", { error, userId });
+    appLogger.error("Customer create failed", { error, userId: tenant.userId });
     throw error;
   }
 };
 
 export const updateCustomerHandler: RouteHandler = async (request, reply) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const tenant = await requireTenant(request, reply, "resources.write");
+  if (!tenant) {
     return reply;
   }
 
@@ -150,17 +161,26 @@ export const updateCustomerHandler: RouteHandler = async (request, reply) => {
   }
 
   const { id } = request.params as { id: string };
-  const updated = await updateCustomer(userId, id, parsed.data);
+  const updated = await updateCustomer(tenant.orgId, id, parsed.data);
+  if (!updated) {
+    return notFound(reply, "customer");
+  }
 
-  return updated ? reply.send(updated) : notFound(reply, "customer");
+  await audit(request, tenant, {
+    action: "customer.updated",
+    targetType: "customer",
+    targetId: id,
+    metadata: { fields: Object.keys(parsed.data) },
+  });
+  return reply.send(updated);
 };
 
 export const setCustomerStatusHandler: RouteHandler = async (
   request,
   reply,
 ) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const tenant = await requireTenant(request, reply, "resources.write");
+  if (!tenant) {
     return reply;
   }
 
@@ -170,14 +190,20 @@ export const setCustomerStatusHandler: RouteHandler = async (
   }
 
   const { id } = request.params as { id: string };
-  const updated = await setCustomerStatus(userId, id, parsed.data);
+  const updated = await setCustomerStatus(tenant.orgId, id, parsed.data);
 
   if (!updated) {
     return notFound(reply, "customer");
   }
 
+  await audit(request, tenant, {
+    action: "customer.status_changed",
+    targetType: "customer",
+    targetId: id,
+    metadata: { status: parsed.data.status },
+  });
   appLogger.info("Customer status changed", {
-    userId,
+    userId: tenant.userId,
     customerId: id,
     status: parsed.data.status,
   });
@@ -189,8 +215,8 @@ export const setCustomerPolicyHandler: RouteHandler = async (
   request,
   reply,
 ) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const tenant = await requireTenant(request, reply, "resources.write");
+  if (!tenant) {
     return reply;
   }
 
@@ -200,13 +226,22 @@ export const setCustomerPolicyHandler: RouteHandler = async (
   }
 
   const { id } = request.params as { id: string };
-  const updated = await setCustomerPolicy(userId, id, parsed.data);
+  const updated = await setCustomerPolicy(tenant.orgId, id, parsed.data);
 
   if (!updated) {
     return notFound(reply, "customer");
   }
 
-  appLogger.info("Customer policy changed", { userId, customerId: id });
+  await audit(request, tenant, {
+    action: "customer.updated",
+    targetType: "customer",
+    targetId: id,
+    metadata: { fields: Object.keys(parsed.data) },
+  });
+  appLogger.info("Customer policy changed", {
+    userId: tenant.userId,
+    customerId: id,
+  });
 
   return reply.send(updated);
 };
@@ -215,34 +250,50 @@ export const resetCustomerUsageHandler: RouteHandler = async (
   request,
   reply,
 ) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const tenant = await requireTenant(request, reply, "resources.write");
+  if (!tenant) {
     return reply;
   }
 
   const { id } = request.params as { id: string };
-  const updated = await resetCustomerUsage(userId, id);
+  const updated = await resetCustomerUsage(tenant.orgId, id);
 
   if (!updated) {
     return notFound(reply, "customer");
   }
 
-  appLogger.info("Customer usage reset", { userId, customerId: id });
+  await audit(request, tenant, {
+    action: "customer.usage_reset",
+    targetType: "customer",
+    targetId: id,
+  });
+  appLogger.info("Customer usage reset", {
+    userId: tenant.userId,
+    customerId: id,
+  });
 
   return reply.send(updated);
 };
 
 export const deleteCustomerHandler: RouteHandler = async (request, reply) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const tenant = await requireTenant(request, reply, "resources.write");
+  if (!tenant) {
     return reply;
   }
 
   const { id } = request.params as { id: string };
-  const deleted = await softDeleteCustomer(userId, id);
+  const deleted = await softDeleteCustomer(tenant.orgId, id);
 
   if (deleted) {
-    appLogger.info("Customer removed", { userId, customerId: id });
+    await audit(request, tenant, {
+      action: "customer.deleted",
+      targetType: "customer",
+      targetId: id,
+    });
+    appLogger.info("Customer removed", {
+      userId: tenant.userId,
+      customerId: id,
+    });
     return reply.code(204).send();
   }
 
@@ -253,8 +304,8 @@ export const batchDeleteCustomersHandler: RouteHandler = async (
   request,
   reply,
 ) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const tenant = await requireTenant(request, reply, "resources.write");
+  if (!tenant) {
     return reply;
   }
 
@@ -263,9 +314,16 @@ export const batchDeleteCustomersHandler: RouteHandler = async (
     return invalidBody(reply, parsed.issues);
   }
 
-  const result = await batchSoftDeleteCustomers(userId, parsed.data.ids);
+  const result = await batchSoftDeleteCustomers(tenant.orgId, parsed.data.ids);
+  if (result.deleted.length > 0) {
+    await audit(request, tenant, {
+      action: "customer.deleted",
+      targetType: "customer",
+      metadata: { ids: result.deleted },
+    });
+  }
   appLogger.info("Customers removed", {
-    userId,
+    userId: tenant.userId,
     count: result.deleted.length,
   });
 
@@ -276,8 +334,8 @@ export const addCustomerIdentityHandler: RouteHandler = async (
   request,
   reply,
 ) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const tenant = await requireTenant(request, reply, "resources.write");
+  if (!tenant) {
     return reply;
   }
 
@@ -287,18 +345,25 @@ export const addCustomerIdentityHandler: RouteHandler = async (
   }
 
   const { id } = request.params as { id: string };
-  if (!(await ownsCustomer(userId, id))) {
+  if (!(await ownsCustomer(tenant.orgId, id))) {
     return notFound(reply, "customer");
   }
 
   try {
-    const customer = await addIdentity(userId, id, parsed.data);
+    const customer = await addIdentity(tenant.orgId, id, parsed.data);
     if (!customer) {
       return notFound(reply, "customer");
     }
 
+    await audit(request, tenant, {
+      action: "customer.updated",
+      targetType: "customer",
+      targetId: id,
+      metadata: { identity: "added", type: parsed.data.type },
+    });
+
     appLogger.info("Customer identity added", {
-      userId,
+      userId: tenant.userId,
       customerId: id,
       type: parsed.data.type,
     });
@@ -308,7 +373,10 @@ export const addCustomerIdentityHandler: RouteHandler = async (
     if (isUniqueViolation(error)) {
       return identityTaken(reply, error);
     }
-    appLogger.error("Customer identity add failed", { error, userId });
+    appLogger.error("Customer identity add failed", {
+      error,
+      userId: tenant.userId,
+    });
     throw error;
   }
 };
@@ -317,8 +385,8 @@ export const updateCustomerIdentityHandler: RouteHandler = async (
   request,
   reply,
 ) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const tenant = await requireTenant(request, reply, "resources.write");
+  if (!tenant) {
     return reply;
   }
 
@@ -330,28 +398,48 @@ export const updateCustomerIdentityHandler: RouteHandler = async (
   const { id } = request.params as { id: string };
   const { identityId } = request.params as { identityId: string };
 
-  const updated = await updateIdentity(userId, id, identityId, parsed.data);
+  const updated = await updateIdentity(
+    tenant.orgId,
+    id,
+    identityId,
+    parsed.data,
+  );
+  if (!updated) {
+    return notFound(reply, "identity");
+  }
 
-  return updated ? reply.send(updated) : notFound(reply, "identity");
+  await audit(request, tenant, {
+    action: "customer.updated",
+    targetType: "customer",
+    targetId: id,
+    metadata: { identity: "updated", identityId },
+  });
+  return reply.send(updated);
 };
 
 export const removeCustomerIdentityHandler: RouteHandler = async (
   request,
   reply,
 ) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const tenant = await requireTenant(request, reply, "resources.write");
+  if (!tenant) {
     return reply;
   }
 
   const { id } = request.params as { id: string };
   const { identityId } = request.params as { identityId: string };
 
-  const removed = await removeIdentity(userId, id, identityId);
+  const removed = await removeIdentity(tenant.orgId, id, identityId);
 
   if (removed) {
+    await audit(request, tenant, {
+      action: "customer.updated",
+      targetType: "customer",
+      targetId: id,
+      metadata: { identity: "removed", identityId },
+    });
     appLogger.info("Customer identity removed", {
-      userId,
+      userId: tenant.userId,
       customerId: id,
       identityId,
     });
@@ -365,19 +453,19 @@ export const listCustomerCreditHandler: RouteHandler = async (
   request,
   reply,
 ) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const tenant = await requireTenant(request, reply, "resources.read");
+  if (!tenant) {
     return reply;
   }
 
   const { id } = request.params as { id: string };
-  if (!(await ownsCustomer(userId, id))) {
+  if (!(await ownsCustomer(tenant.orgId, id))) {
     return notFound(reply, "customer");
   }
 
   const [balance, entries] = await Promise.all([
-    creditBalance(userId, id),
-    listCreditEntries(userId, id),
+    creditBalance(tenant.orgId, id),
+    listCreditEntries(tenant.orgId, id),
   ]);
 
   return reply.send({ balance, items: entries });
@@ -387,8 +475,8 @@ export const grantCustomerCreditHandler: RouteHandler = async (
   request,
   reply,
 ) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const tenant = await requireTenant(request, reply, "resources.write");
+  if (!tenant) {
     return reply;
   }
 
@@ -398,11 +486,11 @@ export const grantCustomerCreditHandler: RouteHandler = async (
   }
 
   const { id } = request.params as { id: string };
-  if (!(await ownsCustomer(userId, id))) {
+  if (!(await ownsCustomer(tenant.orgId, id))) {
     return notFound(reply, "customer");
   }
 
-  const entry = await grantCredit(userId, id, parsed.data);
+  const entry = await grantCredit(tenant.orgId, id, parsed.data);
   if (!entry) {
     const message = "would take the credit balance below zero";
     return reply.code(409).send({
@@ -412,10 +500,17 @@ export const grantCustomerCreditHandler: RouteHandler = async (
     });
   }
 
-  const balance = await creditBalance(userId, id);
+  const balance = await creditBalance(tenant.orgId, id);
+
+  await audit(request, tenant, {
+    action: "customer.credit_adjusted",
+    targetType: "customer",
+    targetId: id,
+    metadata: { entryId: entry.id, kind: entry.kind, amount: entry.amount },
+  });
 
   appLogger.info("Customer credit granted", {
-    userId,
+    userId: tenant.userId,
     customerId: id,
     kind: entry.kind,
     amount: entry.amount,
@@ -428,20 +523,30 @@ export const zeroCustomerCreditHandler: RouteHandler = async (
   request,
   reply,
 ) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const tenant = await requireTenant(request, reply, "resources.write");
+  if (!tenant) {
     return reply;
   }
 
   const { id } = request.params as { id: string };
-  if (!(await ownsCustomer(userId, id))) {
+  if (!(await ownsCustomer(tenant.orgId, id))) {
     return notFound(reply, "customer");
   }
 
-  const balance = await zeroCredit(userId, id, "reset");
-  const entries = await listCreditEntries(userId, id);
+  const balance = await zeroCredit(tenant.orgId, id, "reset");
+  const entries = await listCreditEntries(tenant.orgId, id);
 
-  appLogger.info("Customer credit zeroed", { userId, customerId: id });
+  await audit(request, tenant, {
+    action: "customer.credit_adjusted",
+    targetType: "customer",
+    targetId: id,
+    metadata: { kind: "reset" },
+  });
+
+  appLogger.info("Customer credit zeroed", {
+    userId: tenant.userId,
+    customerId: id,
+  });
 
   return reply.send({ balance, items: entries });
 };
@@ -457,25 +562,25 @@ export const listCustomerCouponsHandler: RouteHandler = async (
   request,
   reply,
 ) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const tenant = await requireTenant(request, reply, "resources.read");
+  if (!tenant) {
     return reply;
   }
 
   const { id } = request.params as { id: string };
-  if (!(await ownsCustomer(userId, id))) {
+  if (!(await ownsCustomer(tenant.orgId, id))) {
     return notFound(reply, "customer");
   }
 
-  return reply.send({ items: await listCoupons(userId, id) });
+  return reply.send({ items: await listCoupons(tenant.orgId, id) });
 };
 
 export const createCustomerCouponHandler: RouteHandler = async (
   request,
   reply,
 ) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const tenant = await requireTenant(request, reply, "resources.write");
+  if (!tenant) {
     return reply;
   }
 
@@ -485,15 +590,22 @@ export const createCustomerCouponHandler: RouteHandler = async (
   }
 
   const { id } = request.params as { id: string };
-  if (!(await ownsCustomer(userId, id))) {
+  if (!(await ownsCustomer(tenant.orgId, id))) {
     return notFound(reply, "customer");
   }
 
   try {
-    const coupon = await createCoupon(userId, id, parsed.data);
+    const coupon = await createCoupon(tenant.orgId, id, parsed.data);
+
+    await audit(request, tenant, {
+      action: "customer.coupon_created",
+      targetType: "customer",
+      targetId: id,
+      metadata: { couponId: coupon.id, code: coupon.code },
+    });
 
     appLogger.info("Customer coupon created", {
-      userId,
+      userId: tenant.userId,
       customerId: id,
       code: coupon.code,
     });
@@ -503,7 +615,10 @@ export const createCustomerCouponHandler: RouteHandler = async (
     if (isUniqueViolation(error)) {
       return couponTaken(reply);
     }
-    appLogger.error("Customer coupon create failed", { error, userId });
+    appLogger.error("Customer coupon create failed", {
+      error,
+      userId: tenant.userId,
+    });
     throw error;
   }
 };
@@ -512,8 +627,8 @@ export const updateCustomerCouponHandler: RouteHandler = async (
   request,
   reply,
 ) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const tenant = await requireTenant(request, reply, "resources.write");
+  if (!tenant) {
     return reply;
   }
 
@@ -525,28 +640,46 @@ export const updateCustomerCouponHandler: RouteHandler = async (
   const { id } = request.params as { id: string };
   const { couponId } = request.params as { couponId: string };
 
-  const coupon = await updateCoupon(userId, id, couponId, parsed.data);
+  const coupon = await updateCoupon(tenant.orgId, id, couponId, parsed.data);
+  if (!coupon) {
+    return notFound(reply, "coupon");
+  }
 
-  return coupon ? reply.send(coupon) : notFound(reply, "coupon");
+  await audit(request, tenant, {
+    action:
+      parsed.data.revoked === true
+        ? "customer.coupon_revoked"
+        : "customer.coupon_updated",
+    targetType: "customer",
+    targetId: id,
+    metadata: { couponId, fields: Object.keys(parsed.data) },
+  });
+  return reply.send(coupon);
 };
 
 export const deleteCustomerCouponHandler: RouteHandler = async (
   request,
   reply,
 ) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const tenant = await requireTenant(request, reply, "resources.write");
+  if (!tenant) {
     return reply;
   }
 
   const { id } = request.params as { id: string };
   const { couponId } = request.params as { couponId: string };
 
-  const removed = await deleteCoupon(userId, id, couponId);
+  const removed = await deleteCoupon(tenant.orgId, id, couponId);
 
   if (removed) {
+    await audit(request, tenant, {
+      action: "customer.coupon_deleted",
+      targetType: "customer",
+      targetId: id,
+      metadata: { couponId },
+    });
     appLogger.info("Customer coupon removed", {
-      userId,
+      userId: tenant.userId,
       customerId: id,
       couponId,
     });
@@ -557,8 +690,8 @@ export const deleteCustomerCouponHandler: RouteHandler = async (
 };
 
 export const resolveCustomerHandler: RouteHandler = async (request, reply) => {
-  const ownerId = requireApiKeyOwner(request, reply);
-  if (!ownerId) {
+  const orgId = requireApiKeyOrg(request, reply);
+  if (!orgId) {
     return reply;
   }
 
@@ -568,11 +701,7 @@ export const resolveCustomerHandler: RouteHandler = async (request, reply) => {
   }
 
   const { payerAddress, network, amount, couponCode } = parsed.data;
-  const resolved = await resolveCustomerForPayer(
-    ownerId,
-    network,
-    payerAddress,
-  );
+  const resolved = await resolveCustomerForPayer(orgId, network, payerAddress);
 
   if (!resolved) {
     return reply.send({
@@ -593,12 +722,12 @@ export const resolveCustomerHandler: RouteHandler = async (request, reply) => {
   const { customer, identityBlocked } = resolved;
 
   const [quotaRemaining, credit, coupon, spent] = await Promise.all([
-    quotaRemainingFor(ownerId, customer),
-    creditBalance(ownerId, customer.id),
+    quotaRemainingFor(orgId, customer),
+    creditBalance(orgId, customer.id),
     couponCode
-      ? findCouponByCode(ownerId, customer.id, couponCode)
+      ? findCouponByCode(orgId, customer.id, couponCode)
       : Promise.resolve(null),
-    spendLimitUsageFor(ownerId, customer),
+    spendLimitUsageFor(orgId, customer),
   ]);
 
   const result = priceFor({
@@ -632,22 +761,22 @@ export const resolveCustomerHandler: RouteHandler = async (request, reply) => {
 };
 
 export const customerOverviewHandler: RouteHandler = async (request, reply) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const tenant = await requireTenant(request, reply, "resources.read");
+  if (!tenant) {
     return reply;
   }
 
   const { id } = request.params as { id: string };
-  if (!(await ownsCustomer(userId, id))) {
+  if (!(await ownsCustomer(tenant.orgId, id))) {
     return notFound(reply, "customer");
   }
 
-  return reply.send(await customerOverview(userId, id));
+  return reply.send(await customerOverview(tenant.orgId, id));
 };
 
 export const customerActivityHandler: RouteHandler = async (request, reply) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const tenant = await requireTenant(request, reply, "resources.read");
+  if (!tenant) {
     return reply;
   }
 
@@ -663,26 +792,26 @@ export const customerActivityHandler: RouteHandler = async (request, reply) => {
   }
 
   const { id } = request.params as { id: string };
-  if (!(await ownsCustomer(userId, id))) {
+  if (!(await ownsCustomer(tenant.orgId, id))) {
     return notFound(reply, "customer");
   }
 
-  return reply.send(await customerActivity(userId, id, parsed.data));
+  return reply.send(await customerActivity(tenant.orgId, id, parsed.data));
 };
 
 export const customerBreakdownHandler: RouteHandler = async (
   request,
   reply,
 ) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const tenant = await requireTenant(request, reply, "resources.read");
+  if (!tenant) {
     return reply;
   }
 
   const { id } = request.params as { id: string };
-  if (!(await ownsCustomer(userId, id))) {
+  if (!(await ownsCustomer(tenant.orgId, id))) {
     return notFound(reply, "customer");
   }
 
-  return reply.send({ items: await customerBreakdown(userId, id) });
+  return reply.send({ items: await customerBreakdown(tenant.orgId, id) });
 };

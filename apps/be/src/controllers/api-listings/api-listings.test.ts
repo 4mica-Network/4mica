@@ -2,23 +2,35 @@ import { clearUserCache } from "@auth/user-store";
 import { apiListingRoutes } from "@routes/api-listings";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { initApp } from "@/server";
+import { actAs, ORG_ID, OTHER_ORG_ID } from "@/test-support/tenancy";
 
-const { authenticateRequest, getUser, findUnique, upsert, apiListing, wallet } =
-  vi.hoisted(() => ({
-    authenticateRequest: vi.fn(),
-    getUser: vi.fn(),
-    findUnique: vi.fn(),
-    upsert: vi.fn(),
-    apiListing: {
-      findMany: vi.fn(),
-      findFirst: vi.fn(),
-      count: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
-      updateMany: vi.fn(),
-    },
-    wallet: { findFirst: vi.fn() },
-  }));
+const {
+  authenticateRequest,
+  getUser,
+  findUnique,
+  upsert,
+  apiListing,
+  wallet,
+  tenancy,
+} = vi.hoisted(() => ({
+  tenancy: {
+    membership: { findFirst: vi.fn(), create: vi.fn() },
+    auditLog: { create: vi.fn() },
+  },
+  authenticateRequest: vi.fn(),
+  getUser: vi.fn(),
+  findUnique: vi.fn(),
+  upsert: vi.fn(),
+  apiListing: {
+    findMany: vi.fn(),
+    findFirst: vi.fn(),
+    count: vi.fn(),
+    create: vi.fn(),
+    update: vi.fn(),
+    updateMany: vi.fn(),
+  },
+  wallet: { findFirst: vi.fn() },
+}));
 
 vi.mock("@clerk/backend", () => ({
   createClerkClient: vi.fn(() => ({ authenticateRequest, users: { getUser } })),
@@ -26,6 +38,7 @@ vi.mock("@clerk/backend", () => ({
 
 vi.mock("@4mica/db", () => ({
   prisma: {
+    ...tenancy,
     agent: { count: vi.fn() },
     user: { findUnique, upsert, update: vi.fn() },
     business: { findUnique: vi.fn(), upsert: vi.fn() },
@@ -128,6 +141,7 @@ describe("api listing routes", () => {
       }
     }
     clearUserCache();
+    actAs(tenancy);
 
     authenticateRequest.mockResolvedValue(signedIn());
     upsert.mockResolvedValue(AUTH_USER);
@@ -258,7 +272,7 @@ describe("api listing routes", () => {
 
       expect(wallet.findFirst.mock.calls[0][0].where).toMatchObject({
         id: WALLET_ID,
-        ownerId: USER_ID,
+        organizationId: ORG_ID,
       });
 
       await instance.close();
@@ -831,7 +845,7 @@ describe("api listing routes", () => {
       });
 
       expect(apiListing.findMany.mock.calls[0][0].where).toMatchObject({
-        ownerId: USER_ID,
+        organizationId: ORG_ID,
         deletedAt: null,
       });
 
@@ -952,7 +966,7 @@ describe("api listing routes", () => {
 
       expect(res.json()).toEqual({ deleted: [LISTING_ID], notFound: [other] });
       expect(apiListing.findMany.mock.calls[0][0].where).toMatchObject({
-        ownerId: USER_ID,
+        organizationId: ORG_ID,
         deletedAt: null,
       });
 
@@ -1018,6 +1032,62 @@ describe("api listing routes", () => {
     await instance.close();
   });
 
+  it("404s and reads nothing for an organization the caller is not in", async () => {
+    const instance = await app();
+
+    const res = await instance.inject({
+      method: "GET",
+      url: "/me/api-listings",
+      headers: { ...AUTH, "x-org-id": OTHER_ORG_ID },
+    });
+
+    expect(res.statusCode).toBe(404);
+    expect(apiListing.findMany).not.toHaveBeenCalled();
+
+    await instance.close();
+  });
+
+  it("records the creator and audits the creation", async () => {
+    apiListing.findMany.mockResolvedValue([]);
+    const instance = await app();
+
+    const res = await instance.inject({
+      method: "POST",
+      url: "/me/api-listings",
+      headers: AUTH,
+      payload: { name: "Listing" },
+    });
+
+    expect(res.statusCode).toBe(201);
+    expect(apiListing.create.mock.calls[0][0].data).toMatchObject({
+      organizationId: ORG_ID,
+      createdById: USER_ID,
+    });
+    expect(tenancy.auditLog.create.mock.calls[0][0].data).toMatchObject({
+      organizationId: ORG_ID,
+      actorUserId: USER_ID,
+      action: "api_listing.created",
+      targetId: LISTING_ID,
+    });
+
+    await instance.close();
+  });
+
+  it("lets a MEMBER write listings", async () => {
+    actAs(tenancy, "MEMBER");
+    const instance = await app();
+
+    const res = await instance.inject({
+      method: "DELETE",
+      url: `/me/api-listings/${LISTING_ID}`,
+      headers: AUTH,
+    });
+
+    expect(res.statusCode).toBe(204);
+
+    await instance.close();
+  });
+
   it("scopes read and update to the owner", async () => {
     const instance = await app();
 
@@ -1028,7 +1098,7 @@ describe("api listing routes", () => {
     });
     expect(apiListing.findFirst.mock.calls[0][0].where).toMatchObject({
       id: LISTING_ID,
-      ownerId: USER_ID,
+      organizationId: ORG_ID,
       deletedAt: null,
     });
 
@@ -1040,7 +1110,7 @@ describe("api listing routes", () => {
     });
     expect(apiListing.updateMany.mock.calls[0][0].where).toMatchObject({
       id: LISTING_ID,
-      ownerId: USER_ID,
+      organizationId: ORG_ID,
       deletedAt: null,
     });
 

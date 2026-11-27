@@ -2,10 +2,11 @@ import type { PaymentNetwork } from "@4mica/db";
 import { slugify } from "@4mica/rules";
 import { MAX_OFFSET } from "@controllers/schema-primitives";
 import {
+  audit,
   invalidBody,
   notFound,
   parseBody,
-  requireUserId,
+  requireTenant,
   sellerWalletError,
 } from "@controllers/shared";
 import { resolveSellerWallet } from "@controllers/wallets/repository";
@@ -46,8 +47,8 @@ const notPayable = (reply: FastifyReply) =>
   });
 
 export const listApiListingsHandler: RouteHandler = async (request, reply) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const tenant = await requireTenant(request, reply, "resources.read");
+  if (!tenant) {
     return reply;
   }
 
@@ -62,24 +63,24 @@ export const listApiListingsHandler: RouteHandler = async (request, reply) => {
     ]);
   }
 
-  return reply.send(await listApiListings(userId, parsed.data));
+  return reply.send(await listApiListings(tenant.orgId, parsed.data));
 };
 
 export const getApiListingHandler: RouteHandler = async (request, reply) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const tenant = await requireTenant(request, reply, "resources.read");
+  if (!tenant) {
     return reply;
   }
 
   const { id } = request.params as { id: string };
-  const listing = await getApiListing(userId, id);
+  const listing = await getApiListing(tenant.orgId, id);
 
   return listing ? reply.send(listing) : notFound(reply, "listing");
 };
 
 export const createApiListingHandler: RouteHandler = async (request, reply) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const tenant = await requireTenant(request, reply, "resources.write");
+  if (!tenant) {
     return reply;
   }
 
@@ -95,7 +96,7 @@ export const createApiListingHandler: RouteHandler = async (request, reply) => {
   let payToAddress: string | null = null;
 
   if (data.walletId) {
-    const resolved = await resolveSellerWallet(userId, data.walletId);
+    const resolved = await resolveSellerWallet(tenant.orgId, data.walletId);
     if (!resolved.ok) {
       return sellerWalletError(reply, resolved);
     }
@@ -113,7 +114,7 @@ export const createApiListingHandler: RouteHandler = async (request, reply) => {
     return notPayable(reply);
   }
 
-  const taken = await takenSlugs(userId);
+  const taken = await takenSlugs(tenant.orgId);
   const requestedSlug = data.slug ?? slugify(data.name);
 
   if (data.slug && taken.has(data.slug)) {
@@ -123,7 +124,7 @@ export const createApiListingHandler: RouteHandler = async (request, reply) => {
   const slug = data.slug ?? nextFreeSlug(requestedSlug, taken);
 
   try {
-    const listing = await createApiListing(userId, {
+    const listing = await createApiListing(tenant.orgId, tenant.userId, {
       slug,
       name: data.name,
       summary: data.summary ?? null,
@@ -145,8 +146,14 @@ export const createApiListingHandler: RouteHandler = async (request, reply) => {
       x402Endpoint: data.x402Endpoint ?? null,
     });
 
+    await audit(request, tenant, {
+      action: "api_listing.created",
+      targetType: "api_listing",
+      targetId: listing.id,
+    });
+
     appLogger.info("Listing created", {
-      userId,
+      userId: tenant.userId,
       listingId: listing.id,
       slug: listing.slug,
     });
@@ -156,14 +163,14 @@ export const createApiListingHandler: RouteHandler = async (request, reply) => {
     if (isUniqueViolation(error)) {
       return slugTaken(reply);
     }
-    appLogger.error("Listing create failed", { error, userId });
+    appLogger.error("Listing create failed", { error, userId: tenant.userId });
     throw error;
   }
 };
 
 export const updateApiListingHandler: RouteHandler = async (request, reply) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const tenant = await requireTenant(request, reply, "resources.write");
+  if (!tenant) {
     return reply;
   }
 
@@ -173,7 +180,7 @@ export const updateApiListingHandler: RouteHandler = async (request, reply) => {
   }
 
   const { id } = request.params as { id: string };
-  const current = await getApiListing(userId, id);
+  const current = await getApiListing(tenant.orgId, id);
   if (!current) {
     return notFound(reply, "listing");
   }
@@ -188,7 +195,7 @@ export const updateApiListingHandler: RouteHandler = async (request, reply) => {
       data.network = null;
       data.payToAddress = null;
     } else {
-      const resolved = await resolveSellerWallet(userId, walletId);
+      const resolved = await resolveSellerWallet(tenant.orgId, walletId);
       if (!resolved.ok) {
         return sellerWalletError(reply, resolved);
       }
@@ -224,7 +231,10 @@ export const updateApiListingHandler: RouteHandler = async (request, reply) => {
       return notPayable(reply);
     }
     if (walletId === undefined && current.walletId) {
-      const resolved = await resolveSellerWallet(userId, current.walletId);
+      const resolved = await resolveSellerWallet(
+        tenant.orgId,
+        current.walletId,
+      );
       if (!resolved.ok) {
         return sellerWalletError(reply, resolved);
       }
@@ -239,15 +249,23 @@ export const updateApiListingHandler: RouteHandler = async (request, reply) => {
   }
 
   if (next.slug && next.slug !== current.slug) {
-    const taken = await takenSlugs(userId);
+    const taken = await takenSlugs(tenant.orgId);
     if (taken.has(next.slug)) {
       return slugTaken(reply);
     }
   }
 
   try {
-    const updated = await updateApiListing(userId, id, data);
-    return updated ? reply.send(updated) : notFound(reply, "listing");
+    const updated = await updateApiListing(tenant.orgId, id, data);
+    if (!updated) {
+      return notFound(reply, "listing");
+    }
+    await audit(request, tenant, {
+      action: "api_listing.updated",
+      targetType: "api_listing",
+      targetId: id,
+    });
+    return reply.send(updated);
   } catch (error) {
     if (isUniqueViolation(error)) {
       return slugTaken(reply);
@@ -260,13 +278,13 @@ export const publishApiListingHandler: RouteHandler = async (
   request,
   reply,
 ) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const tenant = await requireTenant(request, reply, "resources.write");
+  if (!tenant) {
     return reply;
   }
 
   const { id } = request.params as { id: string };
-  const current = await getApiListing(userId, id);
+  const current = await getApiListing(tenant.orgId, id);
   if (!current) {
     return notFound(reply, "listing");
   }
@@ -276,19 +294,27 @@ export const publishApiListingHandler: RouteHandler = async (
   }
 
   if (current.walletId) {
-    const resolved = await resolveSellerWallet(userId, current.walletId);
+    const resolved = await resolveSellerWallet(tenant.orgId, current.walletId);
     if (!resolved.ok) {
       return sellerWalletError(reply, resolved);
     }
   }
 
-  const updated = await updateApiListing(userId, id, {
+  const updated = await updateApiListing(tenant.orgId, id, {
     visibility: "PUBLIC",
     publishedAt: current.publishedAt ?? new Date(),
   });
 
+  if (updated) {
+    await audit(request, tenant, {
+      action: "api_listing.published",
+      targetType: "api_listing",
+      targetId: id,
+    });
+  }
+
   appLogger.info("Listing published", {
-    userId,
+    userId: tenant.userId,
     listingId: id,
     slug: current.slug,
   });
@@ -300,13 +326,13 @@ export const unpublishApiListingHandler: RouteHandler = async (
   request,
   reply,
 ) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const tenant = await requireTenant(request, reply, "resources.write");
+  if (!tenant) {
     return reply;
   }
 
   const { id } = request.params as { id: string };
-  const updated = await updateApiListing(userId, id, {
+  const updated = await updateApiListing(tenant.orgId, id, {
     visibility: "PRIVATE",
   });
 
@@ -314,21 +340,34 @@ export const unpublishApiListingHandler: RouteHandler = async (
     return notFound(reply, "listing");
   }
 
-  appLogger.info("Listing unpublished", { userId, listingId: id });
+  await audit(request, tenant, {
+    action: "api_listing.unpublished",
+    targetType: "api_listing",
+    targetId: id,
+  });
+  appLogger.info("Listing unpublished", {
+    userId: tenant.userId,
+    listingId: id,
+  });
   return reply.send(updated);
 };
 
 export const deleteApiListingHandler: RouteHandler = async (request, reply) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const tenant = await requireTenant(request, reply, "resources.write");
+  if (!tenant) {
     return reply;
   }
 
   const { id } = request.params as { id: string };
-  const deleted = await softDeleteApiListing(userId, id);
+  const deleted = await softDeleteApiListing(tenant.orgId, id);
 
   if (deleted) {
-    appLogger.info("Listing removed", { userId, listingId: id });
+    await audit(request, tenant, {
+      action: "api_listing.deleted",
+      targetType: "api_listing",
+      targetId: id,
+    });
+    appLogger.info("Listing removed", { userId: tenant.userId, listingId: id });
     return reply.code(204).send();
   }
 
@@ -339,8 +378,8 @@ export const batchDeleteApiListingsHandler: RouteHandler = async (
   request,
   reply,
 ) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const tenant = await requireTenant(request, reply, "resources.write");
+  if (!tenant) {
     return reply;
   }
 
@@ -349,9 +388,19 @@ export const batchDeleteApiListingsHandler: RouteHandler = async (
     return invalidBody(reply, parsed.issues);
   }
 
-  const result = await batchSoftDeleteApiListings(userId, parsed.data.ids);
+  const result = await batchSoftDeleteApiListings(
+    tenant.orgId,
+    parsed.data.ids,
+  );
+  if (result.deleted.length > 0) {
+    await audit(request, tenant, {
+      action: "api_listing.deleted",
+      targetType: "api_listing",
+      metadata: { ids: result.deleted },
+    });
+  }
   appLogger.info("Listings removed", {
-    userId,
+    userId: tenant.userId,
     count: result.deleted.length,
   });
 

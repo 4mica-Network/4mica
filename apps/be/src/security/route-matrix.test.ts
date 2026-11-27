@@ -130,6 +130,8 @@ const recordRoutes = Object.assign(
   { [Symbol.for("skip-override")]: true },
 );
 
+let clearCachedUsers: () => void = () => {};
+
 let inject: (
   route: Route,
   headers: Record<string, string>,
@@ -138,10 +140,13 @@ let inject: (
 beforeAll(async () => {
   vi.stubEnv("RATE_LIMIT_ENABLED", "false");
 
-  const [{ initApp }, { routes: appRoutes }] = await Promise.all([
-    import("@/server"),
-    import("@routes/index"),
-  ]);
+  const [{ initApp }, { routes: appRoutes }, { clearUserCache }] =
+    await Promise.all([
+      import("@/server"),
+      import("@routes/index"),
+      import("@auth/user-store"),
+    ]);
+  clearCachedUsers = clearUserCache;
   const app = await initApp([{ plugin: recordRoutes }, ...appRoutes]);
 
   inject = async ({ method, url }, headers) => {
@@ -194,6 +199,7 @@ describe("authentication matrix", () => {
     getUser.mockReset();
     touched.clear();
     userRow.current = null;
+    clearCachedUsers();
   });
 
   const credentials: [string, () => void, Record<string, string>][] = [
@@ -261,6 +267,63 @@ describe("authentication matrix", () => {
       });
       expect(statusCode, keyOf(route)).toBe(401);
     }
+  });
+
+  it("lets an organization the caller does not belong to reach no tenant data", async () => {
+    authenticateRequest.mockResolvedValue(signedIn());
+    userRow.current = {
+      id: ID,
+      clerkUserId: "user_matrix",
+      email: null,
+      name: null,
+      avatarUrl: null,
+      banned: false,
+      locked: false,
+      deletedAt: null,
+    };
+
+    const tenantModels = [
+      "agent",
+      "apiListing",
+      "apiKey",
+      "payment",
+      "customer",
+      "customerCoupon",
+      "customerCreditEntry",
+      "customerPaymentIdentity",
+      "webhook",
+      "wallet",
+      "business",
+      "complianceProfile",
+      "beneficialOwner",
+      "supportRequest",
+      "supportMessage",
+      "resourcePolicy",
+      "faqItem",
+      "review",
+      "report",
+      "auditLog",
+      "organization",
+      "$queryRaw",
+    ];
+    const failures: string[] = [];
+
+    for (const route of sessionRoutes()) {
+      touched.clear();
+      const { statusCode, body } = await inject(route, {
+        authorization: "Bearer good",
+        "x-org-id": "019fce62-0000-7000-8000-00000000f00d",
+      });
+      const leaked = [...touched].filter((name) => tenantModels.includes(name));
+      if (statusCode < 400 && leaked.length > 0) {
+        failures.push(`${keyOf(route)} → ${statusCode} ${body}`);
+      }
+      if (leaked.length > 0) {
+        failures.push(`${keyOf(route)} touched ${leaked.join(", ")}`);
+      }
+    }
+
+    expect(failures).toEqual([]);
   });
 
   it("lets a disabled account reach no data on any session route", async () => {

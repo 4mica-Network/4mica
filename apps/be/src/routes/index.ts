@@ -9,6 +9,7 @@ import { customerRoutes } from "./customers";
 import { developerRoutes } from "./developer";
 import { healthRoutes } from "./health";
 import { meRoutes } from "./me";
+import { organizationRoutes } from "./organizations";
 import { paymentRoutes } from "./payments";
 import { resourceKeyRoutes } from "./resource-keys";
 import { supportRoutes } from "./support";
@@ -25,6 +26,7 @@ export interface RouteRegistration {
 export const routes: RouteRegistration[] = [
   { plugin: healthRoutes },
   { plugin: meRoutes },
+  { plugin: organizationRoutes },
   { plugin: verificationRoutes },
   { plugin: developerRoutes },
   { plugin: bannerRoutes },
@@ -52,6 +54,7 @@ export {
   developerRoutes,
   healthRoutes,
   meRoutes,
+  organizationRoutes,
   paymentRoutes,
   resourceKeyRoutes,
   supportRoutes,

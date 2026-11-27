@@ -316,10 +316,10 @@ describe("rate limiting", () => {
   it("caps each API key on its own, whichever IP it arrives from", async () => {
     apiKeyFind.mockImplementation(async () => ({
       id: "key_1",
-      ownerId: "owner_1",
+      organizationId: "org_1",
       revokedAt: null,
       expiresAt: null,
-      owner: { banned: false, locked: false, deletedAt: null },
+      organization: { deletedAt: null },
     }));
 
     const app = await loadApp({ apiKey: "2" });

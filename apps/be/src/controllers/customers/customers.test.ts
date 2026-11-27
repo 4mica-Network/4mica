@@ -3,6 +3,7 @@ import { clearUserCache } from "@auth/user-store";
 import { customerRoutes } from "@routes/customers";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { initApp } from "@/server";
+import { actAs, ORG_ID, OTHER_ORG_ID } from "@/test-support/tenancy";
 
 const {
   authenticateRequest,
@@ -17,7 +18,12 @@ const {
   wallet,
   queryRaw,
   FakeDecimal,
+  tenancy,
 } = vi.hoisted(() => ({
+  tenancy: {
+    membership: { findFirst: vi.fn(), create: vi.fn() },
+    auditLog: { create: vi.fn() },
+  },
   authenticateRequest: vi.fn(),
   getUser: vi.fn(),
   findUnique: vi.fn(),
@@ -101,6 +107,7 @@ vi.mock("@4mica/db", () => ({
     Decimal: FakeDecimal,
   },
   prisma: {
+    ...tenancy,
     apiKey,
     customer,
     customerCoupon,
@@ -167,10 +174,10 @@ const KEY_AUTH = { authorization: `Bearer ${API_KEY}` };
 
 const storedKey = (over: Record<string, unknown> = {}) => ({
   id: "key_1",
-  ownerId: USER_ID,
+  organizationId: ORG_ID,
   revokedAt: null,
   expiresAt: null,
-  owner: { banned: false, deletedAt: null },
+  organization: { deletedAt: null },
   ...over,
 });
 
@@ -320,6 +327,7 @@ describe("customer routes", () => {
     }
     queryRaw.mockReset();
     clearUserCache();
+    actAs(tenancy);
 
     authenticateRequest.mockResolvedValue(signedIn());
     upsert.mockResolvedValue(AUTH_USER);
@@ -444,7 +452,7 @@ describe("customer routes", () => {
       await instance.close();
     });
 
-    it("scopes the list to the owner", async () => {
+    it("scopes the list to the organization", async () => {
       const instance = await app();
       await instance.inject({
         method: "GET",
@@ -452,7 +460,7 @@ describe("customer routes", () => {
         headers: AUTH,
       });
 
-      expect(sqlValues(rawCall("rank_total") as unknown[])).toContain(USER_ID);
+      expect(sqlValues(rawCall("rank_total") as unknown[])).toContain(ORG_ID);
 
       await instance.close();
     });
@@ -607,10 +615,12 @@ describe("customer routes", () => {
       });
 
       for (const marker of ["rank_total", "WITH matched"]) {
-        expect(sqlText(rawCall(marker) as unknown[])).toContain("p.owner_id =");
+        expect(sqlText(rawCall(marker) as unknown[])).toContain(
+          "p.organization_id =",
+        );
       }
       expect(customer.findMany.mock.calls[0][0].where).toMatchObject({
-        ownerId: USER_ID,
+        organizationId: ORG_ID,
       });
 
       await instance.close();
@@ -662,6 +672,66 @@ describe("customer routes", () => {
     });
   });
 
+  describe("tenancy", () => {
+    it("404s and reads nothing for an organization the caller is not in", async () => {
+      const instance = await app();
+
+      for (const [method, url] of [
+        ["GET", "/me/customers"],
+        ["GET", `/me/customers/${CUSTOMER_ID}`],
+        ["DELETE", `/me/customers/${CUSTOMER_ID}`],
+      ] as const) {
+        const response = await instance.inject({
+          method,
+          url,
+          headers: { ...AUTH, "x-org-id": OTHER_ORG_ID },
+        });
+        expect(response.statusCode, `${method} ${url}`).toBe(404);
+      }
+
+      expect(queryRaw).not.toHaveBeenCalled();
+      expect(customer.findFirst).not.toHaveBeenCalled();
+      expect(customer.updateMany).not.toHaveBeenCalled();
+
+      await instance.close();
+    });
+
+    it("lets a member manage customers", async () => {
+      actAs(tenancy, "MEMBER");
+      const instance = await app();
+
+      const response = await instance.inject({
+        method: "POST",
+        url: "/me/customers",
+        headers: AUTH,
+        payload: { name: "Acme Procurement" },
+      });
+
+      expect(response.statusCode).toBe(201);
+
+      await instance.close();
+    });
+
+    it("audits a status change", async () => {
+      const instance = await app();
+
+      await instance.inject({
+        method: "PATCH",
+        url: `/me/customers/${CUSTOMER_ID}/status`,
+        headers: AUTH,
+        payload: { status: "BLOCKED", reason: "fraud" },
+      });
+
+      expect(tenancy.auditLog.create.mock.calls[0][0].data).toMatchObject({
+        action: "customer.status_changed",
+        targetId: CUSTOMER_ID,
+        metadata: { status: "BLOCKED" },
+      });
+
+      await instance.close();
+    });
+  });
+
   describe("creating", () => {
     it("creates a customer with an attached wallet identity", async () => {
       const instance = await app();
@@ -680,8 +750,15 @@ describe("customer routes", () => {
 
       expect(response.statusCode).toBe(201);
       expect(customer.create.mock.calls[0][0].data).toMatchObject({
-        ownerId: USER_ID,
+        organizationId: ORG_ID,
+        createdById: USER_ID,
         name: "Acme Procurement",
+      });
+      expect(tenancy.auditLog.create.mock.calls[0][0].data).toMatchObject({
+        organizationId: ORG_ID,
+        actorUserId: USER_ID,
+        action: "customer.created",
+        targetId: CUSTOMER_ID,
       });
 
       await instance.close();
@@ -762,7 +839,7 @@ describe("customer routes", () => {
 
     it("refuses a second customer claiming an address already mapped here", async () => {
       customer.create.mockRejectedValue(
-        uniqueViolation(["owner_id", "network", "address"]),
+        uniqueViolation(["organization_id", "network", "address"]),
       );
 
       const instance = await app();
@@ -787,7 +864,7 @@ describe("customer routes", () => {
 
     it("points a duplicate email identity at the value, not the address", async () => {
       customer.create.mockRejectedValue(
-        uniqueViolation(["owner_id", "type", "value"]),
+        uniqueViolation(["organization_id", "type", "value"]),
       );
 
       const instance = await app();
@@ -825,7 +902,7 @@ describe("customer routes", () => {
   });
 
   describe("reading and updating", () => {
-    it("scopes read and update to the owner", async () => {
+    it("scopes read and update to the organization", async () => {
       const instance = await app();
 
       await instance.inject({
@@ -835,7 +912,7 @@ describe("customer routes", () => {
       });
       expect(customer.findFirst.mock.calls[0][0].where).toMatchObject({
         id: CUSTOMER_ID,
-        ownerId: USER_ID,
+        organizationId: ORG_ID,
         deletedAt: null,
       });
 
@@ -847,7 +924,7 @@ describe("customer routes", () => {
       });
       expect(customer.updateMany.mock.calls[0][0].where).toMatchObject({
         id: CUSTOMER_ID,
-        ownerId: USER_ID,
+        organizationId: ORG_ID,
         deletedAt: null,
       });
 
@@ -1006,13 +1083,13 @@ describe("customer routes", () => {
       await instance.close();
     });
 
-    it("scopes a status change to the owner", async () => {
+    it("scopes a status change to the organization", async () => {
       const instance = await app();
       await instance.inject(setStatus({ status: "BLOCKED" }));
 
       expect(customer.updateMany.mock.calls[0][0].where).toMatchObject({
         id: CUSTOMER_ID,
-        ownerId: USER_ID,
+        organizationId: ORG_ID,
         deletedAt: null,
       });
 
@@ -1240,13 +1317,13 @@ describe("customer routes", () => {
       await instance.close();
     });
 
-    it("scopes a policy change to the owner", async () => {
+    it("scopes a policy change to the organization", async () => {
       const instance = await app();
       await instance.inject(setPolicy({ discountPercent: "10" }));
 
       expect(customer.updateMany.mock.calls[0][0].where).toMatchObject({
         id: CUSTOMER_ID,
-        ownerId: USER_ID,
+        organizationId: ORG_ID,
         deletedAt: null,
       });
 
@@ -1370,11 +1447,15 @@ describe("customer routes", () => {
 
       expect(response.statusCode).toBe(201);
       expect(customerCreditEntry.create.mock.calls[0][0].data).toMatchObject({
-        ownerId: USER_ID,
+        organizationId: ORG_ID,
         customerId: CUSTOMER_ID,
         kind: "PROMOTIONAL",
         amount: "5",
         reason: "launch offer",
+      });
+      expect(tenancy.auditLog.create.mock.calls[0][0].data).toMatchObject({
+        action: "customer.credit_adjusted",
+        targetId: CUSTOMER_ID,
       });
 
       await instance.close();
@@ -1509,7 +1590,7 @@ describe("customer routes", () => {
       await instance.close();
     });
 
-    it("scopes the ledger to the owner", async () => {
+    it("scopes the ledger to the organization", async () => {
       const instance = await app();
       await instance.inject({
         method: "GET",
@@ -1518,7 +1599,7 @@ describe("customer routes", () => {
       });
 
       expect(customerCreditEntry.groupBy.mock.calls[0][0].where).toEqual({
-        ownerId: USER_ID,
+        organizationId: ORG_ID,
         customerId: CUSTOMER_ID,
       });
 
@@ -1568,12 +1649,16 @@ describe("customer routes", () => {
 
       expect(response.statusCode).toBe(201);
       expect(customerCoupon.create.mock.calls[0][0].data).toMatchObject({
-        ownerId: USER_ID,
+        organizationId: ORG_ID,
         customerId: CUSTOMER_ID,
         code: "WELCOME10",
         kind: "PERCENT",
         value: "10",
         usageLimit: 5,
+      });
+      expect(tenancy.auditLog.create.mock.calls[0][0].data).toMatchObject({
+        action: "customer.coupon_created",
+        targetId: CUSTOMER_ID,
       });
 
       await instance.close();
@@ -1659,7 +1744,7 @@ describe("customer routes", () => {
 
     it("refuses a second coupon with the same code", async () => {
       customerCoupon.create.mockRejectedValue(
-        uniqueViolation(["owner_id", "code"]),
+        uniqueViolation(["organization_id", "code"]),
       );
 
       const instance = await app();
@@ -1769,7 +1854,7 @@ describe("customer routes", () => {
       await instance.close();
     });
 
-    it("scopes a coupon change to the owner and its customer", async () => {
+    it("scopes a coupon change to the organization and its customer", async () => {
       const instance = await app();
       await instance.inject({
         method: "PATCH",
@@ -1781,7 +1866,7 @@ describe("customer routes", () => {
       expect(customerCoupon.updateMany.mock.calls[0][0].where).toEqual({
         id: COUPON_ID,
         customerId: CUSTOMER_ID,
-        ownerId: USER_ID,
+        organizationId: ORG_ID,
       });
 
       await instance.close();
@@ -1901,7 +1986,7 @@ describe("customer routes", () => {
       expect(
         customerPaymentIdentity.findFirst.mock.calls[0][0].where,
       ).toMatchObject({
-        ownerId: USER_ID,
+        organizationId: ORG_ID,
         type: "WALLET",
         address: PAYER,
         network: "BASE_SEPOLIA",
@@ -2101,15 +2186,17 @@ describe("customer routes", () => {
       await instance.close();
     });
 
-    it("scopes the payer lookup to the key's owner", async () => {
-      apiKey.findUnique.mockResolvedValue(storedKey({ ownerId: "other" }));
+    it("scopes the payer lookup to the key's organization", async () => {
+      apiKey.findUnique.mockResolvedValue(
+        storedKey({ organizationId: "other" }),
+      );
       customerPaymentIdentity.findFirst.mockResolvedValue(null);
 
       const instance = await app();
       await instance.inject(resolve({}));
 
       expect(
-        customerPaymentIdentity.findFirst.mock.calls[0][0].where.ownerId,
+        customerPaymentIdentity.findFirst.mock.calls[0][0].where.organizationId,
       ).toBe("other");
 
       await instance.close();
@@ -2131,7 +2218,7 @@ describe("customer routes", () => {
       expect(
         customerPaymentIdentity.create.mock.calls[0][0].data,
       ).toMatchObject({
-        ownerId: USER_ID,
+        organizationId: ORG_ID,
         customerId: CUSTOMER_ID,
         address: PAYER,
       });
@@ -2156,7 +2243,7 @@ describe("customer routes", () => {
       await instance.close();
     });
 
-    it("scopes an identity change to the owner and its customer", async () => {
+    it("scopes an identity change to the organization and its customer", async () => {
       const instance = await app();
       await instance.inject({
         method: "PATCH",
@@ -2170,7 +2257,7 @@ describe("customer routes", () => {
           where: {
             id: IDENTITY_ID,
             customerId: CUSTOMER_ID,
-            ownerId: USER_ID,
+            organizationId: ORG_ID,
           },
         },
       );

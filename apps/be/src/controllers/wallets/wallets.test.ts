@@ -4,6 +4,7 @@ import { buildWalletLinkMessage } from "@utils/siwe";
 import { privateKeyToAccount } from "viem/accounts";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { initApp } from "@/server";
+import { actAs, ORG_ID, OTHER_ORG_ID } from "@/test-support/tenancy";
 
 const {
   authenticateRequest,
@@ -14,7 +15,12 @@ const {
   walletNonce,
   apiListing,
   agent,
+  tenancy,
 } = vi.hoisted(() => ({
+  tenancy: {
+    membership: { findFirst: vi.fn(), create: vi.fn() },
+    auditLog: { create: vi.fn() },
+  },
   authenticateRequest: vi.fn(),
   getUser: vi.fn(),
   findUnique: vi.fn(),
@@ -46,6 +52,7 @@ vi.mock("@clerk/backend", () => ({
 
 vi.mock("@4mica/db", () => ({
   prisma: {
+    ...tenancy,
     agent,
     apiListing,
     user: { findUnique, upsert, update: vi.fn() },
@@ -164,6 +171,7 @@ describe("wallet routes", () => {
       }
     }
     clearUserCache();
+    actAs(tenancy);
 
     authenticateRequest.mockResolvedValue(signedIn());
     upsert.mockResolvedValue(AUTH_USER);
@@ -227,7 +235,7 @@ describe("wallet routes", () => {
 
     await app.inject({ method: "GET", url: "/me/wallets", headers: AUTH });
     expect(wallet.findMany.mock.calls[0][0].where).toMatchObject({
-      ownerId: USER_ID,
+      organizationId: ORG_ID,
     });
 
     await app.inject({
@@ -237,7 +245,7 @@ describe("wallet routes", () => {
     });
     expect(wallet.findFirst.mock.calls[0][0].where).toEqual({
       id: WALLET_ID,
-      ownerId: USER_ID,
+      organizationId: ORG_ID,
     });
 
     await app.inject({
@@ -247,13 +255,111 @@ describe("wallet routes", () => {
     });
     expect(wallet.findFirst.mock.calls[1][0].where).toEqual({
       id: WALLET_ID,
-      ownerId: USER_ID,
+      organizationId: ORG_ID,
     });
     expect(wallet.deleteMany.mock.calls[0][0].where).toEqual({
       id: { in: [WALLET_ID] },
-      ownerId: USER_ID,
+      organizationId: ORG_ID,
     });
 
+    await app.close();
+  });
+
+  it("404s and reads nothing for an organization the caller is not in", async () => {
+    const app = await initApp([{ plugin: walletRoutes }]);
+
+    const res = await app.inject({
+      method: "GET",
+      url: "/me/wallets",
+      headers: { ...AUTH, "x-org-id": OTHER_ORG_ID },
+    });
+
+    expect(res.statusCode).toBe(404);
+    expect(wallet.findMany).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("lets a member read wallets but not manage them", async () => {
+    actAs(tenancy, "MEMBER");
+    const app = await initApp([{ plugin: walletRoutes }]);
+
+    const list = await app.inject({
+      method: "GET",
+      url: "/me/wallets",
+      headers: AUTH,
+    });
+    expect(list.statusCode).toBe(200);
+
+    for (const [method, url, payload] of [
+      [
+        "POST",
+        "/me/wallets",
+        {
+          label: "Treasury",
+          address: signer.address,
+          network: "BASE_SEPOLIA",
+          nonce: "test-nonce",
+          signature: `0x${"1".repeat(130)}`,
+        },
+      ],
+      ["PATCH", `/me/wallets/${WALLET_ID}`, { label: "Mine now" }],
+      ["PATCH", `/me/wallets/${WALLET_ID}`, { isDefault: true }],
+      ["DELETE", `/me/wallets/${WALLET_ID}`, undefined],
+      ["POST", "/me/wallets/batch-delete", { ids: [WALLET_ID] }],
+    ] as const) {
+      const res = await app.inject({ method, url, headers: AUTH, payload });
+      expect(res.statusCode, `${method} ${url}`).toBe(403);
+      expect(res.json().error).toBe("forbidden");
+    }
+
+    expect(walletNonce.findFirst).not.toHaveBeenCalled();
+    expect(wallet.create).not.toHaveBeenCalled();
+    expect(wallet.update).not.toHaveBeenCalled();
+    expect(wallet.deleteMany).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("audits linking, updating and removing a wallet", async () => {
+    const row = challenge();
+    walletNonce.findFirst.mockResolvedValue(row);
+    const app = await initApp([{ plugin: walletRoutes }]);
+
+    await app.inject({
+      method: "POST",
+      url: "/me/wallets",
+      headers: AUTH,
+      payload: {
+        label: "Treasury",
+        address: signer.address,
+        network: "BASE_SEPOLIA",
+        nonce: row.nonce,
+        signature: await signChallenge(row),
+      },
+    });
+    await app.inject({
+      method: "PATCH",
+      url: `/me/wallets/${WALLET_ID}`,
+      headers: AUTH,
+      payload: { label: "Renamed" },
+    });
+    await app.inject({
+      method: "DELETE",
+      url: `/me/wallets/${WALLET_ID}`,
+      headers: AUTH,
+    });
+
+    expect(
+      tenancy.auditLog.create.mock.calls.map(([arg]) => arg.data),
+    ).toMatchObject([
+      {
+        organizationId: ORG_ID,
+        actorUserId: USER_ID,
+        action: "wallet.added",
+        targetId: WALLET_ID,
+      },
+      { action: "wallet.updated", targetId: WALLET_ID },
+      { action: "wallet.removed", targetId: WALLET_ID },
+    ]);
     await app.close();
   });
 
@@ -342,7 +448,8 @@ describe("wallet routes", () => {
 
       expect(res.statusCode).toBe(201);
       expect(wallet.create.mock.calls[0][0].data).toMatchObject({
-        ownerId: USER_ID,
+        organizationId: ORG_ID,
+        createdById: USER_ID,
         address: ADDRESS,
         verificationMethod: "EOA_SIGNATURE",
         verifiedChainId: 84532,
@@ -622,7 +729,7 @@ describe("wallet routes", () => {
 
         const hidden = {
           where: {
-            ownerId: USER_ID,
+            organizationId: ORG_ID,
             walletId: WALLET_ID,
             visibility: "PUBLIC",
           },
@@ -657,7 +764,11 @@ describe("wallet routes", () => {
       });
 
       expect(wallet.updateMany.mock.calls[0][0]).toMatchObject({
-        where: { ownerId: USER_ID, network: "BASE_SEPOLIA", isDefault: true },
+        where: {
+          organizationId: ORG_ID,
+          network: "BASE_SEPOLIA",
+          isDefault: true,
+        },
         data: { isDefault: false },
       });
       await app.close();
@@ -714,7 +825,7 @@ describe("wallet routes", () => {
 
       expect(res.statusCode).toBe(204);
       expect(apiListing.updateMany.mock.calls[0][0].where).toEqual({
-        ownerId: USER_ID,
+        organizationId: ORG_ID,
         walletId: { in: [WALLET_ID] },
       });
       expect(agent.updateMany).toHaveBeenCalledTimes(2);
@@ -758,7 +869,7 @@ describe("wallet routes", () => {
       });
       expect(wallet.deleteMany.mock.calls[0][0].where).toEqual({
         id: { in: [WALLET_ID] },
-        ownerId: USER_ID,
+        organizationId: ORG_ID,
       });
       await app.close();
     });
@@ -774,7 +885,10 @@ describe("wallet routes", () => {
         payload: { ids: [WALLET_ID, OTHER_ID] },
       });
 
-      const receiving = { ownerId: USER_ID, walletId: { in: [WALLET_ID] } };
+      const receiving = {
+        organizationId: ORG_ID,
+        walletId: { in: [WALLET_ID] },
+      };
       expect(apiListing.updateMany).toHaveBeenCalledWith({
         where: receiving,
         data: { payToAddress: null, visibility: "PRIVATE" },
@@ -784,7 +898,7 @@ describe("wallet routes", () => {
         data: { payToAddress: null, visibility: "PRIVATE" },
       });
       expect(agent.updateMany).toHaveBeenCalledWith({
-        where: { ownerId: USER_ID, payerWalletId: { in: [WALLET_ID] } },
+        where: { organizationId: ORG_ID, payerWalletId: { in: [WALLET_ID] } },
         data: { walletAddress: null },
       });
       await app.close();

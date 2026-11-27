@@ -1,4 +1,4 @@
-import { prisma } from "@4mica/db";
+import { type Prisma, prisma } from "@4mica/db";
 import { toE164 } from "@4mica/rules";
 import type {
   UpdateAccountInput,
@@ -55,7 +55,7 @@ export const USER_SELECT = {
 
 export const BUSINESS_SELECT = {
   id: true,
-  ownerId: true,
+  organizationId: true,
   legalName: true,
   tradingName: true,
   businessType: true,
@@ -93,12 +93,27 @@ export const getUsername = async (userId: string): Promise<string | null> => {
   return row?.username ?? null;
 };
 
-export const findUsernameOwner = async (username: string) =>
-  prisma.user.findUnique({ where: { username }, select: { id: true } });
+export const isUsernameTaken = async (
+  username: string,
+  userId: string,
+): Promise<boolean> => {
+  const [user, organization] = await Promise.all([
+    prisma.user.findUnique({ where: { username }, select: { id: true } }),
+    prisma.organization.findFirst({
+      where: {
+        handle: username,
+        NOT: { personal: true, memberships: { some: { userId } } },
+      },
+      select: { id: true },
+    }),
+  ]);
 
-export const getBusiness = async (userId: string) =>
+  return (user !== null && user.id !== userId) || organization !== null;
+};
+
+export const getBusiness = async (orgId: string) =>
   prisma.business.findUnique({
-    where: { ownerId: userId },
+    where: { organizationId: orgId },
     select: BUSINESS_SELECT,
   });
 
@@ -150,12 +165,53 @@ const routePhoneChange = async (
     : { ...data, phoneNumberVerified: false };
 };
 
-export const updateUser = async (userId: string, data: UpdatableUser) =>
-  prisma.user.update({
-    where: { id: userId },
-    data: await routePhoneChange(userId, await routeEmailChange(userId, data)),
-    select: USER_SELECT,
+const renamePersonalOrganization = async (
+  tx: Prisma.TransactionClient,
+  userId: string,
+  handle: string | null,
+) => {
+  const personal = await tx.organization.findFirst({
+    where: { personal: true, memberships: { some: { userId } } },
+    select: { id: true },
   });
+
+  if (personal) {
+    await tx.organization.update({
+      where: { id: personal.id },
+      data: { handle },
+    });
+  }
+};
+
+export const updateUser = async (
+  userId: string,
+  data: UpdatableUser,
+  previousUsername: string | null = null,
+) => {
+  const write = await routePhoneChange(
+    userId,
+    await routeEmailChange(userId, data),
+  );
+  const renames = "username" in data && data.username !== previousUsername;
+
+  if (!renames) {
+    return prisma.user.update({
+      where: { id: userId },
+      data: write,
+      select: USER_SELECT,
+    });
+  }
+
+  return prisma.$transaction(async (tx) => {
+    const updated = await tx.user.update({
+      where: { id: userId },
+      data: write,
+      select: USER_SELECT,
+    });
+    await renamePersonalOrganization(tx, userId, updated.username);
+    return updated;
+  });
+};
 
 export const markPhoneVerified = async (userId: string) =>
   prisma.user.update({
@@ -165,12 +221,12 @@ export const markPhoneVerified = async (userId: string) =>
   });
 
 export const upsertBusiness = async (
-  userId: string,
+  orgId: string,
   data: UpsertBusinessInput,
 ) =>
   prisma.business.upsert({
-    where: { ownerId: userId },
-    create: { legalName: "", ...data, ownerId: userId },
+    where: { organizationId: orgId },
+    create: { legalName: "", ...data, organizationId: orgId },
     update: data,
     select: BUSINESS_SELECT,
   });

@@ -5,13 +5,13 @@ import { findApiKeyByHash, touchApiKey } from "./repository";
 
 export interface ApiKeyContext {
   id: string;
-  ownerId: string;
+  orgId: string;
   listingId: string | null;
   agentId: string | null;
 }
 
 export interface ResourceKeyContext {
-  ownerId: string;
+  orgId: string;
   kind: "listing" | "agent";
   id: string;
 }
@@ -81,10 +81,8 @@ export const authenticateApiKey = async (
       ? "revoked"
       : record.expiresAt !== null && record.expiresAt.getTime() <= Date.now()
         ? "expired"
-        : record.owner.banned ||
-            record.owner.locked ||
-            record.owner.deletedAt !== null
-          ? "owner_disabled"
+        : record.organization.deletedAt !== null
+          ? "organization_deleted"
           : record.listing?.deletedAt || record.agent?.deletedAt
             ? "resource_deleted"
             : null;
@@ -96,7 +94,7 @@ export const authenticateApiKey = async (
 
   request.apiKey = {
     id: record.id,
-    ownerId: record.ownerId,
+    orgId: record.organizationId,
     listingId: record.listingId,
     agentId: record.agentId,
   };
@@ -104,7 +102,7 @@ export const authenticateApiKey = async (
   void touchApiKey(record.id).catch(() => {});
 };
 
-export const requireApiKeyOwner = (
+export const requireApiKeyOrg = (
   request: FastifyRequest,
   reply: FastifyReply,
 ): string | null => {
@@ -113,7 +111,7 @@ export const requireApiKeyOwner = (
     return null;
   }
 
-  return request.apiKey.ownerId;
+  return request.apiKey.orgId;
 };
 
 export const requireResourceKey = (
@@ -125,13 +123,13 @@ export const requireResourceKey = (
     return null;
   }
 
-  const { ownerId, listingId, agentId } = request.apiKey;
+  const { orgId, listingId, agentId } = request.apiKey;
 
   if (listingId) {
-    return { ownerId, kind: "listing", id: listingId };
+    return { orgId, kind: "listing", id: listingId };
   }
   if (agentId) {
-    return { ownerId, kind: "agent", id: agentId };
+    return { orgId, kind: "agent", id: agentId };
   }
 
   reply.code(403).send({

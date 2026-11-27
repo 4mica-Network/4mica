@@ -2,6 +2,7 @@ import { clearUserCache } from "@auth/user-store";
 import { complianceRoutes } from "@routes/compliance";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { initApp } from "@/server";
+import { actAs, ORG_ID, OTHER_ORG_ID } from "@/test-support/tenancy";
 
 const {
   authenticateRequest,
@@ -12,7 +13,12 @@ const {
   complianceProfile,
   beneficialOwner,
   $transaction,
+  tenancy,
 } = vi.hoisted(() => ({
+  tenancy: {
+    membership: { findFirst: vi.fn(), create: vi.fn() },
+    auditLog: { create: vi.fn() },
+  },
   authenticateRequest: vi.fn(),
   getUser: vi.fn(),
   findUnique: vi.fn(),
@@ -41,6 +47,7 @@ vi.mock("@clerk/backend", () => ({
 
 vi.mock("@4mica/db", () => ({
   prisma: {
+    ...tenancy,
     agent: { count: vi.fn() },
     user: { findUnique, upsert, update: vi.fn() },
     business,
@@ -174,6 +181,7 @@ describe("compliance routes", () => {
       }
     }
     clearUserCache();
+    actAs(tenancy);
 
     authenticateRequest.mockResolvedValue(signedIn());
     upsert.mockResolvedValue(AUTH_USER);
@@ -229,10 +237,10 @@ describe("compliance routes", () => {
       const res = await call("GET", "/me/compliance");
 
       expect(complianceProfile.findUnique.mock.calls[0][0].where).toEqual({
-        ownerId: USER_ID,
+        organizationId: ORG_ID,
       });
       expect(beneficialOwner.findMany.mock.calls[0][0].where).toEqual({
-        ownerId: USER_ID,
+        organizationId: ORG_ID,
       });
       expect(res.json().profile.incorporatedOn).toBe("2020-01-01");
       expect(res.json().owners[0].dateOfBirth).toBe("1985-12-10");
@@ -280,7 +288,7 @@ describe("compliance routes", () => {
       expect(update.prohibitedAttestedAt).toBeInstanceOf(Date);
       expect(update.accuracyAttestedAt).toBeNull();
       expect(update.customerRegions).toEqual(["GB", "US"]);
-      expect(create.ownerId).toBe(USER_ID);
+      expect(create.organizationId).toBe(ORG_ID);
     });
 
     it("leaves attestations alone when the request does not mention them", async () => {
@@ -314,7 +322,7 @@ describe("compliance routes", () => {
 
       expect(res.statusCode).toBe(201);
       const { data } = beneficialOwner.create.mock.calls[0][0];
-      expect(data.ownerId).toBe(USER_ID);
+      expect(data.organizationId).toBe(ORG_ID);
       expect(data.dateOfBirth).toEqual(new Date("1971-12-26T00:00:00Z"));
       expect(data.isPep).toBe(false);
     });
@@ -385,12 +393,12 @@ describe("compliance routes", () => {
 
       expect(res.statusCode).toBe(200);
       expect(beneficialOwner.aggregate.mock.calls[0][0].where).toEqual({
-        ownerId: USER_ID,
+        organizationId: ORG_ID,
         id: { not: STORED_OWNER.id },
       });
       expect(beneficialOwner.updateMany.mock.calls[0][0].where).toEqual({
         id: STORED_OWNER.id,
-        ownerId: USER_ID,
+        organizationId: ORG_ID,
       });
     });
 
@@ -416,7 +424,7 @@ describe("compliance routes", () => {
       expect(res.statusCode).toBe(204);
       expect(beneficialOwner.deleteMany.mock.calls[0][0].where).toEqual({
         id: STORED_OWNER.id,
-        ownerId: USER_ID,
+        organizationId: ORG_ID,
       });
     });
 
@@ -464,7 +472,7 @@ describe("compliance routes", () => {
 
       expect(res.statusCode).toBe(200);
       expect(business.update.mock.calls[0][0]).toEqual({
-        where: { ownerId: USER_ID },
+        where: { organizationId: ORG_ID },
         data: { kybStatus: "PENDING" },
       });
       expect(
@@ -496,6 +504,68 @@ describe("compliance routes", () => {
 
       expect(res.statusCode).toBe(409);
       expect($transaction).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("tenancy", () => {
+    it("404s and reads nothing for an organization the caller is not in", async () => {
+      const res = await call("GET", "/me/compliance", undefined, {
+        ...AUTH,
+        "x-org-id": OTHER_ORG_ID,
+      });
+
+      expect(res.statusCode).toBe(404);
+      expect(complianceProfile.findUnique).not.toHaveBeenCalled();
+      expect(beneficialOwner.findMany).not.toHaveBeenCalled();
+    });
+
+    it("lets a member read but not change compliance details", async () => {
+      actAs(tenancy, "MEMBER");
+
+      expect((await call("GET", "/me/compliance")).statusCode).toBe(200);
+
+      for (const [method, url, payload] of [
+        ["PATCH", "/me/compliance", { regulator: "FCA" }],
+        ["POST", "/me/compliance/owners", NEW_OWNER],
+        ["PATCH", `/me/compliance/owners/${STORED_OWNER.id}`, { isPep: true }],
+        ["DELETE", `/me/compliance/owners/${STORED_OWNER.id}`, undefined],
+        ["POST", "/me/compliance/submit", undefined],
+      ] as const) {
+        const res = await call(method, url, payload);
+        expect(res.statusCode, `${method} ${url}`).toBe(403);
+        expect(res.json().error).toBe("forbidden");
+      }
+
+      expect(complianceProfile.upsert).not.toHaveBeenCalled();
+      expect(beneficialOwner.create).not.toHaveBeenCalled();
+      expect(beneficialOwner.updateMany).not.toHaveBeenCalled();
+      expect(beneficialOwner.deleteMany).not.toHaveBeenCalled();
+      expect($transaction).not.toHaveBeenCalled();
+    });
+
+    it("audits each change to the organization's compliance record", async () => {
+      await call("PATCH", "/me/compliance", { regulator: "FCA" });
+      await call("POST", "/me/compliance/owners", NEW_OWNER);
+      await call("PATCH", `/me/compliance/owners/${STORED_OWNER.id}`, {
+        isPep: true,
+      });
+      await call("DELETE", `/me/compliance/owners/${STORED_OWNER.id}`);
+      await call("POST", "/me/compliance/submit");
+
+      expect(
+        tenancy.auditLog.create.mock.calls.map(([arg]) => arg.data.action),
+      ).toEqual([
+        "compliance.updated",
+        "beneficial_owner.added",
+        "beneficial_owner.updated",
+        "beneficial_owner.removed",
+        "compliance.submitted",
+      ]);
+      expect(tenancy.auditLog.create.mock.calls[1][0].data).toMatchObject({
+        organizationId: ORG_ID,
+        actorUserId: USER_ID,
+        targetId: STORED_OWNER.id,
+      });
     });
   });
 });

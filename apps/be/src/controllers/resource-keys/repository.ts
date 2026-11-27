@@ -15,7 +15,8 @@ export const listResourceKeys = (kind: ResourceKind, id: string) =>
   });
 
 export const createResourceKey = async (
-  ownerId: string,
+  orgId: string,
+  userId: string,
   kind: ResourceKind,
   id: string,
   data: CreateResourceKeyInput,
@@ -24,7 +25,8 @@ export const createResourceKey = async (
 
   const apiKey = await prisma.apiKey.create({
     data: {
-      ownerId,
+      organizationId: orgId,
+      createdById: userId,
       ...target(kind, id),
       name: data.name,
       prefix: secret.prefix,

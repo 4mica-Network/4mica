@@ -1,9 +1,12 @@
+import type { Permission } from "@auth/permissions";
+import type { Tenant } from "@auth/tenant";
 import { MAX_OFFSET } from "@controllers/schema-primitives";
 import {
+  audit,
   invalidBody,
   notFound,
   parseBody,
-  requireUserId,
+  requireTenant,
 } from "@controllers/shared";
 import type { RouteHandler } from "fastify";
 import {
@@ -41,49 +44,65 @@ const what = (kind: ResourceKind) =>
 const withOwnedResource =
   (
     kind: ResourceKind,
+    permission: Permission,
     run: (
       id: string,
       request: Parameters<RouteHandler>[0],
       reply: Parameters<RouteHandler>[1],
+      tenant: Tenant,
     ) => Promise<unknown>,
   ): RouteHandler =>
   async (request, reply) => {
-    const userId = requireUserId(request, reply);
-    if (!userId) {
+    const tenant = await requireTenant(request, reply, permission);
+    if (!tenant) {
       return reply;
     }
 
     const { id } = request.params as { id: string };
 
-    if (!(await ownsResource(kind, userId, id))) {
+    if (!(await ownsResource(kind, tenant.orgId, id))) {
       return notFound(reply, what(kind));
     }
 
-    return run(id, request, reply);
+    return run(id, request, reply, tenant);
   };
 
+const auditTarget = (kind: ResourceKind) =>
+  kind === "listing" ? "api_listing" : "agent";
+
 export const getPolicyHandler = (kind: ResourceKind): RouteHandler =>
-  withOwnedResource(kind, async (id, _request, reply) =>
+  withOwnedResource(kind, "resources.read", async (id, _request, reply) =>
     reply.send({ policy: await getPolicy(kind, id) }),
   );
 
 export const upsertPolicyHandler = (kind: ResourceKind): RouteHandler =>
-  withOwnedResource(kind, async (id, request, reply) => {
-    const parsed = parseBody(UpsertPolicySchema, request.body);
-    if (!parsed.success) {
-      return invalidBody(reply, parsed.issues);
-    }
+  withOwnedResource(
+    kind,
+    "resources.write",
+    async (id, request, reply, tenant) => {
+      const parsed = parseBody(UpsertPolicySchema, request.body);
+      if (!parsed.success) {
+        return invalidBody(reply, parsed.issues);
+      }
 
-    return reply.send({ policy: await upsertPolicy(kind, id, parsed.data) });
-  });
+      const policy = await upsertPolicy(kind, id, parsed.data);
+      await audit(request, tenant, {
+        action: "resource_policy.updated",
+        targetType: auditTarget(kind),
+        targetId: id,
+      });
+
+      return reply.send({ policy });
+    },
+  );
 
 export const trustSummaryHandler = (kind: ResourceKind): RouteHandler =>
-  withOwnedResource(kind, async (id, _request, reply) =>
+  withOwnedResource(kind, "resources.read", async (id, _request, reply) =>
     reply.send(await trustSummary(kind, id)),
   );
 
 export const listReviewsHandler = (kind: ResourceKind): RouteHandler =>
-  withOwnedResource(kind, async (id, request, reply) => {
+  withOwnedResource(kind, "resources.read", async (id, request, reply) => {
     const parsed = parseBody(ListReviewsQuerySchema, request.query);
     if (!parsed.success) {
       return invalidBody(reply, parsed.issues);
@@ -99,26 +118,36 @@ export const listReviewsHandler = (kind: ResourceKind): RouteHandler =>
   });
 
 export const replyToReviewHandler = (kind: ResourceKind): RouteHandler =>
-  withOwnedResource(kind, async (id, request, reply) => {
-    const parsed = parseBody(ReplyToReviewSchema, request.body);
-    if (!parsed.success) {
-      return invalidBody(reply, parsed.issues);
-    }
+  withOwnedResource(
+    kind,
+    "resources.write",
+    async (id, request, reply, tenant) => {
+      const parsed = parseBody(ReplyToReviewSchema, request.body);
+      if (!parsed.success) {
+        return invalidBody(reply, parsed.issues);
+      }
 
-    const { reviewId } = request.params as { reviewId: string };
-    const review = await findReview(kind, id, reviewId);
+      const { reviewId } = request.params as { reviewId: string };
+      const review = await findReview(kind, id, reviewId);
 
-    if (!review) {
-      return notFound(reply, "review");
-    }
+      if (!review) {
+        return notFound(reply, "review");
+      }
 
-    return reply.send({
-      review: await replyToReview(review.id, parsed.data.reply),
-    });
-  });
+      const updated = await replyToReview(review.id, parsed.data.reply);
+      await audit(request, tenant, {
+        action: "review.replied",
+        targetType: "review",
+        targetId: review.id,
+        metadata: { [kind === "listing" ? "listingId" : "agentId"]: id },
+      });
+
+      return reply.send({ review: updated });
+    },
+  );
 
 export const listReportsHandler = (kind: ResourceKind): RouteHandler =>
-  withOwnedResource(kind, async (id, request, reply) => {
+  withOwnedResource(kind, "resources.read", async (id, request, reply) => {
     const parsed = parseBody(ListReportsQuerySchema, request.query);
     if (!parsed.success) {
       return invalidBody(reply, parsed.issues);
@@ -134,35 +163,45 @@ export const listReportsHandler = (kind: ResourceKind): RouteHandler =>
   });
 
 export const updateReportHandler = (kind: ResourceKind): RouteHandler =>
-  withOwnedResource(kind, async (id, request, reply) => {
-    const parsed = parseBody(UpdateReportSchema, request.body);
-    if (!parsed.success) {
-      return invalidBody(reply, parsed.issues);
-    }
+  withOwnedResource(
+    kind,
+    "resources.write",
+    async (id, request, reply, tenant) => {
+      const parsed = parseBody(UpdateReportSchema, request.body);
+      if (!parsed.success) {
+        return invalidBody(reply, parsed.issues);
+      }
 
-    const { reportId } = request.params as { reportId: string };
-    const report = await findReport(kind, id, reportId);
+      const { reportId } = request.params as { reportId: string };
+      const report = await findReport(kind, id, reportId);
 
-    if (!report) {
-      return notFound(reply, "report");
-    }
+      if (!report) {
+        return notFound(reply, "report");
+      }
 
-    return reply.send({
-      report: await updateReport(
+      const updated = await updateReport(
         report.id,
         parsed.data.status,
         parsed.data.resolutionNote,
-      ),
-    });
-  });
+      );
+      await audit(request, tenant, {
+        action: "report.updated",
+        targetType: "report",
+        targetId: report.id,
+        metadata: { status: parsed.data.status },
+      });
+
+      return reply.send({ report: updated });
+    },
+  );
 
 export const listFaqsHandler = (kind: ResourceKind): RouteHandler =>
-  withOwnedResource(kind, async (id, _request, reply) =>
+  withOwnedResource(kind, "resources.read", async (id, _request, reply) =>
     reply.send({ data: await listFaqs(kind, id) }),
   );
 
 export const createFaqHandler = (kind: ResourceKind): RouteHandler =>
-  withOwnedResource(kind, async (id, request, reply) => {
+  withOwnedResource(kind, "resources.write", async (id, request, reply) => {
     const parsed = parseBody(FaqItemSchema, request.body);
     if (!parsed.success) {
       return invalidBody(reply, parsed.issues);
@@ -174,7 +213,7 @@ export const createFaqHandler = (kind: ResourceKind): RouteHandler =>
   });
 
 export const updateFaqHandler = (kind: ResourceKind): RouteHandler =>
-  withOwnedResource(kind, async (id, request, reply) => {
+  withOwnedResource(kind, "resources.write", async (id, request, reply) => {
     const parsed = parseBody(FaqItemSchema, request.body);
     if (!parsed.success) {
       return invalidBody(reply, parsed.issues);
@@ -191,7 +230,7 @@ export const updateFaqHandler = (kind: ResourceKind): RouteHandler =>
   });
 
 export const deleteFaqHandler = (kind: ResourceKind): RouteHandler =>
-  withOwnedResource(kind, async (id, request, reply) => {
+  withOwnedResource(kind, "resources.write", async (id, request, reply) => {
     const { faqId } = request.params as { faqId: string };
     const faq = await findFaq(kind, id, faqId);
 
@@ -205,7 +244,7 @@ export const deleteFaqHandler = (kind: ResourceKind): RouteHandler =>
   });
 
 export const reorderFaqsHandler = (kind: ResourceKind): RouteHandler =>
-  withOwnedResource(kind, async (id, request, reply) => {
+  withOwnedResource(kind, "resources.write", async (id, request, reply) => {
     const parsed = parseBody(ReorderFaqsSchema, request.body);
     if (!parsed.success) {
       return invalidBody(reply, parsed.issues);

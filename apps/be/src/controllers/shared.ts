@@ -1,4 +1,9 @@
+import { prisma } from "@4mica/db";
+import { can, type Permission } from "@auth/permissions";
+import { resolveTenant, type Tenant } from "@auth/tenant";
+import { type AuditEntry, writeAudit } from "@controllers/audit/repository";
 import type { SellerWalletResult } from "@controllers/wallets/repository";
+import { appLogger } from "@logger/index";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import * as v from "valibot";
 
@@ -28,6 +33,80 @@ export const requireUserId = (
   }
 
   return request.user.id;
+};
+
+/**
+ * Resolves the organization the request acts in and checks the caller's role
+ * against `permission`. The organization comes from the `X-Org-Id` header but
+ * is only honoured when the session's user is a member, so the header selects
+ * among the caller's own tenants and never reaches anyone else's. An unknown
+ * or foreign organization answers 404, exactly like a foreign resource.
+ */
+export const requireTenant = async (
+  request: FastifyRequest,
+  reply: FastifyReply,
+  permission: Permission,
+): Promise<Tenant | null> => {
+  const userId = requireUserId(request, reply);
+  if (!userId) {
+    return null;
+  }
+
+  const tenant = await resolveTenant(request, userId);
+  if (!tenant) {
+    notFound(reply, "organization");
+    return null;
+  }
+
+  if (!can(tenant.role, permission)) {
+    void Promise.resolve()
+      .then(() =>
+        writeAudit(prisma, {
+          orgId: tenant.orgId,
+          actorUserId: userId,
+          action: "authz.denied",
+          metadata: {
+            permission,
+            method: request.method,
+            route: request.routeOptions.url ?? null,
+          },
+          ip: request.ip,
+        }),
+      )
+      .catch((error: unknown) => {
+        appLogger.warn("Could not record denied request", { error });
+      });
+
+    reply.code(403).send({
+      error: "forbidden",
+      message: "Your role in this organization does not allow that.",
+      permission,
+    });
+    return null;
+  }
+
+  return tenant;
+};
+
+export const audit = async (
+  request: FastifyRequest,
+  tenant: Tenant,
+  entry: Omit<AuditEntry, "orgId" | "actorUserId" | "ip">,
+): Promise<void> => {
+  try {
+    await writeAudit(prisma, {
+      ...entry,
+      orgId: tenant.orgId,
+      actorUserId: tenant.userId,
+      ip: request.ip,
+    });
+  } catch (error) {
+    appLogger.error("Could not record audit entry", {
+      action: entry.action,
+      orgId: tenant.orgId,
+      error,
+    });
+  }
 };
 
 export const notFound = (reply: FastifyReply, what: string) =>
