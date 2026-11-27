@@ -10,6 +10,7 @@ import {
   routeThroughEnvProxy,
 } from "./core/net.js";
 import { setExplorer } from "./core/outcome.js";
+import { requireSession, type Session } from "./core/platform.js";
 import { type Preview, renderPreview } from "./core/preview.js";
 import {
   type KeyFile,
@@ -18,7 +19,10 @@ import {
   resolveSettings,
   type Settings,
 } from "./core/settings.js";
-import { EXIT } from "./errors.js";
+import { configError, EXIT } from "./errors.js";
+
+/** Read by the account commands from the environment only, never a file. */
+const PLATFORM_VARIABLES = ["API_URL", "TOKEN"] as const;
 
 /** Commands that talk to a 4mica network. */
 export abstract class NetworkCommand extends BaseCommand {
@@ -70,6 +74,36 @@ export abstract class NetworkCommand extends BaseCommand {
   protected showPreview(preview: Preview): void {
     this.log(renderPreview(preview));
     if (!preview.ready) this.exitStatus(EXIT.failure);
+  }
+
+  /**
+   * The signed-in account, for a command that also uses a wallet. The account
+   * comes from the environment and the saved sign-in, as for `4mica auth`;
+   * an env file that tries to choose it is refused, since the network would
+   * follow the file and the account would not, and a wallet on one platform
+   * would be linked to an account on another.
+   */
+  protected async accountSession(settings: Settings): Promise<Session> {
+    const fromFile = PLATFORM_VARIABLES.filter(
+      (name) =>
+        settings.sdkEnv[`FOURMICA_${name}`] !== undefined &&
+        !readEnv(process.env, name),
+    );
+    if (fromFile.length > 0) {
+      const names = fromFile.map((name) => `FOURMICA_${name}`).join(" and ");
+      throw configError(
+        `${settings.envFilePath} sets ${names}, which choose the 4mica ` +
+          "account and are read only from the environment",
+        {
+          code: "PLATFORM_ENV_IN_FILE",
+          suggestions: [
+            `set ${names} in the shell instead, as for \`4mica auth login\``,
+            `or remove ${fromFile.length > 1 ? "them" : "it"} from ${settings.envFilePath}`,
+          ],
+        },
+      );
+    }
+    return requireSession(this.config.configDir);
   }
 
   protected async settings(flags: {

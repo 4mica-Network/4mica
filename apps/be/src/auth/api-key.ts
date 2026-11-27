@@ -46,7 +46,7 @@ const rejected = (
   unauthorized(reply);
 };
 
-const bearerToken = (request: FastifyRequest): string | null => {
+export const bearerToken = (request: FastifyRequest): string | null => {
   const header = request.headers.authorization;
   if (typeof header !== "string") {
     return null;

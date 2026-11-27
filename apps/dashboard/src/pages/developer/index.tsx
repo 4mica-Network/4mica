@@ -12,6 +12,7 @@ import { RevealedSecretBanner } from "@/components/RevealedSecret";
 import { SettingsPage } from "@/components/SettingsPage";
 import { useEphemeralSecret } from "@/hooks/useEphemeralSecret";
 import { ApiKeysCard } from "./ApiKeysCard";
+import { CliSessionsCard } from "./CliSessionsCard";
 import { WebhooksCard } from "./WebhooksCard";
 
 export function DeveloperSettings() {
@@ -41,6 +42,7 @@ export function DeveloperSettings() {
         <>
           <RevealedSecretBanner secret={secret} onDismiss={clear} />
           <ApiKeysCard onReveal={reveal} />
+          <CliSessionsCard onReveal={reveal} />
           <WebhooksCard onReveal={reveal} />
         </>
       )}

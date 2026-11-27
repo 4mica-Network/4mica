@@ -13,6 +13,7 @@ declare module "fastify" {
   interface FastifyInstance {
     sharedRateLimits?: {
       sensitive: preHandlerAsyncHookHandler;
+      publicSensitive: preHandlerAsyncHookHandler;
       apiKey: preHandlerAsyncHookHandler;
     };
   }
@@ -26,8 +27,8 @@ const TOO_MANY_REQUESTS = {
 const isExempt = (request: FastifyRequest): boolean =>
   request.method === "OPTIONS" || request.url.startsWith("/health");
 
-const userKey = (request: FastifyRequest): string =>
-  request.auth?.clerkUserId ?? request.ip;
+export const userKey = (request: FastifyRequest): string =>
+  request.auth?.clerkUserId ?? request.user?.clerkUserId ?? request.ip;
 
 const ipKey = (request: FastifyRequest): string => request.ip;
 
@@ -98,7 +99,7 @@ const userLimit = (
   const check = limiter(app, max, userKey);
 
   return async (request, reply) => {
-    if (!request.auth) {
+    if (!request.auth && !request.cliSession) {
       return;
     }
 
@@ -146,6 +147,32 @@ const apiKeyLimit = (app: FastifyInstance): preHandlerAsyncHookHandler => {
   };
 };
 
+const publicSensitiveLimit = (
+  app: FastifyInstance,
+): preHandlerAsyncHookHandler => {
+  const check = limiter(
+    app,
+    config.rateLimit.sensitiveMax,
+    (request) => `public:${request.ip}`,
+  );
+
+  return async (request, reply) => {
+    const result = await check(request);
+
+    if (result.isAllowed || !result.isExceeded) {
+      return;
+    }
+
+    appLogger.warn("Public sensitive endpoint rate limit exceeded", {
+      key: result.key,
+      method: request.method,
+      path: pathOf(request),
+    });
+
+    return reject(reply, result);
+  };
+};
+
 export const registerRateLimit = async (
   app: FastifyInstance,
 ): Promise<void> => {
@@ -164,6 +191,7 @@ export const registerRateLimit = async (
       config.rateLimit.sensitiveMax,
       "Sensitive endpoint",
     ),
+    publicSensitive: publicSensitiveLimit(app),
     apiKey: apiKeyLimit(app),
   });
 };
@@ -177,3 +205,8 @@ export const apiKeyRateLimit = (
 export const sensitiveRateLimit = (
   app: FastifyInstance,
 ): preHandlerAsyncHookHandler => app.sharedRateLimits?.sensitive ?? noLimit;
+
+export const publicSensitiveRateLimit = (
+  app: FastifyInstance,
+): preHandlerAsyncHookHandler =>
+  app.sharedRateLimits?.publicSensitive ?? noLimit;

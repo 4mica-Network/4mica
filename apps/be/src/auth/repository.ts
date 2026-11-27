@@ -182,3 +182,42 @@ export const ensurePersonalOrganization = async (
     return toTenant(userId, await create(null));
   }
 };
+
+export const findCliSessionByHash = (hashedToken: string) =>
+  prisma.cliSession.findUnique({
+    where: { hashedToken },
+    select: {
+      id: true,
+      kind: true,
+      name: true,
+      scopes: true,
+      revokedAt: true,
+      expiresAt: true,
+      lastUsedAt: true,
+      createdAt: true,
+      user: { select: USER_FIELDS },
+    },
+  });
+
+export const CLI_TOUCH_INTERVAL_MS = 5 * 60 * 1000;
+
+export const touchCliSession = async (
+  id: string,
+  lastUsedAt: Date | null,
+): Promise<void> => {
+  const now = Date.now();
+  if (lastUsedAt && now - lastUsedAt.getTime() < CLI_TOUCH_INTERVAL_MS) {
+    return;
+  }
+
+  await prisma.cliSession.updateMany({
+    where: {
+      id,
+      OR: [
+        { lastUsedAt: null },
+        { lastUsedAt: { lt: new Date(now - CLI_TOUCH_INTERVAL_MS) } },
+      ],
+    },
+    data: { lastUsedAt: new Date(now) },
+  });
+};

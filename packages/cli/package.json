@@ -70,6 +70,9 @@
       },
       "config": {
         "description": "show and change the cli's settings"
+      },
+      "auth": {
+        "description": "sign the cli in to and out of your 4mica account"
       }
     },
     "plugins": [

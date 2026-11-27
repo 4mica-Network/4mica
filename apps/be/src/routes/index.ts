@@ -3,6 +3,7 @@ import { agentRoutes } from "./agents";
 import { apiListingRoutes } from "./api-listings";
 import { balanceRoutes } from "./balances";
 import { bannerRoutes } from "./banners";
+import { cliRoutes } from "./cli";
 import { complianceRoutes } from "./compliance";
 import { configRoutes } from "./config";
 import { customerRoutes } from "./customers";
@@ -42,6 +43,7 @@ export const routes: RouteRegistration[] = [
   { plugin: complianceRoutes },
   { plugin: configRoutes },
   { plugin: supportRoutes },
+  { plugin: cliRoutes },
 ];
 
 export {
@@ -49,6 +51,7 @@ export {
   apiListingRoutes,
   balanceRoutes,
   bannerRoutes,
+  cliRoutes,
   complianceRoutes,
   customerRoutes,
   developerRoutes,

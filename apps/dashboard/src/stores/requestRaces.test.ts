@@ -37,6 +37,10 @@ vi.mock("@api/developer", async (importOriginal) => ({
   ...developerApi,
 }));
 
+vi.mock("@api/cli", () => ({
+  getCliSessions: vi.fn(async () => []),
+}));
+
 vi.mock("@/lib/notify", () => ({
   notifySuccess: vi.fn(),
   notifyError: vi.fn(),

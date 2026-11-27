@@ -1,8 +1,16 @@
-import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
+import {
+  createHash,
+  randomBytes,
+  randomInt,
+  timingSafeEqual,
+} from "node:crypto";
 
 const API_KEY_PREFIX = "4mica_sk";
 const WEBHOOK_SECRET_PREFIX = "whsec";
 const EMAIL_VERIFICATION_PREFIX = "4mica_ev";
+const CLI_TOKEN_NAMESPACE = "4mica_cli";
+
+export const CLI_TOKEN_PREFIX = `${CLI_TOKEN_NAMESPACE}_`;
 
 export interface GeneratedSecret {
   plaintext: string;
@@ -52,3 +60,30 @@ const INVITATION_PREFIX = "4mica_inv";
 
 export const generateInvitationToken = (): GeneratedSecret =>
   generate(INVITATION_PREFIX);
+
+export const generateCliToken = (): GeneratedSecret =>
+  generate(CLI_TOKEN_NAMESPACE);
+
+export const generateDeviceCode = (): string =>
+  randomBytes(32).toString("base64url");
+
+const USER_CODE_ALPHABET = "BCDFGHJKLMNPQRSTVWXZ";
+
+export const USER_CODE_LENGTH = 8;
+
+export const generateUserCode = (): string =>
+  Array.from(
+    { length: USER_CODE_LENGTH },
+    () => USER_CODE_ALPHABET[randomInt(USER_CODE_ALPHABET.length)],
+  ).join("");
+
+export const normalizeUserCode = (value: string): string | null => {
+  const code = value.toUpperCase().replace(/[^A-Z]/g, "");
+  return code.length === USER_CODE_LENGTH &&
+    [...code].every((char) => USER_CODE_ALPHABET.includes(char))
+    ? code
+    : null;
+};
+
+export const formatUserCode = (code: string): string =>
+  `${code.slice(0, 4)}-${code.slice(4)}`;
