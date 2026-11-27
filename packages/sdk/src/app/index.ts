@@ -15,8 +15,14 @@ export type {
   AppPayment,
   AppPaymentStatus,
   AppPolicy,
+  ApprovalState,
+  ApprovalStatus,
   AppVisibility,
+  AuthorizeSpendInput,
+  ConsumeSpendInput,
   CouponSkippedReason,
+  CreateApprovalInput,
+  CreatedApproval,
   CustomerDeniedReason,
   CustomerResolution,
   ReportedPayment,
@@ -24,6 +30,9 @@ export type {
   ResolveCustomerInput,
   ResourceContext,
   ResourceKind,
+  SpendAuthorization,
+  SpendAuthorizationStatus,
+  SpendDeniedReason,
 } from "@/app/models";
 export { fromAppNetwork, toAppNetwork } from "@/app/networks";
 export {

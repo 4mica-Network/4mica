@@ -1,11 +1,17 @@
 import { AppError } from "@/app/errors";
 import type {
   AppPayment,
+  ApprovalState,
+  AuthorizeSpendInput,
+  ConsumeSpendInput,
+  CreateApprovalInput,
+  CreatedApproval,
   CustomerResolution,
   ReportedPayment,
   ReportPaymentInput,
   ResolveCustomerInput,
   ResourceContext,
+  SpendAuthorization,
 } from "@/app/models";
 import { toAppNetwork } from "@/app/networks";
 import { ConfigError } from "@/errors";
@@ -78,6 +84,71 @@ export class AppClient {
       { ...input, network: toAppNetwork(input.network) },
     );
     return { payment: body, created: status === 201 };
+  }
+
+  async authorizeSpend(
+    input: AuthorizeSpendInput,
+  ): Promise<SpendAuthorization> {
+    const { body } = await this.request<SpendAuthorization>(
+      "POST",
+      "/v1/spend/authorize",
+      {
+        ...input,
+        network: toAppNetwork(input.network),
+        assetAddress: input.assetAddress ?? null,
+      },
+    );
+    return body;
+  }
+
+  async getSpendAuthorization(id: string): Promise<SpendAuthorization> {
+    const { body } = await this.request<SpendAuthorization>(
+      "GET",
+      `/v1/spend/authorizations/${encodeURIComponent(id)}`,
+    );
+    return body;
+  }
+
+  async consumeSpendAuthorization(
+    id: string,
+    input: ConsumeSpendInput = {},
+  ): Promise<SpendAuthorization> {
+    const { body } = await this.request<SpendAuthorization>(
+      "POST",
+      `/v1/spend/authorizations/${encodeURIComponent(id)}/consume`,
+      input,
+    );
+    return body;
+  }
+
+  async releaseSpendAuthorization(id: string): Promise<SpendAuthorization> {
+    const { body } = await this.request<SpendAuthorization>(
+      "POST",
+      `/v1/spend/authorizations/${encodeURIComponent(id)}/release`,
+      {},
+    );
+    return body;
+  }
+
+  async createApproval(input: CreateApprovalInput): Promise<CreatedApproval> {
+    const { body } = await this.request<CreatedApproval>(
+      "POST",
+      "/v1/approvals",
+      {
+        ...input,
+        network: toAppNetwork(input.network),
+        assetAddress: input.assetAddress ?? null,
+      },
+    );
+    return body;
+  }
+
+  async getApproval(id: string): Promise<ApprovalState> {
+    const { body } = await this.request<ApprovalState>(
+      "GET",
+      `/v1/approvals/${encodeURIComponent(id)}`,
+    );
+    return body;
   }
 
   private async request<T>(

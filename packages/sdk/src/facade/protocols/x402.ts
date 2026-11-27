@@ -1,3 +1,4 @@
+import { paymentFromHeader } from "@/app/payment";
 import type { Client } from "@/client";
 import type { PaymentProtocol, PaymentTerms } from "@/facade/protocols/types";
 import { resolveNetwork } from "@/networks";
@@ -111,6 +112,16 @@ export const x402Protocol: PaymentProtocol = {
     try {
       const raw: unknown = JSON.parse(base64ToUtf8(header.trim()));
       return isRecord(raw) ? raw.success === true : undefined;
+    } catch {
+      return undefined;
+    }
+  },
+
+  reqId(headers: Record<string, string>): string | undefined {
+    const header = headers["PAYMENT-SIGNATURE"] ?? headers["X-PAYMENT"];
+    if (!header) return undefined;
+    try {
+      return paymentFromHeader(header).reqId;
     } catch {
       return undefined;
     }

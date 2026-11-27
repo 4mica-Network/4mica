@@ -149,6 +149,103 @@ describe("AppClient", () => {
     );
   });
 
+  it("authorizes, reads, consumes and releases spend", async () => {
+    const spend = {
+      id: "auth_1",
+      status: "RESERVED",
+      deniedReason: null,
+      policyId: null,
+      approvalRequestId: null,
+      expiresAt: "2026-11-27T00:10:00.000Z",
+      amount: "0.01",
+      network: "BASE_SEPOLIA",
+      assetAddress: null,
+    };
+    const fetchFn = vi.fn<FetchFn>(async () => json(spend));
+    const client = createAppClient({ apiKey: API_KEY, fetch: fetchFn });
+
+    const granted = await client.authorizeSpend({
+      network: "eip155:84532",
+      amount: "0.01",
+      payerAddress: "0x3d8e1f5a7c9b2d4e6a8c0f2b4d6e8a1c3f5b7d09",
+      recipientAddress: "0x6c5cc69e4c4863dbc3439ab2673806ea7715ebd5",
+    });
+    expect(granted.status).toBe("RESERVED");
+    expect(lastRequest(fetchFn)).toMatchObject({
+      url: `${DEFAULT_APP_BASE_URL}/v1/spend/authorize`,
+      method: "POST",
+      body: {
+        network: "BASE_SEPOLIA",
+        assetAddress: null,
+        amount: "0.01",
+      },
+    });
+
+    await client.getSpendAuthorization("auth/1");
+    expect(lastRequest(fetchFn)).toMatchObject({
+      url: `${DEFAULT_APP_BASE_URL}/v1/spend/authorizations/auth%2F1`,
+      method: "GET",
+    });
+
+    await client.consumeSpendAuthorization("auth_1", { reqId: "0xabc" });
+    expect(lastRequest(fetchFn)).toMatchObject({
+      url: `${DEFAULT_APP_BASE_URL}/v1/spend/authorizations/auth_1/consume`,
+      method: "POST",
+      body: { reqId: "0xabc" },
+    });
+
+    await client.releaseSpendAuthorization("auth_1");
+    expect(lastRequest(fetchFn)).toMatchObject({
+      url: `${DEFAULT_APP_BASE_URL}/v1/spend/authorizations/auth_1/release`,
+      method: "POST",
+      body: {},
+    });
+  });
+
+  it("creates and reads a seller approval, and resolves with it", async () => {
+    const fetchFn = vi
+      .fn<FetchFn>()
+      .mockResolvedValueOnce(
+        json({ id: "apr_1", status: "PENDING", expiresAt: "2026-11-30" }, 201),
+      )
+      .mockResolvedValueOnce(
+        json({
+          id: "apr_1",
+          status: "APPROVED",
+          expiresAt: "2026-11-30",
+          decidedAt: "2026-11-27",
+        }),
+      )
+      .mockResolvedValueOnce(json(resolution));
+    const client = createAppClient({ apiKey: API_KEY, fetch: fetchFn });
+
+    const created = await client.createApproval({
+      payerAddress: "0x3d8e1f5a7c9b2d4e6a8c0f2b4d6e8a1c3f5b7d09",
+      network: "base",
+      amount: "250",
+      reason: "Large order",
+    });
+    expect(created).toMatchObject({ id: "apr_1", status: "PENDING" });
+    expect(lastRequest(fetchFn)).toMatchObject({
+      url: `${DEFAULT_APP_BASE_URL}/v1/approvals`,
+      body: { network: "BASE", assetAddress: null, reason: "Large order" },
+    });
+
+    const state = await client.getApproval("apr_1");
+    expect(state.status).toBe("APPROVED");
+    expect(lastRequest(fetchFn).url).toBe(
+      `${DEFAULT_APP_BASE_URL}/v1/approvals/apr_1`,
+    );
+
+    await client.resolveCustomer({
+      payerAddress: "0x3d8e1f5a7c9b2d4e6a8c0f2b4d6e8a1c3f5b7d09",
+      network: "base",
+      amount: "250",
+      approvalRequestId: "apr_1",
+    });
+    expect(lastRequest(fetchFn).body.approvalRequestId).toBe("apr_1");
+  });
+
   it("surfaces the API's error envelope", async () => {
     const fetchFn = vi.fn<FetchFn>(async () =>
       json(

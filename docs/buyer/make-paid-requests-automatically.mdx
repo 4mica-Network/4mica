@@ -73,6 +73,41 @@ Set limits once, in `FourMica.connect({ spend })`. Amounts are written like depo
 - **Violations throw `SpendLimitError`** before anything is signed. `err.limit` names the limit (`"perPayment"`, `"total"`, `"assets"` or `"payTo"`) and `err.url` the resource.
 - **A limit in an asset the network does not list does not apply there**, so one `spend` setting can cover several networks.
 
+## Organization spending policies
+
+Spend limits live in one process. To check payments against the spending policies your organization sets in the [4mica dashboard](https://app.4mica.io) (per-payment, daily and monthly limits, allowed recipients, frozen keys, and approvals above a threshold), pass `governance` with an API key that has the `SPEND_AUTHORIZE` scope:
+
+```ts
+import { FourMica, SpendAuthorizationError } from "@4mica/sdk";
+
+await using client = await FourMica.connect({
+  privateKey: process.env.PRIVATE_KEY,
+  spend: { perPayment: "5 USDC" },
+  governance: {
+    apiKey: process.env.FOURMICA_API_KEY!,
+    approvalTimeoutMs: 10 * 60_000,
+  },
+});
+
+try {
+  await client.fetch("https://api.example.com/report");
+} catch (err) {
+  if (!(err instanceof SpendAuthorizationError)) throw err;
+  console.log(err.reason, err.deniedReason, err.approvalRequestId);
+}
+```
+
+Before signing, `client.fetch` asks `POST /v1/spend/authorize` for the payment's network, asset, amount, payer and recipient, after the session's own `spend` limits have passed:
+
+- **Reserved**: the payment is signed and sent. When the seller takes it, the authorization is consumed with the payment's `reqId`. When the paid request throws, the outcome is unknown, so it is consumed too: the seller may still redeem the payment, and counting it is the safe side. When signing throws, or the seller answers 402 or an error without taking the payment, the authorization is released.
+- **Denied**: nothing is signed, and `client.fetch` throws `SpendAuthorizationError` with `reason: "denied"` and `deniedReason` (`"frozen"`, `"recipient_not_allowed"`, `"per_payment_limit"`, `"daily_limit"`, `"monthly_limit"`, `"approval_rejected"`, `"approval_expired"` or `"limit_changed"`).
+- **Pending approval**: the amount is above a policy's approval threshold. `client.fetch` polls every `pollIntervalMs` (default 2 s) until someone in your organization decides, for up to `approvalTimeoutMs` (default 5 minutes). If time runs out the authorization is released and it throws `SpendAuthorizationError` with `reason: "approval_timeout"` and the `approvalRequestId` to follow up on.
+- **The API refuses the request** (for example the payer wallet is not one of your organization's, or the key is for another environment): nothing is signed and the `AppError` is thrown.
+
+`agentId` attributes payments to one agent when the key is not already an agent's key.
+
+**This is a cooperative check, not hard enforcement.** 4mica's dashboard is not in the payment path: payments are signed locally, so anyone holding the wallet key can sign without asking, or leave `governance` out. Such a payment is still detected afterwards when the seller reports it: it raises an unauthorized-spend alert and counts toward your limits. Without `governance`, `client.fetch` behaves exactly as before.
+
 `client.paymentFor(response)` returns what was paid for a response: `protocol`, `network`, `asset`, `amount` (a decimal string), `amountRaw` and `payTo`. It returns `undefined` when the request needed no payment, or when the seller failed the request without taking one.
 
 ## What your policy should handle

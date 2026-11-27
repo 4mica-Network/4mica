@@ -814,3 +814,36 @@ export class SpendLimitError extends PaymentError {
     this.url = url;
   }
 }
+
+export class SpendAuthorizationError extends PaymentError {
+  readonly reason: "denied" | "approval_timeout";
+  readonly deniedReason: string | null;
+  readonly authorizationId: string;
+  readonly approvalRequestId: string | null;
+  readonly url: string;
+
+  constructor(
+    reason: "denied" | "approval_timeout",
+    url: string,
+    authorization: {
+      id: string;
+      deniedReason: string | null;
+      approvalRequestId: string | null;
+    },
+  ) {
+    super(
+      reason === "denied"
+        ? `payment for ${url} refused by your organization's spending ` +
+            `policies (${authorization.deniedReason ?? "denied"})`
+        : `payment for ${url} timed out waiting for approval` +
+            (authorization.approvalRequestId
+              ? ` ${authorization.approvalRequestId}`
+              : ""),
+    );
+    this.reason = reason;
+    this.deniedReason = authorization.deniedReason;
+    this.authorizationId = authorization.id;
+    this.approvalRequestId = authorization.approvalRequestId;
+    this.url = url;
+  }
+}

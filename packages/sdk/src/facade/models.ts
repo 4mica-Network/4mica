@@ -19,6 +19,14 @@ export interface SpendLimits {
   payTo?: readonly string[];
 }
 
+export interface GovernanceOptions {
+  apiKey: string;
+  baseUrl?: string;
+  agentId?: string;
+  approvalTimeoutMs?: number;
+  pollIntervalMs?: number;
+}
+
 export interface FourMicaOptions {
   privateKey?: string;
   /** Any viem `Account` with `signTypedData` and `signMessage`. */
@@ -31,6 +39,7 @@ export interface FourMicaOptions {
   /** Self-hosted core. */
   rpcUrl?: string;
   spend?: SpendLimits;
+  governance?: GovernanceOptions;
   /** In order of preference. Default `["x402"]`. */
   protocols?: readonly string[];
   fetch?: typeof fetch;

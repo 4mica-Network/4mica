@@ -102,6 +102,7 @@ export interface ResolveCustomerInput {
   network: string;
   amount: string;
   couponCode?: string | null;
+  approvalRequestId?: string | null;
 }
 
 export type CustomerDeniedReason =
@@ -186,4 +187,79 @@ export interface ReportedPayment {
 export interface AppIssue {
   path: string;
   message: string;
+}
+
+export type SpendAuthorizationStatus =
+  | "RESERVED"
+  | "PENDING_APPROVAL"
+  | "DENIED"
+  | "CONSUMED"
+  | "RELEASED"
+  | "EXPIRED";
+
+export type SpendDeniedReason =
+  | "frozen"
+  | "recipient_not_allowed"
+  | "per_payment_limit"
+  | "daily_limit"
+  | "monthly_limit"
+  | "limit_changed"
+  | "approval_rejected"
+  | "approval_expired";
+
+export interface AuthorizeSpendInput {
+  network: string;
+  assetAddress?: string | null;
+  amount: string;
+  payerAddress: string;
+  recipientAddress: string;
+  reqId?: string;
+  agentId?: string;
+}
+
+export interface SpendAuthorization {
+  id: string;
+  status: SpendAuthorizationStatus;
+  deniedReason: SpendDeniedReason | null;
+  policyId: string | null;
+  approvalRequestId: string | null;
+  expiresAt: string;
+  amount: string;
+  network: AppNetwork;
+  assetAddress: string | null;
+}
+
+export interface ConsumeSpendInput {
+  reqId?: string;
+  txHash?: string;
+}
+
+export type ApprovalStatus =
+  | "PENDING"
+  | "APPROVED"
+  | "REJECTED"
+  | "EXPIRED"
+  | "CANCELLED";
+
+export interface CreateApprovalInput {
+  customerId?: string;
+  payerAddress: string;
+  network: string;
+  assetAddress?: string | null;
+  amount: string;
+  resource?: string;
+  reason?: string;
+}
+
+export interface CreatedApproval {
+  id: string;
+  status: ApprovalStatus;
+  expiresAt: string;
+}
+
+export interface ApprovalState {
+  id: string;
+  status: ApprovalStatus;
+  expiresAt: string;
+  decidedAt: string | null;
 }
