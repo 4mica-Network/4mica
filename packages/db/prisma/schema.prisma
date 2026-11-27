@@ -81,15 +81,17 @@ model Agent {
   project      Project?      @relation(fields: [projectId], references: [id], onDelete: Restrict)
   environment  Environment?  @relation(fields: [environmentId], references: [id], onDelete: Restrict)
 
-  createdBy   User?           @relation("AgentCreator", fields: [createdById], references: [id], onDelete: SetNull)
-  payerWallet Wallet?         @relation("AgentPayerWallet", fields: [payerWalletId], references: [id], onDelete: SetNull)
-  wallet      Wallet?         @relation("AgentRecipientWallet", fields: [walletId], references: [id], onDelete: SetNull)
-  payments    Payment[]
-  reviews     Review[]
-  reports     Report[]
-  policy      ResourcePolicy?
-  faqs        FaqItem[]
-  apiKeys     ApiKey[]
+  createdBy           User?                @relation("AgentCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  payerWallet         Wallet?              @relation("AgentPayerWallet", fields: [payerWalletId], references: [id], onDelete: SetNull)
+  wallet              Wallet?              @relation("AgentRecipientWallet", fields: [walletId], references: [id], onDelete: SetNull)
+  payments            Payment[]
+  reviews             Review[]
+  reports             Report[]
+  policy              ResourcePolicy?
+  faqs                FaqItem[]
+  apiKeys             ApiKey[]
+  spendingPolicies    SpendingPolicy[]
+  spendAuthorizations SpendAuthorization[]
 
   @@unique([walletAddress, network])
   @@unique([organizationId, slug])
@@ -176,6 +178,54 @@ enum OrgRole {
   ADMIN
   DEVELOPER
   VIEWER
+  FINANCE
+}
+
+enum SpendingPolicyScope {
+  ORGANIZATION
+  PROJECT
+  AGENT
+  API_KEY
+}
+
+enum SpendingPolicyMode {
+  ENFORCE
+  MONITOR
+}
+
+enum SpendAuthorizationStatus {
+  RESERVED
+  PENDING_APPROVAL
+  CONSUMED
+  RELEASED
+  EXPIRED
+  DENIED
+}
+
+enum ApprovalKind {
+  PAYMENT
+  SELLER_PAYMENT
+  GOVERNANCE
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  EXPIRED
+  CANCELLED
+}
+
+enum ApprovalVote {
+  APPROVE
+  REJECT
+}
+
+enum FinancialAlertKind {
+  BUDGET_THRESHOLD
+  UNAUTHORIZED_SPEND
+  POLICY_DENIAL
+  APPROVAL_REQUESTED
 }
 
 enum ProjectRole {
@@ -193,6 +243,8 @@ enum ApiKeyScope {
   PAYMENTS_WRITE
   CUSTOMERS_READ
   RESOURCE_READ
+  SPEND_AUTHORIZE
+  APPROVALS_WRITE
 }
 
 model Organization {
@@ -225,6 +277,11 @@ model Organization {
   supportRequests       SupportRequest[]
   projects              Project[]
   serviceAccounts       ServiceAccount[]
+  spendingPolicies      SpendingPolicy[]
+  spendAuthorizations   SpendAuthorization[]
+  approvalRequests      ApprovalRequest[]
+  governanceSettings    GovernanceSettings?
+  financialAlerts       FinancialAlert[]
   cliSessions           CliSession[]
 
   @@map("organizations")
@@ -245,17 +302,20 @@ model Project {
   createdAt          DateTime  @default(now()) @map("created_at")
   updatedAt          DateTime  @updatedAt @map("updated_at")
 
-  organization    Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  createdBy       User?               @relation("ProjectCreator", fields: [createdById], references: [id], onDelete: SetNull)
-  environments    Environment[]
-  members         ProjectMembership[]
-  serviceAccounts ServiceAccount[]
-  agents          Agent[]
-  apiListings     ApiListing[]
-  apiKeys         ApiKey[]
-  webhooks        Webhook[]
-  customers       Customer[]
-  payments        Payment[]
+  organization        Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy           User?                @relation("ProjectCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  environments        Environment[]
+  members             ProjectMembership[]
+  serviceAccounts     ServiceAccount[]
+  agents              Agent[]
+  apiListings         ApiListing[]
+  apiKeys             ApiKey[]
+  webhooks            Webhook[]
+  customers           Customer[]
+  payments            Payment[]
+  spendingPolicies    SpendingPolicy[]
+  spendAuthorizations SpendAuthorization[]
+  approvalRequests    ApprovalRequest[]
 
   @@unique([organizationId, slug])
   @@index([organizationId])
@@ -315,6 +375,163 @@ model ServiceAccount {
   @@map("service_accounts")
 }
 
+model SpendingPolicy {
+  id                String              @id @default(uuid(7))
+  organizationId    String              @map("organization_id")
+  name              String              @db.VarChar(120)
+  scope             SpendingPolicyScope
+  projectId         String?             @map("project_id")
+  agentId           String?             @map("agent_id")
+  apiKeyId          String?             @map("api_key_id")
+  mode              SpendingPolicyMode  @default(ENFORCE)
+  network           PaymentNetwork?
+  assetAddress      String?             @map("asset_address") @db.VarChar(42)
+  perPaymentLimit   Decimal?            @map("per_payment_limit") @db.Decimal(38, 18)
+  dailyLimit        Decimal?            @map("daily_limit") @db.Decimal(38, 18)
+  monthlyLimit      Decimal?            @map("monthly_limit") @db.Decimal(38, 18)
+  approvalThreshold Decimal?            @map("approval_threshold") @db.Decimal(38, 18)
+  approvalsRequired Int                 @default(1) @map("approvals_required")
+  allowedRecipients String[]            @default([]) @map("allowed_recipients")
+  alertThresholds   Int[]               @default([80, 100]) @map("alert_thresholds")
+  frozenAt          DateTime?           @map("frozen_at")
+  enabled           Boolean             @default(true)
+  createdById       String?             @map("created_by_id")
+  createdAt         DateTime            @default(now()) @map("created_at")
+  updatedAt         DateTime            @updatedAt @map("updated_at")
+  deletedAt         DateTime?           @map("deleted_at")
+
+  organization   Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project        Project?             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  agent          Agent?               @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  apiKey         ApiKey?              @relation(fields: [apiKeyId], references: [id], onDelete: Cascade)
+  createdBy      User?                @relation("SpendingPolicyCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  authorizations SpendAuthorization[]
+  alerts         FinancialAlert[]
+
+  @@index([organizationId, scope])
+  @@index([projectId])
+  @@index([agentId])
+  @@index([apiKeyId])
+  @@map("spending_policies")
+}
+
+model SpendAuthorization {
+  id                String                   @id @default(uuid(7))
+  organizationId    String                   @map("organization_id")
+  projectId         String                   @map("project_id")
+  environment       EnvironmentKind
+  apiKeyId          String?                  @map("api_key_id")
+  agentId           String?                  @map("agent_id")
+  network           PaymentNetwork
+  assetAddress      String?                  @map("asset_address") @db.VarChar(42)
+  payerAddress      String                   @map("payer_address") @db.VarChar(42)
+  recipientAddress  String                   @map("recipient_address") @db.VarChar(42)
+  amount            Decimal                  @db.Decimal(38, 18)
+  reqId             String?                  @map("req_id") @db.VarChar(66)
+  status            SpendAuthorizationStatus
+  deniedReason      String?                  @map("denied_reason") @db.VarChar(64)
+  policyId          String?                  @map("policy_id")
+  approvalRequestId String?                  @unique @map("approval_request_id")
+  paymentId         String?                  @map("payment_id")
+  expiresAt         DateTime                 @map("expires_at")
+  consumedAt        DateTime?                @map("consumed_at")
+  createdAt         DateTime                 @default(now()) @map("created_at")
+  updatedAt         DateTime                 @updatedAt @map("updated_at")
+
+  organization    Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project         Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  apiKey          ApiKey?          @relation(fields: [apiKeyId], references: [id], onDelete: SetNull)
+  agent           Agent?           @relation(fields: [agentId], references: [id], onDelete: SetNull)
+  policy          SpendingPolicy?  @relation(fields: [policyId], references: [id], onDelete: SetNull)
+  approvalRequest ApprovalRequest? @relation(fields: [approvalRequestId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, network, assetAddress, createdAt])
+  @@index([organizationId, reqId])
+  @@index([apiKeyId, createdAt])
+  @@index([agentId, createdAt])
+  @@map("spend_authorizations")
+}
+
+model ApprovalRequest {
+  id                  String         @id @default(uuid(7))
+  organizationId      String         @map("organization_id")
+  projectId           String?        @map("project_id")
+  kind                ApprovalKind
+  action              String         @db.VarChar(64)
+  summary             String         @db.VarChar(280)
+  payload             Json
+  payloadHash         String         @map("payload_hash") @db.VarChar(64)
+  requestedById       String?        @map("requested_by_id")
+  requestedByApiKeyId String?        @map("requested_by_api_key_id")
+  requiredApprovals   Int            @default(1) @map("required_approvals")
+  status              ApprovalStatus @default(PENDING)
+  expiresAt           DateTime       @map("expires_at")
+  decidedAt           DateTime?      @map("decided_at")
+  executedAt          DateTime?      @map("executed_at")
+  createdAt           DateTime       @default(now()) @map("created_at")
+  updatedAt           DateTime       @updatedAt @map("updated_at")
+
+  organization       Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project            Project?            @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  requestedBy        User?               @relation("ApprovalRequester", fields: [requestedById], references: [id], onDelete: SetNull)
+  decisions          ApprovalDecision[]
+  spendAuthorization SpendAuthorization?
+
+  @@index([organizationId, status, createdAt(sort: Desc)])
+  @@index([organizationId, action, payloadHash])
+  @@map("approval_requests")
+}
+
+model ApprovalDecision {
+  id                String       @id @default(uuid(7))
+  approvalRequestId String       @map("approval_request_id")
+  userId            String       @map("user_id")
+  vote              ApprovalVote
+  comment           String?      @db.VarChar(500)
+  createdAt         DateTime     @default(now()) @map("created_at")
+
+  approvalRequest ApprovalRequest @relation(fields: [approvalRequestId], references: [id], onDelete: Cascade)
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([approvalRequestId, userId])
+  @@map("approval_decisions")
+}
+
+model GovernanceSettings {
+  organizationId      String   @id @map("organization_id")
+  approvalsRequired   Int      @default(0) @map("approvals_required")
+  governedActions     String[] @default([]) @map("governed_actions")
+  approvalTtlHours    Int      @default(72) @map("approval_ttl_hours")
+  financeRecipientIds String[] @default([]) @map("finance_recipient_ids")
+  auditRetentionDays  Int?     @map("audit_retention_days")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("governance_settings")
+}
+
+model FinancialAlert {
+  id               String             @id @default(uuid(7))
+  organizationId   String             @map("organization_id")
+  projectId        String?            @map("project_id")
+  kind             FinancialAlertKind
+  policyId         String?            @map("policy_id")
+  title            String             @db.VarChar(160)
+  detail           Json
+  dedupeKey        String?            @map("dedupe_key") @db.VarChar(160)
+  acknowledgedAt   DateTime?          @map("acknowledged_at")
+  acknowledgedById String?            @map("acknowledged_by_id")
+  createdAt        DateTime           @default(now()) @map("created_at")
+
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  policy       SpendingPolicy? @relation(fields: [policyId], references: [id], onDelete: SetNull)
+
+  @@unique([organizationId, dedupeKey])
+  @@index([organizationId, createdAt(sort: Desc)])
+  @@map("financial_alerts")
+}
+
 model Membership {
   id             String   @id @default(uuid(7))
   organizationId String   @map("organization_id")
@@ -356,6 +573,7 @@ model Invitation {
 model AuditLog {
   id             String   @id @default(uuid(7))
   organizationId String   @map("organization_id")
+  projectId      String?  @map("project_id")
   actorUserId    String?  @map("actor_user_id")
   actorApiKeyId  String?  @map("actor_api_key_id")
   action         String   @db.VarChar(64)
@@ -370,6 +588,7 @@ model AuditLog {
 
   @@index([organizationId, createdAt(sort: Desc)])
   @@index([organizationId, action, createdAt(sort: Desc)])
+  @@index([organizationId, projectId, createdAt(sort: Desc)])
   @@map("audit_logs")
 }
 
@@ -436,6 +655,9 @@ model User {
   createdProjects                Project[]                @relation("ProjectCreator")
   createdServiceAccounts         ServiceAccount[]         @relation("ServiceAccountCreator")
   projectMemberships             ProjectMembership[]
+  createdSpendingPolicies        SpendingPolicy[]         @relation("SpendingPolicyCreator")
+  requestedApprovals             ApprovalRequest[]        @relation("ApprovalRequester")
+  approvalDecisions              ApprovalDecision[]
   reviews                        Review[]
   reports                        Report[]
   bannerInteractions             BannerInteraction[]
@@ -542,9 +764,12 @@ model ApiKey {
   environment    Environment     @relation(fields: [environmentId], references: [id], onDelete: Restrict)
   serviceAccount ServiceAccount? @relation(fields: [serviceAccountId], references: [id], onDelete: Cascade)
 
-  createdBy User?       @relation("ApiKeyCreator", fields: [createdById], references: [id], onDelete: SetNull)
-  listing   ApiListing? @relation(fields: [listingId], references: [id], onDelete: Cascade)
-  agent     Agent?      @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  createdBy           User?                @relation("ApiKeyCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  listing             ApiListing?          @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  agent               Agent?               @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  spendingPolicies    SpendingPolicy[]
+  spendAuthorizations SpendAuthorization[]
+  payments            Payment[]
 
   @@index([organizationId])
   @@index([listingId])
@@ -638,6 +863,7 @@ enum PaymentStatus {
 model Payment {
   id             String  @id @default(uuid(7))
   projectId      String? @map("project_id")
+  apiKeyId       String? @map("api_key_id")
   organizationId String  @map("organization_id")
 
   listingId String? @map("listing_id")
@@ -674,6 +900,7 @@ model Payment {
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   project      Project?     @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  apiKey       ApiKey?      @relation(fields: [apiKeyId], references: [id], onDelete: SetNull)
   listing      ApiListing?  @relation(fields: [listingId], references: [id], onDelete: SetNull)
   agent        Agent?       @relation(fields: [agentId], references: [id], onDelete: SetNull)
 
@@ -682,6 +909,7 @@ model Payment {
   @@index([payerAddress, createdAt(sort: Desc)])
   @@index([recipientAddress, createdAt(sort: Desc)])
   @@index([projectId, createdAt(sort: Desc)])
+  @@index([apiKeyId, createdAt(sort: Desc)])
   @@map("payments")
 }
 
@@ -735,19 +963,21 @@ enum CustomerIdentitySource {
 }
 
 model Customer {
-  id             String         @id @default(uuid(7))
-  projectId      String         @map("project_id")
-  organizationId String         @map("organization_id")
-  createdById    String?        @map("created_by_id")
-  name           String         @db.VarChar(120)
-  email          String?        @db.VarChar(320)
-  type           CustomerType   @default(ORGANIZATION)
-  status         CustomerStatus @default(ACTIVE)
-  description    String?        @db.VarChar(280)
-  notes          String?        @db.VarChar(2000)
-  dailyLimit     Decimal?       @map("daily_limit") @db.Decimal(38, 18)
-  monthlyLimit   Decimal?       @map("monthly_limit") @db.Decimal(38, 18)
-  limitCurrency  String         @default("USD") @map("limit_currency") @db.VarChar(16)
+  id                String          @id @default(uuid(7))
+  projectId         String          @map("project_id")
+  organizationId    String          @map("organization_id")
+  createdById       String?         @map("created_by_id")
+  name              String          @db.VarChar(120)
+  email             String?         @db.VarChar(320)
+  type              CustomerType    @default(ORGANIZATION)
+  status            CustomerStatus  @default(ACTIVE)
+  description       String?         @db.VarChar(280)
+  notes             String?         @db.VarChar(2000)
+  dailyLimit        Decimal?        @map("daily_limit") @db.Decimal(38, 18)
+  monthlyLimit      Decimal?        @map("monthly_limit") @db.Decimal(38, 18)
+  limitCurrency     String          @default("USD") @map("limit_currency") @db.VarChar(16)
+  limitNetwork      PaymentNetwork? @map("limit_network")
+  limitAssetAddress String?         @map("limit_asset_address") @db.VarChar(42)
 
   statusReason   String?   @map("status_reason") @db.VarChar(280)
   suspendedUntil DateTime? @map("suspended_until")
