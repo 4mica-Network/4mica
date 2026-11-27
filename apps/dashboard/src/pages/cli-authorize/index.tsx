@@ -31,7 +31,6 @@ const SCOPE_KEYS: Record<string, string> = {
   "wallets:write": "developer.cli.authorize.scope.walletsWrite",
 };
 
-/** The mark and name, as on the sign-in page, so the two read as one flow. */
 function Brand() {
   const { t } = useTranslation();
 
@@ -83,9 +82,6 @@ export function CliAuthorize() {
 
   usePageTitle(t("developer.cli.authorize.title"));
 
-  // No dependencies, so the effect below runs once per code and not again
-  // when the language (and with it `t`) changes. A failure is kept as the
-  // server's own message, or "" for the translated fallback.
   const lookUp = useCallback(async (userCode: string) => {
     setStage({ name: "loading" });
     setError(null);

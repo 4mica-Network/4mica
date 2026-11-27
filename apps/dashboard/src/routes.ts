@@ -107,10 +107,6 @@ export const APP_PAGES: RouteMeta[] = [
   { path: "help/requests/:id", component: HelpRequestDetail },
 ];
 
-/**
- * Signed-in pages that stand alone, outside the app shell: a consent screen
- * should show the one decision and nothing to wander off into.
- */
 export const STANDALONE_PAGES: RouteMeta[] = [
   { path: "cli/authorize", component: CliAuthorize },
 ];

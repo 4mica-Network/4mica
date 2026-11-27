@@ -148,11 +148,6 @@ const apiKeyLimit = (app: FastifyInstance): preHandlerAsyncHookHandler => {
   };
 };
 
-/**
- * The sensitive budget for routes with no caller identity at all, keyed by IP.
- * The per-user limit skips unauthenticated requests, so without this a public
- * credential-minting route would only have the much looser IP shield.
- */
 const publicSensitiveLimit = (
   app: FastifyInstance,
 ): preHandlerAsyncHookHandler => {

@@ -3,20 +3,11 @@ import { text } from "node:stream/consumers";
 import { verifyMessage } from "viem";
 import { type MockServer, mockServer } from "./spawn.js";
 
-/**
- * A stand-in for the platform API: enough of `apps/be` for the account
- * commands, holding its state in memory so a test can read what the cli
- * did to it.
- */
 export interface MockPlatform extends MockServer {
-  /** What the next polls of the token endpoint answer, in order. */
   polls: string[];
-  /** Tokens the platform accepts. */
   tokens: Set<string>;
-  /** Every token that arrived as a bearer, valid or not. */
   bearers: string[];
   wallets: { id: string; label: string; address: string; network: string }[];
-  /** The message handed out by the next wallet-link challenge. */
   challenge?: string;
   clientName?: string;
 }
@@ -51,8 +42,6 @@ export const linkMessage = (address: string, chainId = 84532) =>
   ].join("\n");
 
 export async function mockPlatform(): Promise<MockPlatform> {
-  // Filled in below, once the server exists: the handler reads the same
-  // object the test writes to.
   const state = {
     polls: [],
     tokens: new Set<string>(),

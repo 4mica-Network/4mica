@@ -14,7 +14,6 @@ export default class AuthLogout extends PlatformCommand {
     const { flags } = await this.parse(AuthLogout);
     const platform = await this.platform(flags);
     const dir = this.config.configDir;
-    // The stored token only: FOURMICA_TOKEN belongs to whoever set it.
     const stored = await loadStoredSession(dir);
     const fromEnv = Boolean(readEnv(process.env, "TOKEN"));
 
@@ -25,7 +24,6 @@ export default class AuthLogout extends PlatformCommand {
           method: "DELETE",
           token: stored.token,
         });
-        // 401: it was already revoked or had expired, which is as good.
         revoked = response.status === 204 || response.status === 401;
       } catch {
         revoked = false;

@@ -1254,7 +1254,6 @@ export const createdCliTokenResponseSchema = {
   required: ["session", "plaintext"],
   properties: {
     session: cliSessionResponseSchema,
-    // Present in this one response and never retrievable again.
     plaintext: str,
   },
 } as const;

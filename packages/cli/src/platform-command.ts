@@ -12,10 +12,6 @@ import {
   type Session,
 } from "./core/platform.js";
 
-/**
- * Commands that talk to the 4mica platform as an account, not to a network
- * as a wallet. They need no wallet key and never use one.
- */
 export abstract class PlatformCommand extends BaseCommand {
   static baseFlags = {
     ...BaseCommand.baseFlags,
@@ -31,7 +27,6 @@ export abstract class PlatformCommand extends BaseCommand {
     }),
   };
 
-  /** The platform API in use. Nothing here makes a request. */
   protected async platform(flags: {
     "request-timeout": number;
   }): Promise<Platform> {
@@ -41,7 +36,6 @@ export abstract class PlatformCommand extends BaseCommand {
     return platform;
   }
 
-  /** The signed-in session, or the error that says how to get one. */
   protected async session(flags: {
     "request-timeout": number;
   }): Promise<Session> {

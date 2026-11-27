@@ -62,10 +62,6 @@ export const generateCliToken = (): GeneratedSecret =>
 export const generateDeviceCode = (): string =>
   randomBytes(32).toString("base64url");
 
-/**
- * RFC 8628 §6.1: consonants only, so a code never spells a word and has no
- * characters that are mistaken for one another when read off a terminal.
- */
 const USER_CODE_ALPHABET = "BCDFGHJKLMNPQRSTVWXZ";
 
 export const USER_CODE_LENGTH = 8;

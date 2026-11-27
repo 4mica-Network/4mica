@@ -56,8 +56,6 @@ export const walletRoutes: FastifyPluginCallback = (app, _opts, done) => {
 
   const publicWrite = { ...strict, onResponse: revalidateOnWrite };
 
-  // The CLI links and unlinks the wallets it holds keys for, so these four
-  // also take a CLI token. Every other wallet route stays dashboard-only.
   const read = cliGuards(app, "wallets:read");
   const write = cliGuards(app, "wallets:write");
   const strictWrite = {

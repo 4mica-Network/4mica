@@ -3,22 +3,15 @@ import { loadToken, type Storage, storedOrigins } from "./credentials.js";
 import { API_URL } from "./links.js";
 import { type Resolved, readEnv, requireApiUrl } from "./settings.js";
 
-/** How every token this cli can hold begins. */
 export const TOKEN_PREFIX = "4mica_cli_";
 
 export interface Platform {
   apiUrl: Resolved;
-  /** What a stored token is filed under: a token is for one API only. */
   origin: string;
 }
 
 type Env = Record<string, string | undefined>;
 
-/**
- * The platform API in use. From the environment or the default, and from
- * nowhere else: not from a `./.env`, so that running a command inside
- * someone else's project cannot send the account token to their server.
- */
 export function resolvePlatform(env: Env = process.env): Platform {
   const fromEnv = readEnv(env, "API_URL");
   const apiUrl: Resolved = fromEnv
@@ -31,11 +24,9 @@ export function resolvePlatform(env: Env = process.env): Platform {
 export interface Session {
   platform: Platform;
   token: string;
-  /** `env` is `FOURMICA_TOKEN`; the others are where `auth login` put it. */
   source: "env" | Storage;
 }
 
-/** The token `auth login` stored for this API, whatever the environment says. */
 export async function loadStoredSession(
   configDir: string,
   env: Env = process.env,
@@ -45,10 +36,6 @@ export async function loadStoredSession(
   return stored && { platform, token: stored.token, source: stored.storage };
 }
 
-/**
- * The token in effect: `FOURMICA_TOKEN` when it is set, which is how CI
- * signs in, and otherwise the one `auth login` stored for this API.
- */
 export async function loadSession(
   configDir: string,
   env: Env = process.env,
@@ -64,11 +51,6 @@ export async function loadSession(
   return loadStoredSession(configDir, env);
 }
 
-/**
- * Names the platform that was asked. A token is kept per platform, so being
- * signed in to one (a local backend, say) and asking another reads as "not
- * signed in" unless the message says which, and where a session does exist.
- */
 export async function notLoggedIn(configDir: string, platform: Platform) {
   const elsewhere = (await storedOrigins(configDir)).filter(
     (origin) => origin !== platform.origin,
@@ -94,7 +76,6 @@ export async function requireSession(configDir: string): Promise<Session> {
 
 export interface ApiResponse {
   status: number;
-  /** The JSON body, or undefined when there was none. */
   body: unknown;
 }
 
@@ -104,7 +85,6 @@ interface RequestOptions {
   body?: unknown;
 }
 
-/** One request, answered or not; the caller decides what a status means. */
 export async function request(
   platform: Platform,
   path: string,
@@ -120,7 +100,6 @@ export async function request(
       ...(options.token ? { authorization: `Bearer ${options.token}` } : {}),
     },
     body: options.body === undefined ? undefined : JSON.stringify(options.body),
-    // A redirect would carry the token to wherever it points.
     redirect: "error",
   });
   const text = await response.text();
@@ -149,7 +128,6 @@ const issueLines = (issues: unknown): string[] =>
       })
     : [];
 
-/** What a refusal from the platform means at a terminal. */
 export function apiError(platform: Platform, response: ApiResponse) {
   const { status } = response;
   const body = (response.body ?? {}) as ErrorBody;
@@ -189,7 +167,6 @@ export function apiError(platform: Platform, response: ApiResponse) {
   );
 }
 
-/** A request that must succeed; anything else is thrown as a `CliError`. */
 export async function api<T>(
   platform: Platform,
   path: string,
@@ -226,6 +203,5 @@ export interface WhoAmI {
 export const whoAmI = (platform: Platform, token: string) =>
   api<WhoAmI>(platform, "/v1/cli/session", { token });
 
-/** `ada@example.com`, or the best name there is for an account without one. */
 export const accountLabel = (user: Account): string =>
   user.email ?? user.username ?? user.name ?? user.id;

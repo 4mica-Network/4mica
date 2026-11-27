@@ -96,11 +96,6 @@ export const recordDevicePoll = (id: string) =>
     select: { id: true },
   });
 
-/**
- * Trades an approved request for a session, once. The request is claimed and
- * the session created in one transaction, so two polls racing each other
- * cannot both walk away with a token.
- */
 export const redeemDeviceRequest = (request: {
   id: string;
   userId: string;

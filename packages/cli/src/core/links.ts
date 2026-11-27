@@ -11,10 +11,6 @@
  */
 export const DASHBOARD_URL = "https://app.4mica.io";
 
-/**
- * The platform API the dashboard talks to, and `4mica auth login` signs in
- * to. `FOURMICA_API_URL` points the cli at another one.
- */
 export const API_URL = "https://api.app.4mica.io";
 
 export const DOCS_URL = "https://docs.4mica.io";

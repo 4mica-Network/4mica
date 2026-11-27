@@ -18,8 +18,6 @@ describe("the cli's copy of the site's addresses", () => {
     expect(FUNDING_DOCS.startsWith(`${links.docs}/`)).toBe(true);
   });
 
-  // The platform API is not in `@4mica/url`: the deployment reference is
-  // where its production address is written down.
   it("has the platform API where the deployment reference puts it", async () => {
     const deployment = await readFile(
       join(packageRoot, "../../.github/DEPLOYMENT.md"),

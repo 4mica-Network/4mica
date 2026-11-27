@@ -10,7 +10,6 @@ interface DeviceCode {
   verification_uri_complete: string;
 }
 
-/** What `4mica auth login` does first: ask the API for a code to approve. */
 const startLogin = async (request: APIRequestContext, name: string) => {
   const response = await request.post(`${API}/v1/cli/device/code`, {
     data: { client_name: name },
@@ -19,7 +18,6 @@ const startLogin = async (request: APIRequestContext, name: string) => {
   return (await response.json()) as DeviceCode;
 };
 
-/** And what it does while it waits. */
 const poll = (request: APIRequestContext, deviceCode: string) =>
   request.post(`${API}/v1/cli/device/token`, {
     data: { grant_type: GRANT, device_code: deviceCode },
@@ -53,7 +51,6 @@ test("approving a CLI sign-in gives that terminal a session, which can be revoke
     page.getByRole("heading", { name: "The CLI is signed in" }),
   ).toBeVisible();
 
-  // The interval the API named has to pass before the next poll.
   await page.waitForTimeout(5500);
   const granted = await poll(request, login.device_code);
   expect(granted.status()).toBe(200);
@@ -71,7 +68,6 @@ test("approving a CLI sign-in gives that terminal a session, which can be revoke
   const row = page.getByTestId("cli-session").filter({ hasText: name });
   await expect(row).toBeVisible();
   await row.getByRole("button", { name: "Revoke" }).click();
-  // The confirmation opens in a popup, after the row in the document.
   await page.getByRole("button", { name: "Revoke" }).last().click();
   await expect(page.getByText(name)).toHaveCount(0);
 

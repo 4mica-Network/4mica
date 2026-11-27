@@ -2,7 +2,6 @@ import { failure, usageError } from "../errors.js";
 import { api, type Platform } from "./platform.js";
 import type { Settings } from "./settings.js";
 
-/** A wallet as the platform knows it: an address someone proved they hold. */
 export interface LinkedWallet {
   id: string;
   label: string;
@@ -15,11 +14,6 @@ export interface LinkedWallet {
   createdAt: string;
 }
 
-/**
- * The platform's name for a hosted network: `base-sepolia` is
- * `BASE_SEPOLIA`. A core given by URL has no such name, and a wallet cannot
- * be linked on it.
- */
 export function platformNetwork(settings: Settings): {
   name: string;
   chainId: number;
@@ -52,12 +46,6 @@ export async function listLinkedWallets(
   return items;
 }
 
-/**
- * Checks that the text the platform asks the wallet to sign is the
- * wallet-link challenge for this address and nothing else, before the key
- * goes near it. A signature is proof of whatever was signed, so the cli
- * does not sign a message it has not read.
- */
 export function assertLinkChallenge(
   message: string,
   expected: { address: string; chainId: number; nonce: string },

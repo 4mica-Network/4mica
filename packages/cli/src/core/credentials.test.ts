@@ -9,8 +9,6 @@ import {
   saveToken,
 } from "./credentials.js";
 
-// The file store only: the keychain is the developer's own, and these tests
-// must not write to it.
 const env = { FOURMICA_CREDENTIAL_STORE: "file" };
 const A = "https://api.app.4mica.io";
 const B = "http://localhost:4000";

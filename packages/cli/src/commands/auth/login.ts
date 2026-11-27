@@ -22,7 +22,6 @@ import { PlatformCommand } from "../../platform-command.js";
 import { brand, spinner } from "../../ui/log.js";
 import { fields } from "../../ui/output.js";
 
-/** RFC 8628's name for what this command does. */
 const DEVICE_GRANT = "urn:ietf:params:oauth:grant-type:device_code";
 
 interface DeviceCode {
@@ -93,13 +92,11 @@ export default class AuthLogin extends PlatformCommand {
       ? requireToken(await readInput("-"))
       : await this.interactive(platform, flags);
 
-    // Checked before it is kept: a token that does not work is not stored.
     const me = await whoAmI(platform, token);
     const previous = await loadStoredSession(dir);
     const kept = await saveToken(dir, platform.origin, token, {
       fileOnly: flags["insecure-storage"],
     });
-    // The session this one replaces would otherwise stay valid for months.
     if (previous && previous.token !== token) {
       await request(platform, "/v1/cli/session", {
         method: "DELETE",
@@ -130,7 +127,6 @@ export default class AuthLogin extends PlatformCommand {
     };
   }
 
-  /** At a terminal with no flag saying how: ask, as `gh auth login` does. */
   private async interactive(
     platform: Platform,
     flags: { web: boolean; open: boolean; name?: string },
@@ -172,8 +168,6 @@ export default class AuthLogin extends PlatformCommand {
       });
     }
 
-    // Not `note`: without these two lines there is no way to sign in, so
-    // `--quiet` does not hide them.
     process.stderr.write(
       `Your one-time code: ${brand(device.user_code)}\n` +
         `Approve it at ${page}\n`,

@@ -11,24 +11,12 @@ import { execa } from "execa";
 import { configError } from "../errors.js";
 import { debug } from "../ui/log.js";
 
-/**
- * Where the account token is kept. The system keychain when there is one:
- * the macOS keychain through `security`, the Secret Service (GNOME Keyring,
- * KWallet) through `secret-tool`. Both ship with the system or its desktop,
- * so the cli needs no native module to reach them. Anywhere else (Windows,
- * a container, a server with no desktop session) the token goes in a file
- * only this user can read, as the wallet keys do.
- *
- * `credentials.json` records which of the two holds the token for each
- * platform API, and holds the token itself only in the second case.
- */
 export type Storage = "keychain" | "file";
 
 type Entry = { storage: "keychain" } | { storage: "file"; token: string };
 
 const SERVICE = "4mica-cli";
 const TOOL_TIMEOUT_MS = 5000;
-/** Everything a token is made of; nothing a shell-like parser would split. */
 const TOKEN = /^[A-Za-z0-9_-]+$/;
 
 export const credentialsPath = (configDir: string) =>
@@ -68,8 +56,6 @@ const macos: Keychain = {
     return found.failed || found.stdout === "" ? undefined : found.stdout;
   },
   async write(account, token) {
-    // Through `security -i`, which reads its command from stdin: as an
-    // argument the token would show in the process list while it runs.
     await tool(
       "security",
       ["-i"],
@@ -119,7 +105,6 @@ const secretService: Keychain = {
 
 type Env = Record<string, string | undefined>;
 
-/** `FOURMICA_CREDENTIAL_STORE=file` keeps the cli away from the keychain. */
 function keychainFor(env: Env): Keychain | undefined {
   if (env.FOURMICA_CREDENTIAL_STORE === "file") return undefined;
   if (process.platform === "darwin") return macos;
@@ -158,7 +143,6 @@ async function readFileEntries(
   }
 }
 
-/** In one step, and readable by this user only, like the config file. */
 async function writeFileEntries(
   configDir: string,
   entries: Record<string, Entry>,
@@ -182,7 +166,6 @@ async function writeFileEntries(
   if (process.platform !== "win32") await chmod(path, 0o600);
 }
 
-/** The platform APIs a token is kept for, for saying where one is signed in. */
 export async function storedOrigins(configDir: string): Promise<string[]> {
   return Object.keys(await readFileEntries(configDir));
 }
@@ -192,7 +175,6 @@ export interface Stored {
   storage: Storage;
 }
 
-/** The token kept for the platform API at `origin`, if there is one. */
 export async function loadToken(
   configDir: string,
   origin: string,
@@ -210,17 +192,10 @@ export async function loadToken(
 }
 
 export interface SaveOptions {
-  /** Never the keychain, whatever the system has. */
   fileOnly?: boolean;
   env?: Env;
 }
 
-/**
- * Keeps the token, in the keychain when it takes it. What was written is
- * read back before it is trusted: `security -i` reports a refusal on a
- * stream, not in its exit status, and a keyring with no session to unlock
- * it fails the same quiet way.
- */
 export async function saveToken(
   configDir: string,
   origin: string,
@@ -253,7 +228,6 @@ export async function saveToken(
   return { storage: "file", where: credentialsPath(configDir) };
 }
 
-/** Forgets the token for `origin`, wherever it was kept. */
 export async function removeToken(
   configDir: string,
   origin: string,

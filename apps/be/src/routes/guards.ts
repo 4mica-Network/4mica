@@ -10,12 +10,6 @@ export const guards = (app: FastifyInstance) => ({
   preHandler: [app.getUserData],
 });
 
-/**
- * For the few routes the CLI may call as well as the dashboard. A bearer that
- * is a CLI token is checked as one, against `scope`; anything else takes the
- * Clerk path exactly as `guards` does. Routes that do not opt in here never
- * look a CLI token up at all.
- */
 export const cliGuards = (app: FastifyInstance, scope: CliScope) => {
   const asCli = authenticateCliToken(scope);
 

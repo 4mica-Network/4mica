@@ -25,11 +25,9 @@ const { openBrowser, readInput } = vi.hoisted(() => ({
   readInput: vi.fn(async () => ""),
 }));
 
-// A test must never open the developer's browser, and has no stdin to pipe.
 vi.mock("../../core/runner.js", () => ({ openBrowser }));
 vi.mock("../../core/input.js", () => ({ readInput }));
 
-// A sign-in waits out the poll interval the platform names: a second here.
 vi.setConfig({ testTimeout: 30_000 });
 
 let home: string;
@@ -53,7 +51,6 @@ const run = (
 ) =>
   runCommand(command, argv, home, { FOURMICA_API_URL: platform.url, ...env });
 
-/** Where the cli keeps its files under the test's home. */
 const configDir = () => join(home, "4mica");
 
 const signIn = () => run(AuthLogin, ["--json", "--name", "ada-laptop"]);
@@ -73,7 +70,6 @@ describe("auth login", () => {
     expect(json).toMatchObject({ account: ACCOUNT, storage: "file" });
     pinJson("auth login", json);
 
-    // Kept, readable by this user only, and never printed.
     const file = credentialsPath(configDir());
     expect(await readFile(file, "utf8")).toContain(GRANTED);
     if (process.platform !== "win32") {
@@ -196,7 +192,6 @@ describe("auth status", () => {
       });
 
       expect(error).toMatchObject({ code: "NOT_LOGGED_IN" });
-      // Says which platform it asked, and where there is a session.
       expect(error?.message).toContain(other.url);
       expect(error?.suggestions?.[0]).toContain(
         `FOURMICA_API_URL=${platform.url}`,
@@ -272,7 +267,6 @@ describe("wallets link", () => {
     const { address } = await create("buyer-1");
     const { json, stdout, stderr } = await run(WalletsLink, ["--json"]);
 
-    // The mock only stores a wallet whose signature it verified.
     expect(platform.wallets).toEqual([
       expect.objectContaining({
         address: address.toLowerCase(),

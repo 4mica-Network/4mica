@@ -56,7 +56,6 @@ export async function spawnCli(
     XDG_CONFIG_HOME: home,
     LOCALAPPDATA: home,
     NO_COLOR: "1",
-    // Never the developer's own keychain.
     FOURMICA_CREDENTIAL_STORE: "file",
     ...options.env,
   });

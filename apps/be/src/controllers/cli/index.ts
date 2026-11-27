@@ -34,7 +34,6 @@ const POLL_TOLERANCE_MS = 1000;
 const verificationUri = () =>
   `${config.appUrl.replace(/\/+$/, "")}/cli/authorize`;
 
-/** RFC 8628 §3.5 / RFC 6749 §5.2: these codes are what a client branches on. */
 const grantError = (reply: FastifyReply, error: string, message: string) =>
   reply.code(400).send({ error, message });
 

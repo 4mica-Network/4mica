@@ -87,7 +87,6 @@ describe("CliAuthorize", () => {
     expect(api.approveCliDeviceRequest).toHaveBeenCalledWith("BCDF-GHJK");
     expect(api.denyCliDeviceRequest).not.toHaveBeenCalled();
 
-    // A way back into the app, and to the list where it can be revoked.
     expect(button("developer.cli.authorize.home")).toBeInTheDocument();
     expect(
       screen.getByRole("link", { name: "developer.cli.authorize.manage" }),

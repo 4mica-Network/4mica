@@ -53,7 +53,6 @@ export default class WalletsLink extends NetworkCommand {
     const address = await walletAddress(settings);
     const network = platformNetwork(settings);
 
-    // A key file the cli made is named after its wallet.
     const file = settings.key?.file;
     const label =
       flags.label ??

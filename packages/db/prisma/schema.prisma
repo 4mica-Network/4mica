@@ -822,8 +822,6 @@ enum CliSessionKind {
   TOKEN
 }
 
-/// A credential the 4mica CLI holds for one account. Only the SHA-256 of the
-/// token is stored; the plaintext is handed out once, when it is minted.
 model CliSession {
   id          String         @id @default(uuid(7))
   userId      String         @map("user_id")
@@ -851,8 +849,6 @@ enum CliDeviceRequestStatus {
   DENIED
 }
 
-/// One run of `4mica auth login` waiting for its owner to approve it in the
-/// dashboard (RFC 8628). The device code is stored hashed, like a token.
 model CliDeviceRequest {
   id             String                 @id @default(uuid(7))
   deviceCodeHash String                 @unique @map("device_code_hash")
