@@ -190,6 +190,28 @@ describe("auth login", () => {
     expect(platform.requests.map((r) => r.url)).toEqual(["/v1/cli/session"]);
   });
 
+  it("revokes a browser session when signing in fails before it is kept", async () => {
+    platform.sessionDown = true;
+    const { error } = await run(AuthLogin);
+
+    expect(error).toBeDefined();
+    expect(platform.tokens.has(GRANTED)).toBe(false);
+    await expect(readFile(tokenFile())).rejects.toThrow();
+  });
+
+  it("says so when the session it replaces could not be revoked", async () => {
+    platform.tokens.add("4mica_cli_older");
+    platform.kinds.set("4mica_cli_older", "DEVICE");
+    readInput.mockResolvedValue("4mica_cli_older");
+    await run(AuthLogin, ["--with-token"]);
+    platform.revokeFails = true;
+
+    const { error, stderr } = await signIn();
+
+    expect(error).toBeUndefined();
+    expect(stderr).toContain("could not be revoked");
+  });
+
   it("revokes a browser session it could not keep", async () => {
     const { error } = await run(AuthLogin, ["--insecure-storage"], {
       FOURMICA_CREDENTIAL_STORE: "keychain",
@@ -495,6 +517,20 @@ describe("wallets unlink", () => {
       "--scopes account:read,wallets:read,wallets:link,wallets:unlink",
     );
     expect(platform.requests.map((r) => r.url)).toEqual(["/v1/cli/session"]);
+  });
+
+  it("points at FOURMICA_TOKEN when that is the session short of permissions", async () => {
+    platform.tokens.add("4mica_cli_for-ci");
+    platform.sessionScopes = ["account:read", "wallets:read"];
+    const { error } = await run(
+      WalletsUnlink,
+      ["0x000000000000000000000000000000000000dEaD", "--yes"],
+      { FOURMICA_TOKEN: "4mica_cli_for-ci" },
+    );
+
+    expect(error).toMatchObject({ code: "INSUFFICIENT_SCOPE" });
+    expect(error?.suggestions?.[0]).toContain("FOURMICA_TOKEN");
+    expect(error?.suggestions?.[1]).toContain("unset FOURMICA_TOKEN");
   });
 
   it("says so when the wallet is not linked", async () => {

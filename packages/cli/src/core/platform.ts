@@ -287,17 +287,25 @@ export function loginCommandFor(needed: string[]): string {
 }
 
 function missingScopes(missing: string[], said?: string) {
+  const login =
+    missing.length > 0
+      ? `\`${loginCommandFor(missing)}\``
+      : "`4mica auth login`";
+  const needs = missing.length > 0 ? ` with ${missing.join(", ")}` : "";
   return failure(
     said ??
       `this session is not allowed to do that (needs ${missing.join(", ")})`,
     {
       code: "INSUFFICIENT_SCOPE",
-      suggestions: [
-        missing.length > 0
-          ? `sign in again allowing it: \`${loginCommandFor(missing)}\``
-          : "sign in again with `4mica auth login`",
-        "a token from the dashboard has the permissions chosen when it was made",
-      ],
+      suggestions: readEnv(process.env, "TOKEN")
+        ? [
+            `FOURMICA_TOKEN is the session in use: set it to a dashboard token${needs}`,
+            `or unset FOURMICA_TOKEN and sign in with ${login}`,
+          ]
+        : [
+            `sign in again allowing it: ${login}`,
+            "a token from the dashboard has the permissions chosen when it was made",
+          ],
     },
   );
 }

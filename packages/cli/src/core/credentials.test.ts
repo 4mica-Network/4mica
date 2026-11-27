@@ -97,12 +97,12 @@ describe("the token store", () => {
     ).toEqual([]);
   });
 
-  it("takes over a lock left behind by a process that died", async () => {
+  it("takes over a lock another machine stopped refreshing", async () => {
     await withCredentialLock(dir, A, async () => {});
     const lock = `${credentialsFile(dir, A)}.lock`;
     await writeFile(
       lock,
-      JSON.stringify({ id: "old", pid: process.pid, host: hostname() }),
+      JSON.stringify({ id: "old", pid: 1, host: "another-machine" }),
     );
     const { utimes } = await import("node:fs/promises");
     const old = new Date(Date.now() - 60_000);
@@ -167,6 +167,42 @@ describe("the token store", () => {
     await rm(lock);
     await waiting;
     expect(ran).toBe(true);
+  });
+
+  it("never takes a lock from a live process here, however long it is quiet", async () => {
+    await withCredentialLock(dir, A, async () => {});
+    const lock = `${credentialsFile(dir, A)}.lock`;
+    await writeFile(
+      lock,
+      JSON.stringify({ id: "asleep", pid: process.pid, host: hostname() }),
+    );
+    const { utimes } = await import("node:fs/promises");
+    const old = new Date(Date.now() - 10 * 60_000);
+    await utimes(lock, old, old);
+    let ran = false;
+    const waiting = withCredentialLock(dir, A, async () => {
+      ran = true;
+    });
+
+    await sleep(300);
+    expect(ran).toBe(false);
+    await rm(lock);
+    await waiting;
+    expect(ran).toBe(true);
+  });
+
+  it("tells a holder that lost its lock before it writes", async () => {
+    const lock = `${credentialsFile(dir, A)}.lock`;
+    await expect(
+      withCredentialLock(dir, A, async (assertHeld) => {
+        await assertHeld();
+        await writeFile(
+          lock,
+          JSON.stringify({ id: "taken", pid: process.pid, host: hostname() }),
+        );
+        await assertHeld();
+      }),
+    ).rejects.toMatchObject({ code: "CREDENTIALS_LOCK_LOST" });
   });
 
   it("never removes a lock another process now holds", async () => {

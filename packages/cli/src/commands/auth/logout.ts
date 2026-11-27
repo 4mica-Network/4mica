@@ -42,7 +42,7 @@ export default class AuthLogout extends PlatformCommand {
     const outcome = await withCredentialLock(
       dir,
       platform.origin,
-      async (): Promise<Outcome> => {
+      async (assertHeld): Promise<Outcome> => {
         const found = await loadStoredSession(dir);
         if (!found) return "none";
         const result = await this.retire(
@@ -51,6 +51,7 @@ export default class AuthLogout extends PlatformCommand {
           found.kind,
           flags.revoke,
         );
+        await assertHeld();
         await removeToken(dir, platform.origin);
         return result;
       },

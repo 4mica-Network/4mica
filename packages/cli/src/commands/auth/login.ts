@@ -16,6 +16,7 @@ import {
   readStoredSession,
   request,
   TOKEN_PREFIX,
+  type WhoAmI,
   whoAmI,
 } from "../../core/platform.js";
 import { openBrowser } from "../../core/runner.js";
@@ -95,32 +96,40 @@ export default class AuthLogin extends PlatformCommand {
           minted = true;
         });
 
-    const { me, kept } = await withCredentialLock(
-      dir,
-      platform.origin,
-      async () => {
-        const me = await whoAmI(platform, token);
-        const before = await readStoredSession(dir);
-        let saved: Awaited<ReturnType<typeof saveToken>>;
-        try {
-          saved = await saveToken(dir, platform.origin, token, {
+    let persisted = false;
+    let signedIn: { me: WhoAmI; kept: Awaited<ReturnType<typeof saveToken>> };
+    try {
+      signedIn = await withCredentialLock(
+        dir,
+        platform.origin,
+        async (assertHeld) => {
+          const me = await whoAmI(platform, token);
+          const before = await readStoredSession(dir);
+          await assertHeld();
+          const saved = await saveToken(dir, platform.origin, token, {
             kind: me.session.kind,
             fileOnly: flags["insecure-storage"],
           });
-        } catch (error) {
-          if (minted) await revokeToken(platform, token);
-          throw error;
-        }
-        if (before.status === "found" && before.session.token !== token) {
-          await this.retire(
-            platform,
-            before.session.token,
-            before.session.kind,
-          );
-        }
-        return { me, kept: saved };
-      },
-    );
+          persisted = true;
+          if (before.status === "found" && before.session.token !== token) {
+            await this.retire(
+              platform,
+              before.session.token,
+              before.session.kind,
+            );
+          }
+          return { me, kept: saved };
+        },
+      );
+    } catch (error) {
+      if (minted && !persisted && !(await revokeToken(platform, token))) {
+        this.warning(
+          "the browser session just created could not be revoked; revoke it under Settings → Developer → CLI sessions",
+        );
+      }
+      throw error;
+    }
+    const { me, kept } = signedIn;
 
     this.note(`Signed in as ${brand(accountLabel(me.user))}`);
     this.note(`token kept in ${kept.where}`);
@@ -157,7 +166,11 @@ export default class AuthLogin extends PlatformCommand {
         () => undefined,
       ));
     if (kind === "DEVICE") {
-      await revokeToken(platform, token);
+      if (!(await revokeToken(platform, token))) {
+        this.warning(
+          "the browser session used before could not be revoked; revoke it under Settings → Developer → CLI sessions",
+        );
+      }
       return;
     }
     if (kind === "TOKEN") {
@@ -236,8 +249,8 @@ export default class AuthLogin extends PlatformCommand {
   }
 }
 
-const revokeToken = (platform: Platform, token: string) =>
+const revokeToken = (platform: Platform, token: string): Promise<boolean> =>
   request(platform, "/v1/cli/session", { method: "DELETE", token }).then(
-    () => undefined,
-    () => undefined,
+    (response) => response.status === 204 || response.status === 401,
+    () => false,
   );

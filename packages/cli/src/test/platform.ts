@@ -8,6 +8,8 @@ export interface MockPlatform extends MockServer {
   tokens: Set<string>;
   kinds: Map<string, "DEVICE" | "TOKEN">;
   sessionScopes: string[];
+  sessionDown?: boolean;
+  revokeFails?: boolean;
   scope?: string;
   bearers: string[];
   wallets: { id: string; label: string; address: string; network: string }[];
@@ -140,6 +142,9 @@ export async function mockPlatform(): Promise<MockPlatform> {
     }
 
     if (route === "GET /v1/cli/session") {
+      if (state.sessionDown) {
+        return send(res, 503, { error: "unavailable", message: "down" });
+      }
       return send(res, 200, {
         user: ACCOUNT,
         session: {
@@ -153,6 +158,9 @@ export async function mockPlatform(): Promise<MockPlatform> {
       });
     }
     if (route === "DELETE /v1/cli/session") {
+      if (state.revokeFails) {
+        return send(res, 500, { error: "internal", message: "boom" });
+      }
       state.tokens.delete(bearer);
       return send(res, 204);
     }

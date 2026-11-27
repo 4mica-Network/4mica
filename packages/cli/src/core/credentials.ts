@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import {
   chmod,
+  link,
   mkdir,
   open,
   readdir,
@@ -268,8 +269,8 @@ async function isStale(path: string): Promise<LockOwner | false> {
   if (!held) return false;
   const quiet = Date.now() - held.mtimeMs > LOCK_STALE_MS;
   if (!owner) return quiet ? { id: "", pid: 0, host: "" } : false;
-  const dead = owner.host === hostname() && !isAlive(owner.pid);
-  return dead || quiet ? owner : false;
+  if (owner.host === hostname()) return isAlive(owner.pid) ? false : owner;
+  return quiet ? owner : false;
 }
 
 async function breakStale(path: string, judged: LockOwner): Promise<void> {
@@ -281,8 +282,7 @@ async function breakStale(path: string, judged: LockOwner): Promise<void> {
   }
   const taken = await readOwner(aside);
   if (taken && taken.id !== judged.id) {
-    await rename(aside, path).catch(() => undefined);
-    return;
+    await link(aside, path).catch(() => undefined);
   }
   await rm(aside, { force: true });
 }
@@ -297,10 +297,20 @@ const lockedError = (path: string) =>
     ],
   });
 
+const lockLost = () =>
+  configError(
+    "another 4mica command took over the sign-in while this one was paused",
+    {
+      code: "CREDENTIALS_LOCK_LOST",
+      retryable: true,
+      suggestions: ["run the command again"],
+    },
+  );
+
 export async function withCredentialLock<T>(
   configDir: string,
   origin: string,
-  use: () => Promise<T>,
+  use: (assertHeld: () => Promise<void>) => Promise<T>,
 ): Promise<T> {
   await mkdir(credentialsDir(configDir), { recursive: true, mode: 0o700 });
   const path = `${credentialsFile(configDir, origin)}.lock`;
@@ -336,8 +346,12 @@ export async function withCredentialLock<T>(
   }, LOCK_HEARTBEAT_MS);
   heartbeat.unref();
 
+  const assertHeld = async () => {
+    if ((await readOwner(path))?.id !== me.id) throw lockLost();
+  };
+
   try {
-    return await use();
+    return await use(assertHeld);
   } finally {
     clearInterval(heartbeat);
     const owner = await readOwner(path);
