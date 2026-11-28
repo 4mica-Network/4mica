@@ -7,7 +7,8 @@ try {
 process.env.CLERK_PUBLISHABLE_KEY ??=
   process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
-const port = 3100;
+const port = Number(process.env.E2E_PORT ?? 3100);
+const server = process.env.E2E_SERVER === "production" ? "start" : "dev";
 const baseURL = `http://localhost:${port}`;
 const authFile = "playwright/.clerk/user.json";
 
@@ -24,7 +25,7 @@ export default defineConfig({
     trace: "on-first-retry",
   },
   webServer: {
-    command: `pnpm exec next dev -p ${port}`,
+    command: `pnpm exec next ${server} -p ${port}`,
     url: `${baseURL}/sign-in`,
     reuseExistingServer: true,
     timeout: 180_000,

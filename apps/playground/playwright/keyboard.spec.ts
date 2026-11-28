@@ -14,17 +14,28 @@ const focusIndicator = (page: Page) =>
   page.evaluate(() => {
     const active = document.activeElement;
     if (!active || active === document.body) {
-      return { tag: "body", visible: false };
+      return { tag: "body", visible: false, tooling: false };
+    }
+    if (active.closest("nextjs-portal")) {
+      return { tag: "nextjs-portal", visible: false, tooling: true };
     }
     let node: Element | null = active;
     for (let depth = 0; node && depth < 4; depth += 1) {
       const style = getComputedStyle(node);
       if (style.outlineStyle !== "none" && style.outlineWidth !== "0px") {
-        return { tag: active.outerHTML.slice(0, 120), visible: true };
+        return {
+          tag: active.outerHTML.slice(0, 120),
+          visible: true,
+          tooling: false,
+        };
       }
       node = node.parentElement;
     }
-    return { tag: active.outerHTML.slice(0, 120), visible: false };
+    return {
+      tag: active.outerHTML.slice(0, 120),
+      visible: false,
+      tooling: false,
+    };
   });
 
 for (const path of PAGES) {
@@ -35,7 +46,10 @@ for (const path of PAGES) {
     const seen = new Set<string>();
     for (let i = 0; i < MAX_TABS; i += 1) {
       await page.keyboard.press("Tab");
-      const { tag, visible } = await focusIndicator(page);
+      const { tag, visible, tooling } = await focusIndicator(page);
+      if (tooling) {
+        continue;
+      }
       if (tag === "body" || seen.has(tag)) {
         break;
       }
