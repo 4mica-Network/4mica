@@ -306,5 +306,17 @@
   "store.team.sessionsRevokedBody_other": "Se cerraron {{count}} sesiones.",
   "store.team.sessionsRevokedBody_many": "Se cerraron {{count}} sesiones.",
   "store.team.sessionsRevokeFailed": "No se pudo cerrar la sesión del miembro.",
-  "store.team.identityNotManaged": "Solo se puede cerrar la sesión en todas partes de miembros cuyo correo esté en uno de tus dominios verificados. Pídele que cierre sesión o elimínalo."
+  "store.team.identityNotManaged": "Solo se puede cerrar la sesión en todas partes de miembros cuyo correo esté en uno de tus dominios verificados. Pídele que cierre sesión o elimínalo.",
+  "projects.advanced": "Avanzado",
+  "projects.access.title": "Quién puede acceder a este proyecto",
+  "projects.access.description": "Decide quién de la organización puede abrir este proyecto.",
+  "projects.access.defaultHint": "Todos en la organización pueden acceder al proyecto predeterminado.",
+  "projects.access.everyone": "Todos en la organización",
+  "projects.access.everyoneHint": "Cada miembro recibe el rol de proyecto que corresponde a su rol en la organización.",
+  "projects.access.chosen": "Solo las personas que elija",
+  "projects.access.chosenHint": "Propietarios y administradores, más las personas que añadas abajo.",
+  "projects.access.chosenTag": "Solo personas elegidas",
+  "projects.access.roles": "Roles del proyecto",
+  "projects.members.chosenTitle": "Personas con acceso",
+  "projects.members.chosenDescription": "Elige quién puede trabajar en este proyecto y con qué rol. Los propietarios y administradores siempre tienen acceso."
 }

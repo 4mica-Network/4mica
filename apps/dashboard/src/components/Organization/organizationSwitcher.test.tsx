@@ -4,9 +4,9 @@ import { INITIAL_STATE as ORGANIZATION_INITIAL_STATE } from "@stores/organizatio
 import type { OrganizationSummary } from "@stores/organization/type";
 import { INITIAL_STATE } from "@stores/user/reducer";
 import type { User } from "@stores/user/type";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { Provider } from "react-redux";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { createStore } from "redux";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import "@/i18n";
@@ -193,5 +193,91 @@ describe("organization switcher", () => {
     renderSidebar("acme", "/settings/profile");
 
     expect(screen.queryByText("Audit log")).toBeNull();
+  });
+});
+
+function Where() {
+  const location = useLocation();
+  return <p data-testid="where">{`${location.pathname}${location.search}`}</p>;
+}
+
+describe("after creating an organization", () => {
+  it("lands on Team with the invite dialog requested", async () => {
+    const created = organization({ id: "labs", name: "Acme Labs" });
+    const initial = {
+      user: { ...INITIAL_STATE, user: { name: "Ada Lovelace" } as User },
+      banner: BANNER_INITIAL_STATE,
+      developer: {},
+      organization: {
+        ...ORGANIZATION_INITIAL_STATE,
+        items: [ORGANIZATIONS[0]],
+        defaultId: "personal",
+        activeId: "personal",
+        status: "loaded" as const,
+      },
+    };
+    const store = createStore(
+      (
+        current: typeof initial = initial,
+        action: { type: string },
+      ): typeof initial => {
+        if (
+          action.type === organizationActionTypes.CREATE_ORGANIZATION_REQUESTED
+        ) {
+          return {
+            ...current,
+            organization: {
+              ...current.organization,
+              pending: { createOrganization: true },
+            },
+          };
+        }
+        if (action.type === "test/created") {
+          return {
+            ...current,
+            organization: {
+              ...current.organization,
+              items: [...current.organization.items, created],
+              activeId: created.id,
+              pending: {},
+            },
+          };
+        }
+        return current;
+      },
+    );
+    render(
+      <Provider store={store}>
+        <MemoryRouter initialEntries={["/payments"]}>
+          <Routes>
+            <Route
+              path="*"
+              element={
+                <>
+                  <Sidebar collapsed={false} />
+                  <Where />
+                </>
+              }
+            />
+          </Routes>
+        </MemoryRouter>
+      </Provider>,
+    );
+    openMenu();
+    fireEvent.click(screen.getByTestId("organization-create"));
+    fireEvent.change(await screen.findByLabelText(/^Name/), {
+      target: { value: "Acme Labs" },
+    });
+    fireEvent.click(screen.getByTestId("create-organization-submit"));
+    expect(screen.getByTestId("where")).toHaveTextContent("/payments");
+
+    act(() => {
+      store.dispatch({ type: "test/created" });
+    });
+
+    expect(screen.getByTestId("where")).toHaveTextContent(
+      "/settings/team?invite=1",
+    );
+    expect(screen.queryByTestId("create-organization-modal")).toBeNull();
   });
 });

@@ -12,6 +12,7 @@ import {
 } from "@stores/project/selector";
 import { type FormEvent, useEffect, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Disclosure } from "@/components/Disclosure";
 import { FieldRow, SwitchCard, TextArea, TextInput } from "@/components/form";
 
 export const PROJECT_NAME_MAX_LENGTH = 120;
@@ -132,49 +133,55 @@ export function CreateProjectModal({
             onChange={changeName}
           />
         </FieldRow>
-        <FieldRow
-          title={t("project.create.slug")}
-          description={t("project.create.slugHint")}
-          htmlFor="create-project-slug"
+        <Disclosure
+          label={t("project.create.moreOptions")}
+          forceOpen={Boolean(slugError || issues.description)}
+          data-testid="create-project-more"
         >
-          <TextInput
-            id="create-project-slug"
-            value={slug}
-            maxLength={SLUG_MAX_LENGTH}
-            autoComplete="off"
-            spellCheck={false}
-            error={slugError}
-            onChange={(value) => {
-              setSlug(value.toLowerCase());
-              setSlugEdited(true);
-              if (issues.slug) {
-                dispatch(clearProjectIssues());
-              }
-            }}
-          />
-        </FieldRow>
-        <FieldRow
-          title={t("project.create.descriptionLabel")}
-          htmlFor="create-project-description"
-        >
-          <TextArea
-            id="create-project-description"
-            value={description}
-            rows={2}
-            maxLength={PROJECT_DESCRIPTION_MAX_LENGTH}
-            error={issues.description}
-            onChange={setDescription}
-          />
-        </FieldRow>
-        <div className="pt-3">
-          <SwitchCard
-            id="create-project-restricted"
-            title={t("project.create.restricted")}
-            description={t("project.create.restrictedHint")}
-            checked={restricted}
-            onToggle={setRestricted}
-          />
-        </div>
+          <FieldRow
+            title={t("project.create.slug")}
+            description={t("project.create.slugHint")}
+            htmlFor="create-project-slug"
+          >
+            <TextInput
+              id="create-project-slug"
+              value={slug}
+              maxLength={SLUG_MAX_LENGTH}
+              autoComplete="off"
+              spellCheck={false}
+              error={slugError}
+              onChange={(value) => {
+                setSlug(value.toLowerCase());
+                setSlugEdited(true);
+                if (issues.slug) {
+                  dispatch(clearProjectIssues());
+                }
+              }}
+            />
+          </FieldRow>
+          <FieldRow
+            title={t("project.create.descriptionLabel")}
+            htmlFor="create-project-description"
+          >
+            <TextArea
+              id="create-project-description"
+              value={description}
+              rows={2}
+              maxLength={PROJECT_DESCRIPTION_MAX_LENGTH}
+              error={issues.description}
+              onChange={setDescription}
+            />
+          </FieldRow>
+          <div className="pt-3">
+            <SwitchCard
+              id="create-project-restricted"
+              title={t("project.create.restricted")}
+              description={t("project.create.restrictedHint")}
+              checked={restricted}
+              onToggle={setRestricted}
+            />
+          </div>
+        </Disclosure>
       </form>
     </Modal>
   );

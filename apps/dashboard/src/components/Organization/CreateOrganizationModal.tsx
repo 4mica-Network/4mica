@@ -6,14 +6,18 @@ import {
   organizationPendingKeys,
 } from "@stores/organization/actions";
 import {
+  selectActiveOrganization,
   selectIsOrganizationPending,
   selectOrganizationIssues,
 } from "@stores/organization/selector";
 import { NAME_MAX_LENGTH, NAME_MIN_LENGTH } from "@utils/user-rules";
-import { type FormEvent, useEffect, useId, useState } from "react";
+import { type FormEvent, useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useNavigate } from "react-router-dom";
 import { FieldRow, TextInput } from "@/components/form";
 import { handleProblemKey, suggestHandle } from "./handle";
+
+export const INVITE_TEAM_PATH = "/settings/team?invite=1";
 
 export function CreateOrganizationModal({
   isOpen,
@@ -29,6 +33,9 @@ export function CreateOrganizationModal({
     selectIsOrganizationPending(organizationPendingKeys.create),
   );
   const issues = useAppSelector(selectOrganizationIssues);
+  const active = useAppSelector(selectActiveOrganization);
+  const navigate = useNavigate();
+  const startedFrom = useRef<string | null | undefined>(undefined);
 
   const [name, setName] = useState("");
   const [handle, setHandle] = useState("");
@@ -43,8 +50,24 @@ export function CreateOrganizationModal({
     setHandle("");
     setHandleEdited(false);
     setSubmitted(false);
+    startedFrom.current = undefined;
     dispatch(clearOrganizationIssues());
   }, [dispatch, isOpen]);
+
+  useEffect(() => {
+    if (
+      startedFrom.current === undefined ||
+      isSaving ||
+      !active ||
+      active.personal ||
+      active.id === startedFrom.current
+    ) {
+      return;
+    }
+    startedFrom.current = undefined;
+    onClose();
+    navigate(INVITE_TEAM_PATH);
+  }, [active, isSaving, navigate, onClose]);
 
   const trimmedName = name.trim();
   const candidate = handle.trim().toLowerCase();
@@ -80,6 +103,7 @@ export function CreateOrganizationModal({
     if (nameError || problemKey || !candidate || isSaving) {
       return;
     }
+    startedFrom.current = active?.id ?? null;
     dispatch(createOrganization({ name: trimmedName, handle: candidate }));
   };
 

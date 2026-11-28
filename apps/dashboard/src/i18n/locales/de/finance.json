@@ -267,5 +267,13 @@
   "store.finance.governanceFailed": "Governance-Einstellungen konnten nicht geladen werden.",
   "store.finance.governanceSaved": "Governance aktualisiert",
   "store.finance.governanceSavedBody": "Neue Anfragen folgen ab sofort diesen Regeln.",
-  "store.finance.governanceSaveFailed": "Governance-Einstellungen konnten nicht gespeichert werden."
+  "store.finance.governanceSaveFailed": "Governance-Einstellungen konnten nicht gespeichert werden.",
+  "finance.limits.title": "Ausgabenlimits",
+  "finance.limits.description": "Begrenzen Sie, was Ihre Agenten pro Zahlung, pro Tag und pro Monat ausgeben dürfen.",
+  "finance.limits.create": "Neues Limit",
+  "finance.limits.alertsTitle": "Budgetwarnungen",
+  "finance.limits.alertsDescription": "Offene Warnungen, wenn Ausgaben eine Warnschwelle eines Limits überschreiten.",
+  "finance.limits.alertsEmpty": "Keine offenen Budgetwarnungen",
+  "finance.policy.advanced": "Erweitert",
+  "finance.policy.advancedHint": "Lassen Sie Ihre Agenten nur an die angegebenen Empfänger zahlen."
 }

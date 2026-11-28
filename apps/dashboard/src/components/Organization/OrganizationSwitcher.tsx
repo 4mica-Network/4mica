@@ -13,9 +13,11 @@ const ITEM_CLASS =
   "flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-ink-body text-sm outline-none hover:bg-overlay/10 focus-visible:bg-overlay/10 focus-visible:ring-1 focus-visible:ring-overlay/60 focus-visible:ring-inset";
 
 export function OrganizationSwitcher({
+  showOrganizations = true,
   onDone,
   onCreate,
 }: {
+  showOrganizations?: boolean;
   onDone: () => void;
   onCreate: () => void;
 }) {
@@ -39,10 +41,12 @@ export function OrganizationSwitcher({
       className="flex flex-col border-overlay/10 border-b pb-1"
       data-testid="organization-switcher"
     >
-      <span className="px-2.5 pt-1.5 pb-1 text-2xs text-ink-subtle uppercase tracking-wide">
-        {t("organization.switcher.title")}
-      </span>
-      {organizations.map((organization) => {
+      {showOrganizations && (
+        <span className="px-2.5 pt-1.5 pb-1 text-2xs text-ink-subtle uppercase tracking-wide">
+          {t("organization.switcher.title")}
+        </span>
+      )}
+      {(showOrganizations ? organizations : []).map((organization) => {
         const active = organization.id === activeId;
         return (
           <button

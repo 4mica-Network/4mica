@@ -14,6 +14,8 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { FinancePage } from "@/components/Finance/FinancePage";
 import { ListState } from "@/components/Finance/ListState";
+import { useWorkspaceMode } from "@/hooks/useWorkspaceMode";
+import { BudgetAlerts } from "./BudgetAlerts";
 import { PolicyCard } from "./PolicyCard";
 import { PolicyFormModal } from "./PolicyFormModal";
 
@@ -37,6 +39,7 @@ export function SpendingPolicies() {
   const status = useAppSelector(selectPoliciesStatus);
   const error = useAppSelector(selectPoliciesError);
   const canManage = useAppSelector(selectCan(PERMISSION.FINANCE_MANAGE));
+  const { personal } = useWorkspaceMode();
   const [editing, setEditing] = useState<SpendingPolicy | null>(null);
   const [open, setOpen] = useState(false);
 
@@ -51,8 +54,10 @@ export function SpendingPolicies() {
 
   return (
     <FinancePage
-      titleKey="finance.policies.title"
-      descriptionKey="finance.policies.description"
+      titleKey={personal ? "finance.limits.title" : "finance.policies.title"}
+      descriptionKey={
+        personal ? "finance.limits.description" : "finance.policies.description"
+      }
       action={
         canManage && (
           <Button
@@ -64,7 +69,9 @@ export function SpendingPolicies() {
             onClick={() => openForm(null)}
             data-testid="policy-create"
           >
-            {t("finance.policies.create")}
+            {personal
+              ? t("finance.limits.create")
+              : t("finance.policies.create")}
           </Button>
         )
       }
@@ -94,9 +101,12 @@ export function SpendingPolicies() {
         </div>
       </ListState>
 
+      {personal && <BudgetAlerts canManage={canManage} />}
+
       {canManage && (
         <PolicyFormModal
           isOpen={open}
+          simple={personal}
           policy={editing}
           onClose={() => setOpen(false)}
         />

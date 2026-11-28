@@ -14,6 +14,7 @@ import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import { useTranslation } from "react-i18next";
 import { ListToolbar } from "@/components/ListToolbar";
 import { useNetworkOptions } from "@/hooks/useNetworkOptions";
+import { showsProjects, useWorkspaceMode } from "@/hooks/useWorkspaceMode";
 import { VISIBILITY_OPTIONS } from "./constants";
 
 export function AgentToolbar({
@@ -24,6 +25,7 @@ export function AgentToolbar({
   onMove: () => void;
 }) {
   const { t } = useTranslation();
+  const canMove = showsProjects(useWorkspaceMode());
   const dispatch = useAppDispatch();
   const networkOptions = useNetworkOptions();
 
@@ -49,7 +51,7 @@ export function AgentToolbar({
             : dispatch(setAgentSelection(agents.map((item) => item.id)))
         }
         onBatchDelete={onBatchDelete}
-        onMove={onMove}
+        onMove={canMove ? onMove : undefined}
       />
     ) : undefined;
 

@@ -305,5 +305,17 @@
   "store.team.sessionsRevokedBody_one": "{{count}} session was ended.",
   "store.team.sessionsRevokedBody_other": "{{count}} sessions were ended.",
   "store.team.sessionsRevokeFailed": "Couldn't sign the member out.",
-  "store.team.identityNotManaged": "Only members whose email is on one of your verified domains can be signed out everywhere. Ask this member to sign out themselves, or remove them."
+  "store.team.identityNotManaged": "Only members whose email is on one of your verified domains can be signed out everywhere. Ask this member to sign out themselves, or remove them.",
+  "projects.advanced": "Advanced",
+  "projects.access.title": "Who can access this project",
+  "projects.access.description": "Decide who in the organization can open this project.",
+  "projects.access.defaultHint": "Everyone in the organization can access the default project.",
+  "projects.access.everyone": "Everyone in the organization",
+  "projects.access.everyoneHint": "Each member gets the project role that matches their organization role.",
+  "projects.access.chosen": "Only people I choose",
+  "projects.access.chosenHint": "Owners and admins, plus the people you add below.",
+  "projects.access.chosenTag": "Chosen people only",
+  "projects.access.roles": "Project roles",
+  "projects.members.chosenTitle": "People with access",
+  "projects.members.chosenDescription": "Pick who can work in this project and their role. Owners and admins always have access."
 }

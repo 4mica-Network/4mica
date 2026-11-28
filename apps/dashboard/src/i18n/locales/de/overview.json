@@ -53,5 +53,16 @@
   "overview.leaders.sort.amount": "Volumen",
   "overview.leaders.sort.settledCount": "Zahlungen",
   "overview.leaders.listingsEmpty": "Keine API hat in diesem Zeitraum eine abgerechnete Zahlung erhalten.",
-  "overview.leaders.agentsEmpty": "Kein Agent hat in diesem Zeitraum etwas bezahlt."
+  "overview.leaders.agentsEmpty": "Kein Agent hat in diesem Zeitraum etwas bezahlt.",
+  "overview.setup.title": "Richten Sie Ihre Organisation ein",
+  "overview.setup.progress": "{{done}} von {{total}} erledigt",
+  "overview.setup.dismiss": "Ausblenden",
+  "overview.setup.statusDone": "Erledigt",
+  "overview.setup.statusTodo": "Noch offen",
+  "overview.setup.invite.title": "Laden Sie Ihr Team ein",
+  "overview.setup.invite.hint": "Fügen Sie Ihre Kolleginnen und Kollegen hinzu und wählen Sie ihre Rollen.",
+  "overview.setup.project.title": "Projekt erstellen (optional)",
+  "overview.setup.project.hint": "Halten Sie Agenten, APIs und Schlüssel verschiedener Produkte getrennt.",
+  "overview.setup.access.title": "Projektzugriff festlegen",
+  "overview.setup.access.hint": "Öffnen Sie ein Projekt für alle oder nur für ausgewählte Personen."
 }

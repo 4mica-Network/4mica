@@ -356,8 +356,8 @@
   "page.settings.roles.description": "Define roles with exactly the permissions your team needs.",
   "page.settings.auditStreams.title": "Audit streaming",
   "page.settings.auditStreams.description": "Send audit events to your SIEM or log pipeline as they happen.",
-  "page.settings.security.title": "Security",
-  "page.settings.security.description": "Domains, single sign-on and access policies for this organization.",
+  "page.settings.security.title": "Security policies",
+  "page.settings.security.description": "Sign-in, session and network access policies for this organization.",
   "page.settings.scim.title": "Provisioning (SCIM)",
   "page.settings.scim.description": "Let your identity provider add, update and remove members automatically.",
   "page.settings.complianceReport.title": "Compliance report",
@@ -366,5 +366,14 @@
   "ipAllowlist.restricted_other": "{{count}} allowed IP ranges",
   "ipAllowlist.edit": "IP restrictions for {{name}}",
   "ipAllowlist.editTitle": "IP restrictions for {{name}}",
-  "ipAllowlist.save": "Save"
+  "ipAllowlist.save": "Save",
+  "nav.section.organization": "Organization",
+  "nav.section.workspace": "Workspace",
+  "nav.securityCompliance": "Security & compliance",
+  "nav.securityPolicies": "Security policies",
+  "nav.domainsSso": "Domains & SSO",
+  "nav.spendingLimits": "Spending limits",
+  "page.settings.sso.title": "Domains & SSO",
+  "page.settings.sso.description": "Verify your email domains and set up single sign-on for this organization.",
+  "project.create.moreOptions": "More options"
 }

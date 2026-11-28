@@ -9,13 +9,14 @@ import type { SecurityFailure, SecurityState } from "@stores/security/type";
 import { INITIAL_STATE as USER_INITIAL_STATE } from "@stores/user/reducer";
 import type { User } from "@stores/user/type";
 import { fireEvent, render, screen, within } from "@testing-library/react";
+import type { ComponentType } from "react";
 import { Provider } from "react-redux";
 import { MemoryRouter } from "react-router-dom";
 import { createStore } from "redux";
 import { describe, expect, it } from "vitest";
 import "@/i18n";
 import { isValidDomain } from "./DomainsSection";
-import { SecuritySettingsPage } from "./index";
+import { DomainsSsoSettings, SecuritySettingsPage } from "./index";
 import {
   emptySsoDraft,
   toSsoInput,
@@ -80,6 +81,7 @@ let dispatched: { type: string; payload?: unknown }[] = [];
 const renderSecurity = (
   permissions: Permission[],
   over: Partial<SecurityState> = {},
+  Page: ComponentType = DomainsSsoSettings,
 ) => {
   dispatched = [];
   const organization: OrganizationSummary = {
@@ -124,7 +126,7 @@ const renderSecurity = (
   render(
     <Provider store={store}>
       <MemoryRouter>
-        <SecuritySettingsPage />
+        <Page />
       </MemoryRouter>
     </Provider>,
   );
@@ -218,14 +220,18 @@ describe("security settings", () => {
   });
 
   it("shows the caller's IP and adds it when the allowlist would lock them out", () => {
-    renderSecurity(OWNER, {
-      settings: { ...SETTINGS, ipAllowlist: ["10.0.0.0/8"] },
-      failure: failure({
-        key: "saveSettings",
-        code: "would_lock_out",
-        detail: { ip: "203.0.113.9" },
-      }),
-    });
+    renderSecurity(
+      OWNER,
+      {
+        settings: { ...SETTINGS, ipAllowlist: ["10.0.0.0/8"] },
+        failure: failure({
+          key: "saveSettings",
+          code: "would_lock_out",
+          detail: { ip: "203.0.113.9" },
+        }),
+      },
+      SecuritySettingsPage,
+    );
 
     expect(screen.getByTestId("policies-would-lock-out")).toHaveTextContent(
       "203.0.113.9",
@@ -242,7 +248,7 @@ describe("security settings", () => {
   });
 
   it("blocks saving an allowlist with an invalid entry", () => {
-    renderSecurity(OWNER);
+    renderSecurity(OWNER, {}, SecuritySettingsPage);
 
     fireEvent.change(screen.getByLabelText("IP allowlist"), {
       target: { value: "10.0.0.0/8\nnot-an-ip" },
@@ -259,7 +265,25 @@ describe("security settings", () => {
     expect(screen.getByTestId("security-read-only")).toBeInTheDocument();
     expect(screen.getByTestId("sso-owner-only")).toBeInTheDocument();
     expect(screen.queryByTestId("domain-verify-dom_1")).toBeNull();
+  });
+
+  it("keeps the access policies read-only for an admin", () => {
+    renderSecurity(
+      ["members.manage", "compliance.read"],
+      {},
+      SecuritySettingsPage,
+    );
+
+    expect(screen.getByTestId("security-read-only")).toBeInTheDocument();
     expect(screen.queryByTestId("policies-save")).toBeNull();
+    expect(screen.queryByTestId("domain-verify-dom_1")).toBeNull();
+  });
+
+  it("keeps domains and single sign-on off the policies tab", () => {
+    renderSecurity(OWNER, {}, SecuritySettingsPage);
+
+    expect(screen.getByTestId("policies-save")).toBeInTheDocument();
+    expect(screen.queryByTestId("domain-verify-dom_1")).toBeNull();
   });
 });
 

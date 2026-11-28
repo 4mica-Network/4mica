@@ -272,5 +272,13 @@
   "store.finance.governanceFailed": "No se pudieron cargar los ajustes de gobernanza.",
   "store.finance.governanceSaved": "Gobernanza actualizada",
   "store.finance.governanceSavedBody": "Las nuevas solicitudes siguen estas reglas desde ahora.",
-  "store.finance.governanceSaveFailed": "No se pudieron guardar los ajustes de gobernanza."
+  "store.finance.governanceSaveFailed": "No se pudieron guardar los ajustes de gobernanza.",
+  "finance.limits.title": "Límites de gasto",
+  "finance.limits.description": "Limita lo que tus agentes pueden gastar por pago, por día y por mes.",
+  "finance.limits.create": "Nuevo límite",
+  "finance.limits.alertsTitle": "Alertas de presupuesto",
+  "finance.limits.alertsDescription": "Alertas abiertas generadas cuando el gasto supera uno de los umbrales de alerta de un límite.",
+  "finance.limits.alertsEmpty": "No hay alertas de presupuesto abiertas",
+  "finance.policy.advanced": "Avanzado",
+  "finance.policy.advancedHint": "Permita que sus agentes paguen solo a los destinatarios indicados."
 }

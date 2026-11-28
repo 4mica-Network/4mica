@@ -8,7 +8,7 @@ import {
   allows,
   selectActiveOrganization,
 } from "@stores/organization/selector";
-import { PERMISSION } from "@stores/organization/type";
+import { PERMISSION, type Permission } from "@stores/organization/type";
 import { selectUser } from "@stores/user/selector";
 import { m } from "framer-motion";
 import {
@@ -36,8 +36,16 @@ import { OrganizationSwitcher } from "@/components/Organization/OrganizationSwit
 import { EnvironmentToggle } from "@/components/Project/EnvironmentToggle";
 import { ProjectSwitcher } from "@/components/Project/ProjectSwitcher";
 import { SidebarBanners } from "@/components/SidebarBanners";
+import { showsProjects, useWorkspaceMode } from "@/hooks/useWorkspaceMode";
 import { links } from "@/lib/links";
-import { FOOTER_ITEMS, NAV_SECTIONS, type NavItem, SETTINGS_NAV } from "@/nav";
+import {
+  FOOTER_ITEMS,
+  NAV_SECTIONS,
+  type NavItem,
+  type NavSection,
+  resolveNav,
+  SETTINGS_SECTIONS,
+} from "@/nav";
 import { preloadPage } from "@/routes";
 
 const CreateOrganizationModal = lazy(() =>
@@ -133,7 +141,9 @@ function useFinanceBadgeRefresh() {
   const dispatch = useAppDispatch();
   const organization = useAppSelector(selectActiveOrganization);
   const enabled =
-    organization !== null && allows(organization, PERMISSION.FINANCE_READ);
+    organization !== null &&
+    !organization.personal &&
+    allows(organization, PERMISSION.FINANCE_READ);
   const organizationId = organization?.id;
 
   useEffect(() => {
@@ -195,7 +205,11 @@ function NavRow({
   end?: boolean;
 }) {
   const { t } = useTranslation();
+  const { pathname } = useLocation();
   const label = t(item.labelKey);
+  const childActive = Boolean(
+    item.children?.some((child) => child.to === pathname),
+  );
   return (
     <Tooltip title={label} placement="right" disabled={!collapsed} delay={80}>
       <span className="block w-full">
@@ -204,7 +218,9 @@ function NavRow({
           end={end}
           onMouseEnter={() => preloadPage(item.to)}
           onFocus={() => preloadPage(item.to)}
-          className={({ isActive }) => cn(rowClass(isActive), "relative")}
+          className={({ isActive }) =>
+            cn(rowClass(isActive || childActive), "relative")
+          }
         >
           <RowIcon icon={item.icon} />
           <Label collapsed={collapsed} className="pr-2.5">
@@ -214,6 +230,40 @@ function NavRow({
         </NavLink>
       </span>
     </Tooltip>
+  );
+}
+
+function NavGroup({
+  section,
+  collapsed,
+  titled,
+}: {
+  section: NavSection;
+  collapsed: boolean;
+  titled: boolean;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div className="mb-1">
+      {titled && section.titleKey && (
+        <Label
+          collapsed={collapsed}
+          className="block px-2.5 pt-2 pb-0.5 text-2xs text-ink-subtle uppercase tracking-wide"
+        >
+          {t(section.titleKey)}
+        </Label>
+      )}
+      <div className="flex flex-col gap-0.5">
+        {section.items.map((item) => (
+          <NavRow
+            key={`${item.to}:${item.labelKey}`}
+            item={item}
+            collapsed={collapsed}
+            end={item.end}
+          />
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -259,6 +309,7 @@ function AvatarMenu({ collapsed }: { collapsed: boolean }) {
 
   const displayName = useDisplayName();
   const organization = useAppSelector(selectActiveOrganization);
+  const { hasTeamOrganizations } = useWorkspaceMode();
 
   return (
     <>
@@ -318,6 +369,7 @@ function AvatarMenu({ collapsed }: { collapsed: boolean }) {
       >
         <div id={menuId} role="menu" aria-label={displayName}>
           <OrganizationSwitcher
+            showOrganizations={hasTeamOrganizations}
             onDone={() => setOpen(false)}
             onCreate={() => setCreating(true)}
           />
@@ -404,13 +456,15 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
 
   const [settled, setSettled] = useState(!collapsed);
   const organization = useAppSelector(selectActiveOrganization);
-  const permitted = (item: NavItem) =>
-    !item.permission || allows(organization, item.permission);
-  const settingsNav = SETTINGS_NAV.filter(permitted);
-  const sections = NAV_SECTIONS.map((section) => ({
-    ...section,
-    items: section.items.filter(permitted),
-  })).filter((section) => section.items.length > 0);
+  const mode = useWorkspaceMode();
+  const permitted = (permission: Permission) =>
+    allows(organization, permission);
+  const sections = resolveNav(
+    inSettings ? SETTINGS_SECTIONS : NAV_SECTIONS,
+    mode,
+    permitted,
+  );
+  const showProjects = showsProjects(mode);
   useFinanceBadgeRefresh();
 
   useEffect(() => {
@@ -448,38 +502,20 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
           <AvatarMenu collapsed={collapsed} />
         )}
         <div className="mt-1 flex flex-col gap-1.5">
-          <ProjectSwitcher collapsed={collapsed} />
+          {showProjects && <ProjectSwitcher collapsed={collapsed} />}
           <EnvironmentToggle collapsed={collapsed} />
         </div>
       </div>
 
       <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto overflow-x-hidden px-3 pb-3">
-        {inSettings
-          ? settingsNav.map((item) => (
-              <NavRow key={item.to} item={item} collapsed={collapsed} />
-            ))
-          : sections.map((section, i) => (
-              <div key={section.titleKey ?? `section-${i}`} className="mb-1">
-                {section.titleKey && (
-                  <Label
-                    collapsed={collapsed}
-                    className="block px-2.5 pt-2 pb-0.5 text-2xs text-ink-subtle uppercase tracking-wide"
-                  >
-                    {t(section.titleKey)}
-                  </Label>
-                )}
-                <div className="flex flex-col gap-0.5">
-                  {section.items.map((item) => (
-                    <NavRow
-                      key={item.to}
-                      item={item}
-                      collapsed={collapsed}
-                      end={item.end}
-                    />
-                  ))}
-                </div>
-              </div>
-            ))}
+        {sections.map((section, i) => (
+          <NavGroup
+            key={section.titleKey ?? `section-${i}`}
+            section={section}
+            collapsed={collapsed}
+            titled={!inSettings || sections.length > 1}
+          />
+        ))}
       </nav>
 
       <div className="p-3">

@@ -33,9 +33,11 @@ const ORG_ADMIN_ROLES = new Set(["OWNER", "ADMIN"]);
 function MemberRow({
   member,
   canManage,
+  restricted,
 }: {
   member: ProjectMember;
   canManage: boolean;
+  restricted: boolean;
 }) {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
@@ -78,7 +80,12 @@ function MemberRow({
             value={member.projectRole ?? INHERITED}
             disabled={isPending}
             options={[
-              { value: INHERITED, title: t("projects.members.inherited") },
+              {
+                value: INHERITED,
+                title: restricted
+                  ? t("projects.members.noAccess")
+                  : t("projects.members.inherited"),
+              },
               ...PROJECT_ROLES.map((role) => ({
                 value: role,
                 title: t(`project.role.${role}`),
@@ -96,7 +103,9 @@ function MemberRow({
         <Tag size="sm" variant="neutral" className="shrink-0">
           {member.projectRole
             ? t(`project.role.${member.projectRole}`)
-            : t("projects.members.inherited")}
+            : restricted
+              ? t("projects.members.noAccess")
+              : t("projects.members.inherited")}
         </Tag>
       )}
 
@@ -114,7 +123,7 @@ function MemberRow({
   );
 }
 
-export function MembersSection() {
+export function MembersSection({ restricted }: { restricted: boolean }) {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const members = useAppSelector(selectProjectMembers);
@@ -130,8 +139,16 @@ export function MembersSection() {
 
   return (
     <SettingsSection
-      title={t("projects.members.title")}
-      description={t("projects.members.description")}
+      title={
+        restricted
+          ? t("projects.members.chosenTitle")
+          : t("projects.members.title")
+      }
+      description={
+        restricted
+          ? t("projects.members.chosenDescription")
+          : t("projects.members.description")
+      }
     >
       {status === "idle" || status === "loading" ? (
         <PageSpinner />
@@ -162,6 +179,7 @@ export function MembersSection() {
               key={member.userId}
               member={member}
               canManage={canManage}
+              restricted={restricted}
             />
           ))}
         </div>

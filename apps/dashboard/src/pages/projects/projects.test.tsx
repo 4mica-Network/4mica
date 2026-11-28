@@ -68,7 +68,25 @@ const member = (over: Partial<ProjectMember>): ProjectMember => ({
 
 let dispatched: { type: string; payload?: unknown }[] = [];
 
-const renderPage = (activeId: string) => {
+const DEFAULT_PROJECTS = [
+  project({}),
+  project({ id: "checkout", name: "Checkout", isDefault: false }),
+  project({
+    id: "old",
+    name: "Legacy",
+    isDefault: false,
+    archived: true,
+  }),
+];
+
+const openRoles = () =>
+  fireEvent.click(
+    within(screen.getByTestId("project-roles")).getByRole("button", {
+      name: "Project roles",
+    }),
+  );
+
+const renderPage = (activeId: string, items = DEFAULT_PROJECTS) => {
   dispatched = [];
   const state = {
     user: { ...USER_INITIAL_STATE, user: { id: "me", name: "Ada" } as User },
@@ -81,16 +99,7 @@ const renderPage = (activeId: string) => {
     project: {
       ...PROJECT_INITIAL_STATE,
       organizationId: "acme",
-      items: [
-        project({}),
-        project({ id: "checkout", name: "Checkout", isDefault: false }),
-        project({
-          id: "old",
-          name: "Legacy",
-          isDefault: false,
-          archived: true,
-        }),
-      ],
+      items,
       activeId,
       status: "loaded" as const,
       members: [
@@ -129,6 +138,7 @@ describe("projects settings", () => {
       within(screen.getByTestId("projects-row-old")).getByText("Archived"),
     ).toBeInTheDocument();
     expect(screen.getByTestId("projects-create")).toBeInTheDocument();
+    openRoles();
     expect(dispatched.map((a) => a.type)).toContain(
       projectActionTypes.FETCH_PROJECT_MEMBERS_REQUESTED,
     );
@@ -171,6 +181,7 @@ describe("projects settings", () => {
 
   it("shows org role, explicit role and effective role for every member", () => {
     renderPage("main");
+    openRoles();
 
     const developer = screen.getByTestId("project-member-u_dev");
     expect(developer).toHaveTextContent("Organization: Developer");
@@ -186,5 +197,70 @@ describe("projects settings", () => {
       within(owner).queryByTestId("project-role-u_owner-select"),
     ).toBeNull();
     expect(owner).toHaveTextContent("Admin");
+  });
+});
+
+describe("project access", () => {
+  it("keeps the default project open to everyone", () => {
+    renderPage("main");
+
+    expect(screen.queryByTestId("project-access")).toBeNull();
+    expect(
+      screen.getByText(
+        "Everyone in the organization can access the default project.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("restricts a project to chosen people", () => {
+    renderPage("checkout");
+
+    expect(screen.getByTestId("project-access-everyone")).toBeChecked();
+    expect(screen.queryByText("People with access")).toBeNull();
+
+    fireEvent.click(screen.getByLabelText(/Only people I choose/));
+
+    expect(dispatched).toContainEqual(
+      expect.objectContaining({
+        type: projectActionTypes.UPDATE_PROJECT_REQUESTED,
+        payload: { restricted: true },
+      }),
+    );
+  });
+
+  it("picks people and their role once only chosen people have access", () => {
+    renderPage("checkout", [
+      project({}),
+      project({
+        id: "checkout",
+        name: "Checkout",
+        isDefault: false,
+        restricted: true,
+      }),
+    ]);
+
+    expect(screen.getByTestId("project-access-chosen")).toBeChecked();
+    expect(screen.getByText("People with access")).toBeInTheDocument();
+    expect(
+      screen.getByTestId("project-role-u_dev-select-trigger"),
+    ).toHaveTextContent("No access");
+  });
+
+  it("keeps the production restriction under Advanced", () => {
+    renderPage("checkout");
+
+    expect(
+      screen.queryByText("Only project admins can change production"),
+    ).toBeNull();
+
+    fireEvent.click(
+      within(screen.getByTestId("project-advanced")).getByRole("button", {
+        name: "Advanced",
+      }),
+    );
+
+    expect(
+      screen.getByText("Only project admins can change production"),
+    ).toBeInTheDocument();
   });
 });

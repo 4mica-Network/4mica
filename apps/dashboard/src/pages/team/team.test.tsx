@@ -72,7 +72,7 @@ const INVITATION: PendingInvitation = {
 
 let dispatched: { type: string; payload?: unknown }[] = [];
 
-const renderTeam = (active: OrganizationSummary) => {
+const renderTeam = (active: OrganizationSummary, path = "/settings/team") => {
   dispatched = [];
   const state = {
     user: {
@@ -99,7 +99,7 @@ const renderTeam = (active: OrganizationSummary) => {
   });
   return render(
     <Provider store={store}>
-      <MemoryRouter>
+      <MemoryRouter initialEntries={[path]}>
         <TeamSettings />
       </MemoryRouter>
     </Provider>,
@@ -111,6 +111,21 @@ const dispatchedTypes = () => dispatched.map((action) => action.type);
 describe("team settings", () => {
   beforeEach(() => {
     dispatched = [];
+  });
+
+  it("opens the invite dialog when it is asked for in the link", () => {
+    renderTeam(organization(), "/settings/team?invite=1");
+
+    expect(screen.getByRole("dialog", { name: /Invite/ })).toBeInTheDocument();
+  });
+
+  it("does not open the invite dialog for someone who cannot invite", () => {
+    renderTeam(
+      organization({ role: "DEVELOPER", permissions: ["resources.read"] }),
+      "/settings/team?invite=1",
+    );
+
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 
   it("explains that a personal workspace has a single member", () => {

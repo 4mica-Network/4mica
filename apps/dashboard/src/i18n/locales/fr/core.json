@@ -363,8 +363,8 @@
   "page.settings.roles.description": "Définissez des rôles avec exactement les autorisations nécessaires.",
   "page.settings.auditStreams.title": "Diffusion d'audit",
   "page.settings.auditStreams.description": "Envoyez les événements d'audit à votre SIEM ou pipeline de logs en temps réel.",
-  "page.settings.security.title": "Sécurité",
-  "page.settings.security.description": "Domaines, authentification unique et règles d'accès de cette organisation.",
+  "page.settings.security.title": "Règles de sécurité",
+  "page.settings.security.description": "Règles de connexion, de session et d'accès réseau de cette organisation.",
   "page.settings.scim.title": "Provisionnement (SCIM)",
   "page.settings.scim.description": "Laissez votre fournisseur d'identité ajouter, modifier et retirer les membres automatiquement.",
   "page.settings.complianceReport.title": "Rapport de conformité",
@@ -374,5 +374,14 @@
   "ipAllowlist.restricted_many": "{{count}} plages IP autorisées",
   "ipAllowlist.edit": "Restrictions IP pour {{name}}",
   "ipAllowlist.editTitle": "Restrictions IP pour {{name}}",
-  "ipAllowlist.save": "Enregistrer"
+  "ipAllowlist.save": "Enregistrer",
+  "nav.section.organization": "Organisation",
+  "nav.section.workspace": "Espace de travail",
+  "nav.securityCompliance": "Sécurité et conformité",
+  "nav.securityPolicies": "Règles de sécurité",
+  "nav.domainsSso": "Domaines et SSO",
+  "nav.spendingLimits": "Limites de dépenses",
+  "page.settings.sso.title": "Domaines et SSO",
+  "page.settings.sso.description": "Vérifiez vos domaines e-mail et configurez l'authentification unique de cette organisation.",
+  "project.create.moreOptions": "Plus d'options"
 }

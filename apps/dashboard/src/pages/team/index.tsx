@@ -18,6 +18,7 @@ import { selectUser } from "@stores/user/selector";
 import { TriangleAlert, UserPlus, Users } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useSearchParams } from "react-router-dom";
 import { SettingsSection } from "@/components/layout";
 import { CreateOrganizationModal } from "@/components/Organization/CreateOrganizationModal";
 import { RoleRestrictedNotice } from "@/components/Organization/RoleRestricted";
@@ -63,6 +64,25 @@ function Members() {
   const roles = useAppSelector(selectSecurityCollection("roles"));
   const domains = useAppSelector(selectSecurityCollection("domains"));
   const [inviting, setInviting] = useState(false);
+  const [params, setParams] = useSearchParams();
+  const inviteRequested = params.has("invite");
+
+  useEffect(() => {
+    if (!inviteRequested) {
+      return;
+    }
+    if (canManage) {
+      setInviting(true);
+    }
+    setParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        next.delete("invite");
+        return next;
+      },
+      { replace: true },
+    );
+  }, [inviteRequested, canManage, setParams]);
 
   useEffect(() => {
     dispatch(fetchMembers());

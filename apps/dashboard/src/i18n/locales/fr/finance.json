@@ -272,5 +272,13 @@
   "store.finance.governanceFailed": "Impossible de charger les paramètres de gouvernance.",
   "store.finance.governanceSaved": "Gouvernance mise à jour",
   "store.finance.governanceSavedBody": "Les nouvelles demandes suivent désormais ces règles.",
-  "store.finance.governanceSaveFailed": "Impossible d’enregistrer les paramètres de gouvernance."
+  "store.finance.governanceSaveFailed": "Impossible d’enregistrer les paramètres de gouvernance.",
+  "finance.limits.title": "Limites de dépenses",
+  "finance.limits.description": "Plafonnez ce que vos agents peuvent dépenser par paiement, par jour et par mois.",
+  "finance.limits.create": "Nouvelle limite",
+  "finance.limits.alertsTitle": "Alertes de budget",
+  "finance.limits.alertsDescription": "Alertes ouvertes déclenchées lorsque les dépenses franchissent un seuil d'alerte d'une limite.",
+  "finance.limits.alertsEmpty": "Aucune alerte de budget ouverte",
+  "finance.policy.advanced": "Avancé",
+  "finance.policy.advancedHint": "N'autorisez vos agents à payer que les destinataires indiqués."
 }

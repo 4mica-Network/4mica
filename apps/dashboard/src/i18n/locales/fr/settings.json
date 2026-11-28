@@ -306,5 +306,17 @@
   "store.team.sessionsRevokedBody_other": "{{count}} sessions ont été fermées.",
   "store.team.sessionsRevokedBody_many": "{{count}} sessions ont été fermées.",
   "store.team.sessionsRevokeFailed": "Impossible de déconnecter le membre.",
-  "store.team.identityNotManaged": "Seuls les membres dont l'e-mail appartient à l'un de vos domaines vérifiés peuvent être déconnectés partout. Demandez-lui de se déconnecter ou retirez-le."
+  "store.team.identityNotManaged": "Seuls les membres dont l'e-mail appartient à l'un de vos domaines vérifiés peuvent être déconnectés partout. Demandez-lui de se déconnecter ou retirez-le.",
+  "projects.advanced": "Avancé",
+  "projects.access.title": "Qui peut accéder à ce projet",
+  "projects.access.description": "Choisissez qui dans l'organisation peut ouvrir ce projet.",
+  "projects.access.defaultHint": "Tous les membres de l'organisation ont accès au projet par défaut.",
+  "projects.access.everyone": "Tous les membres de l'organisation",
+  "projects.access.everyoneHint": "Chaque membre reçoit le rôle de projet correspondant à son rôle dans l'organisation.",
+  "projects.access.chosen": "Seulement les personnes que je choisis",
+  "projects.access.chosenHint": "Les propriétaires et les admins, ainsi que les personnes ajoutées ci-dessous.",
+  "projects.access.chosenTag": "Personnes choisies uniquement",
+  "projects.access.roles": "Rôles du projet",
+  "projects.members.chosenTitle": "Personnes ayant accès",
+  "projects.members.chosenDescription": "Choisissez qui peut travailler dans ce projet et avec quel rôle. Les propriétaires et les admins y ont toujours accès."
 }

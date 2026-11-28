@@ -363,8 +363,8 @@
   "page.settings.roles.description": "Define roles con exactamente los permisos que necesita tu equipo.",
   "page.settings.auditStreams.title": "Streaming de auditoría",
   "page.settings.auditStreams.description": "Envía los eventos de auditoría a tu SIEM o canal de registros en tiempo real.",
-  "page.settings.security.title": "Seguridad",
-  "page.settings.security.description": "Dominios, inicio de sesión único y políticas de acceso de esta organización.",
+  "page.settings.security.title": "Políticas de seguridad",
+  "page.settings.security.description": "Políticas de inicio de sesión, sesión y acceso de red de esta organización.",
   "page.settings.scim.title": "Aprovisionamiento (SCIM)",
   "page.settings.scim.description": "Deja que tu proveedor de identidad añada, actualice y elimine miembros automáticamente.",
   "page.settings.complianceReport.title": "Informe de cumplimiento",
@@ -374,5 +374,14 @@
   "ipAllowlist.restricted_many": "{{count}} rangos de IP permitidos",
   "ipAllowlist.edit": "Restricciones de IP para {{name}}",
   "ipAllowlist.editTitle": "Restricciones de IP para {{name}}",
-  "ipAllowlist.save": "Guardar"
+  "ipAllowlist.save": "Guardar",
+  "nav.section.organization": "Organización",
+  "nav.section.workspace": "Espacio de trabajo",
+  "nav.securityCompliance": "Seguridad y cumplimiento",
+  "nav.securityPolicies": "Políticas de seguridad",
+  "nav.domainsSso": "Dominios y SSO",
+  "nav.spendingLimits": "Límites de gasto",
+  "page.settings.sso.title": "Dominios y SSO",
+  "page.settings.sso.description": "Verifica tus dominios de correo y configura el inicio de sesión único de esta organización.",
+  "project.create.moreOptions": "Más opciones"
 }

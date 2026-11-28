@@ -267,5 +267,13 @@
   "store.finance.governanceFailed": "Couldn't load the governance settings.",
   "store.finance.governanceSaved": "Governance updated",
   "store.finance.governanceSavedBody": "New requests follow these rules from now on.",
-  "store.finance.governanceSaveFailed": "Couldn't save the governance settings."
+  "store.finance.governanceSaveFailed": "Couldn't save the governance settings.",
+  "finance.limits.title": "Spending limits",
+  "finance.limits.description": "Cap what your agents can spend per payment, per day and per month.",
+  "finance.limits.create": "New limit",
+  "finance.limits.alertsTitle": "Budget alerts",
+  "finance.limits.alertsDescription": "Open alerts raised when spending crosses one of a limit's alert thresholds.",
+  "finance.limits.alertsEmpty": "No open budget alerts",
+  "finance.policy.advanced": "Advanced",
+  "finance.policy.advancedHint": "Let your agents pay only the recipients you list."
 }

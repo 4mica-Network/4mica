@@ -22,6 +22,7 @@ import { Plus } from "lucide-react";
 import { type FormEvent, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ConfirmAction } from "@/components/ConfirmAction";
+import { Disclosure } from "@/components/Disclosure";
 import { FieldRow, SwitchCard, TextArea, TextInput } from "@/components/form";
 import { SettingsSection } from "@/components/layout";
 import { RoleRestricted } from "@/components/Organization/RoleRestricted";
@@ -31,7 +32,7 @@ import {
   PROJECT_NAME_MAX_LENGTH,
 } from "@/components/Project/CreateProjectModal";
 import { SettingsPage } from "@/components/SettingsPage";
-import { MembersSection } from "./MembersSection";
+import { AccessSection } from "./AccessSection";
 
 function ProjectList() {
   const { t } = useTranslation();
@@ -87,7 +88,7 @@ function ProjectList() {
               )}
               {project.restricted && (
                 <Tag size="sm" variant="neutral">
-                  {t("project.create.restricted")}
+                  {t("projects.access.chosenTag")}
                 </Tag>
               )}
               {project.archived && (
@@ -136,7 +137,6 @@ function ProjectSettingsForm({ project }: { project: ProjectSummary }) {
   const [name, setName] = useState(project.name);
   const [slug, setSlug] = useState(project.slug);
   const [description, setDescription] = useState(project.description ?? "");
-  const [restricted, setRestricted] = useState(project.restricted);
   const [restrictProduction, setRestrictProduction] = useState(
     project.restrictProduction,
   );
@@ -153,7 +153,6 @@ function ProjectSettingsForm({ project }: { project: ProjectSummary }) {
     ...(description.trim() !== (project.description ?? "")
       ? { description: description.trim() || null }
       : {}),
-    ...(restricted !== project.restricted ? { restricted } : {}),
     ...(restrictProduction !== project.restrictProduction
       ? { restrictProduction }
       : {}),
@@ -223,16 +222,12 @@ function ProjectSettingsForm({ project }: { project: ProjectSummary }) {
               onChange={setDescription}
             />
           </FieldRow>
-          <div className="flex flex-col gap-2 pt-3">
-            {!project.isDefault && (
-              <SwitchCard
-                id="project-restricted"
-                title={t("project.create.restricted")}
-                description={t("project.create.restrictedHint")}
-                checked={restricted}
-                onToggle={setRestricted}
-              />
-            )}
+          <Disclosure
+            label={t("projects.advanced")}
+            defaultOpen={project.restrictProduction}
+            className="pt-3"
+            data-testid="project-advanced"
+          >
             <SwitchCard
               id="project-restrict-production"
               title={t("projects.settings.restrictProduction")}
@@ -240,7 +235,7 @@ function ProjectSettingsForm({ project }: { project: ProjectSummary }) {
               checked={restrictProduction}
               onToggle={setRestrictProduction}
             />
-          </div>
+          </Disclosure>
           <div className="flex justify-end pt-3">
             <Button
               type="submit"
@@ -364,7 +359,7 @@ export function ProjectsSettings() {
           <RoleRestricted allowed={canUpdate} message={t("project.restricted")}>
             <ProjectSettingsForm key={project.id} project={project} />
           </RoleRestricted>
-          <MembersSection />
+          <AccessSection key={project.id} project={project} />
           <DangerZone project={project} />
         </>
       )}

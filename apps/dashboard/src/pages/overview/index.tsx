@@ -19,6 +19,7 @@ import { CollateralTable } from "./CollateralTable";
 import { KpiStrip } from "./KpiStrip";
 import { Leaderboard } from "./Leaderboard";
 import { totalsByAsset } from "./metrics";
+import { OrgSetupCard } from "./OrgSetupCard";
 import { Panel } from "./Panel";
 
 export function Overview() {
@@ -82,6 +83,8 @@ export function Overview() {
           </p>
         </div>
       </div>
+
+      <OrgSetupCard />
 
       {noPayments && noWallets ? (
         <EmptyState

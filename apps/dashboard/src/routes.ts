@@ -117,6 +117,9 @@ const RolesSettings = lazyPage("pages/roles", () =>
 const SecuritySettingsPage = lazyPage("pages/security", () =>
   import("@/pages/security").then((page) => page.SecuritySettingsPage),
 );
+const DomainsSsoSettings = lazyPage("pages/security", () =>
+  import("@/pages/security").then((page) => page.DomainsSsoSettings),
+);
 const ScimSettings = lazyPage("pages/scim", () =>
   import("@/pages/scim").then((page) => page.ScimSettings),
 );
@@ -194,6 +197,7 @@ export const SETTINGS_PAGES: SettingsRouteMeta[] = [
   { path: "audit-log", component: AuditLogSettings },
   { path: "audit-streams", component: AuditStreamsSettings },
   { path: "security", component: SecuritySettingsPage },
+  { path: "sso", component: DomainsSsoSettings },
   { path: "scim", component: ScimSettings },
   { path: "compliance-report", component: ComplianceReportSettings },
 ];

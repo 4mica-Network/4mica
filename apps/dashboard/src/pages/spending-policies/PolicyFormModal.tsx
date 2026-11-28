@@ -20,6 +20,7 @@ import {
 } from "@stores/project/selector";
 import { type FormEvent, useEffect, useId, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Disclosure } from "@/components/Disclosure";
 import { tokenKey, tokenLabel, tokenOptions } from "@/components/Finance/token";
 import { FieldRow, Select, TextArea, TextInput } from "@/components/form";
 import { useEnvironmentNetworks } from "@/hooks/useNetworkOptions";
@@ -41,12 +42,27 @@ const AMOUNT_PLACEHOLDERS: Record<(typeof AMOUNT_FIELDS)[number], string> = {
   approvalThreshold: "50",
 };
 
+export const SIMPLE_SCOPES: PolicyScope[] = ["ORGANIZATION", "AGENT"];
+
+const LIMIT_FIELDS = AMOUNT_FIELDS.filter(
+  (field) => field !== "approvalThreshold",
+);
+
+export const hasAdvancedValues = (draft: PolicyDraft): boolean =>
+  Boolean(
+    draft.approvalThreshold.trim() ||
+      draft.allowedRecipients.trim() ||
+      draft.approvalsRequired.trim() !== "1",
+  );
+
 export function PolicyFormModal({
   isOpen,
+  simple = false,
   policy,
   onClose,
 }: {
   isOpen: boolean;
+  simple?: boolean;
   policy: SpendingPolicy | null;
   onClose: () => void;
 }) {
@@ -125,8 +141,71 @@ export function PolicyFormModal({
     );
   };
 
-  const needsProject = draft.scope !== "ORGANIZATION";
+  const needsProject = draft.scope !== "ORGANIZATION" && !simple;
   const hasToken = draft.token !== "";
+  const scopes = simple
+    ? POLICY_SCOPES.filter(
+        (scope) => SIMPLE_SCOPES.includes(scope) || scope === policy?.scope,
+      )
+    : POLICY_SCOPES;
+
+  const amountField = (field: (typeof AMOUNT_FIELDS)[number]) => (
+    <FieldRow
+      key={field}
+      title={t(`finance.policy.fields.${field}`)}
+      htmlFor={`policy-${field}`}
+    >
+      <TextInput
+        id={`policy-${field}`}
+        inputMode="decimal"
+        value={draft[field]}
+        placeholder={AMOUNT_PLACEHOLDERS[field]}
+        disabled={!hasToken && !draft[field]}
+        error={shown(field)}
+        onChange={(value) => set(field, value)}
+      />
+    </FieldRow>
+  );
+
+  const approvalsField = (
+    <FieldRow
+      title={t("finance.policy.fields.approvalsRequired")}
+      description={t("finance.policy.fields.approvalsRequiredHint")}
+      htmlFor="policy-approvals"
+    >
+      <TextInput
+        id="policy-approvals"
+        inputMode="numeric"
+        value={draft.approvalsRequired}
+        error={shown("approvalsRequired")}
+        onChange={(value) => set("approvalsRequired", value)}
+      />
+    </FieldRow>
+  );
+
+  const recipientsField = (
+    <FieldRow
+      title={t("finance.policy.fields.recipients")}
+      description={t("finance.policy.fields.recipientsHint")}
+      htmlFor="policy-recipients"
+    >
+      <TextArea
+        id="policy-recipients"
+        rows={3}
+        spellCheck={false}
+        value={draft.allowedRecipients}
+        placeholder="0x…"
+        error={shown("allowedRecipients")}
+        onChange={(value) => set("allowedRecipients", value)}
+      />
+    </FieldRow>
+  );
+
+  const advancedErrors = Boolean(
+    shown("approvalThreshold") ||
+      shown("approvalsRequired") ||
+      shown("allowedRecipients"),
+  );
 
   return (
     <Modal
@@ -203,7 +282,7 @@ export function PolicyFormModal({
           <Select
             id="policy-scope"
             value={draft.scope}
-            options={POLICY_SCOPES.map((scope) => ({
+            options={scopes.map((scope) => ({
               value: scope,
               title: t(`finance.scope.${scope}`),
             }))}
@@ -301,55 +380,42 @@ export function PolicyFormModal({
           />
         </FieldRow>
 
-        <div className="grid gap-x-4 sm:grid-cols-2">
-          {AMOUNT_FIELDS.map((field) => (
-            <FieldRow
-              key={field}
-              title={t(`finance.policy.fields.${field}`)}
-              htmlFor={`policy-${field}`}
+        {simple ? (
+          <>
+            <div className="grid gap-x-4 sm:grid-cols-3">
+              {LIMIT_FIELDS.map(amountField)}
+            </div>
+            <Disclosure
+              key={`${policy?.id ?? "new"}:${isOpen}`}
+              label={t("finance.policy.advanced")}
+              defaultOpen={Boolean(
+                policy && hasAdvancedValues(draftFrom(policy)),
+              )}
+              forceOpen={advancedErrors}
+              className="py-2"
+              data-testid="policy-advanced"
             >
-              <TextInput
-                id={`policy-${field}`}
-                inputMode="decimal"
-                value={draft[field]}
-                placeholder={AMOUNT_PLACEHOLDERS[field]}
-                disabled={!hasToken && !draft[field]}
-                error={shown(field)}
-                onChange={(value) => set(field, value)}
-              />
-            </FieldRow>
-          ))}
-        </div>
-
-        <FieldRow
-          title={t("finance.policy.fields.approvalsRequired")}
-          description={t("finance.policy.fields.approvalsRequiredHint")}
-          htmlFor="policy-approvals"
-        >
-          <TextInput
-            id="policy-approvals"
-            inputMode="numeric"
-            value={draft.approvalsRequired}
-            error={shown("approvalsRequired")}
-            onChange={(value) => set("approvalsRequired", value)}
-          />
-        </FieldRow>
-
-        <FieldRow
-          title={t("finance.policy.fields.recipients")}
-          description={t("finance.policy.fields.recipientsHint")}
-          htmlFor="policy-recipients"
-        >
-          <TextArea
-            id="policy-recipients"
-            rows={3}
-            spellCheck={false}
-            value={draft.allowedRecipients}
-            placeholder="0x…"
-            error={shown("allowedRecipients")}
-            onChange={(value) => set("allowedRecipients", value)}
-          />
-        </FieldRow>
+              <p className="text-ink-muted text-xs">
+                {t("finance.policy.advancedHint")}
+              </p>
+              {policy?.approvalThreshold ? (
+                <>
+                  {amountField("approvalThreshold")}
+                  {approvalsField}
+                </>
+              ) : null}
+              {recipientsField}
+            </Disclosure>
+          </>
+        ) : (
+          <>
+            <div className="grid gap-x-4 sm:grid-cols-2">
+              {AMOUNT_FIELDS.map(amountField)}
+            </div>
+            {approvalsField}
+            {recipientsField}
+          </>
+        )}
 
         <FieldRow
           title={t("finance.policy.fields.alerts")}

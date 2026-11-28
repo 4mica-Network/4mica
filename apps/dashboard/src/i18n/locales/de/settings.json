@@ -305,5 +305,17 @@
   "store.team.sessionsRevokedBody_one": "{{count}} Sitzung wurde beendet.",
   "store.team.sessionsRevokedBody_other": "{{count}} Sitzungen wurden beendet.",
   "store.team.sessionsRevokeFailed": "Das Mitglied konnte nicht abgemeldet werden.",
-  "store.team.identityNotManaged": "Nur Mitglieder mit einer E-Mail auf einer deiner verifizierten Domains können überall abgemeldet werden. Bitte das Mitglied, sich selbst abzumelden, oder entferne es."
+  "store.team.identityNotManaged": "Nur Mitglieder mit einer E-Mail auf einer deiner verifizierten Domains können überall abgemeldet werden. Bitte das Mitglied, sich selbst abzumelden, oder entferne es.",
+  "projects.advanced": "Erweitert",
+  "projects.access.title": "Wer auf dieses Projekt zugreifen kann",
+  "projects.access.description": "Legen Sie fest, wer in der Organisation dieses Projekt öffnen kann.",
+  "projects.access.defaultHint": "Alle in der Organisation haben Zugriff auf das Standardprojekt.",
+  "projects.access.everyone": "Alle in der Organisation",
+  "projects.access.everyoneHint": "Jedes Mitglied erhält die Projektrolle, die seiner Rolle in der Organisation entspricht.",
+  "projects.access.chosen": "Nur ausgewählte Personen",
+  "projects.access.chosenHint": "Inhaber und Admins sowie die Personen, die Sie unten hinzufügen.",
+  "projects.access.chosenTag": "Nur ausgewählte Personen",
+  "projects.access.roles": "Projektrollen",
+  "projects.members.chosenTitle": "Personen mit Zugriff",
+  "projects.members.chosenDescription": "Wählen Sie aus, wer in diesem Projekt arbeiten darf und mit welcher Rolle. Inhaber und Admins haben immer Zugriff."
 }

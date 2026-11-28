@@ -53,5 +53,16 @@
   "overview.leaders.sort.amount": "Volume",
   "overview.leaders.sort.settledCount": "Payments",
   "overview.leaders.listingsEmpty": "No API has taken a settled payment in this period.",
-  "overview.leaders.agentsEmpty": "No agent has paid for anything in this period."
+  "overview.leaders.agentsEmpty": "No agent has paid for anything in this period.",
+  "overview.setup.title": "Set up your organization",
+  "overview.setup.progress": "{{done}} of {{total}} done",
+  "overview.setup.dismiss": "Dismiss",
+  "overview.setup.statusDone": "Done",
+  "overview.setup.statusTodo": "Not done yet",
+  "overview.setup.invite.title": "Invite your team",
+  "overview.setup.invite.hint": "Add the people you work with and pick their roles.",
+  "overview.setup.project.title": "Create a project (optional)",
+  "overview.setup.project.hint": "Keep agents, APIs and keys for separate products apart.",
+  "overview.setup.access.title": "Choose who can access each project",
+  "overview.setup.access.hint": "Open a project to everyone or only to the people you choose."
 }
