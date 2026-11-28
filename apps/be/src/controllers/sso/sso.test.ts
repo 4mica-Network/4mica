@@ -167,6 +167,48 @@ describe("creating a connection", () => {
     expect(tables.auditLogs.map((row) => row.action)).toContain("sso.created");
   });
 
+  it("leaves a durable record of every Clerk SAML call", async () => {
+    const domain = verifiedDomain();
+    saml.createSamlConnection.mockResolvedValue(clerkConnection());
+
+    await create({
+      domainId: domain.id,
+      provider: "OKTA",
+      name: "Okta",
+      idpMetadataUrl: "https://acme.okta.com/app/metadata",
+    });
+
+    expect(tables.externalOperations).toEqual([
+      expect.objectContaining({
+        kind: "clerk.saml_connection.create",
+        targetType: "organization_domain",
+        targetId: domain.id,
+        status: "SUCCEEDED",
+      }),
+    ]);
+  });
+
+  it("records an ambiguous Clerk outcome when creating a connection fails", async () => {
+    const domain = verifiedDomain();
+    saml.createSamlConnection.mockRejectedValue(new Error("socket hang up"));
+
+    await create({
+      domainId: domain.id,
+      provider: "OKTA",
+      name: "Okta",
+      idpMetadataUrl: "https://acme.okta.com/app/metadata",
+    });
+
+    expect(tables.externalOperations).toEqual([
+      expect.objectContaining({
+        kind: "clerk.saml_connection.create",
+        status: "UNKNOWN",
+        error: "socket hang up",
+      }),
+    ]);
+    expect(tables.ssoConnection).toHaveLength(0);
+  });
+
   it.each([
     ["OKTA", "saml_okta"],
     ["GOOGLE_WORKSPACE", "saml_google"],

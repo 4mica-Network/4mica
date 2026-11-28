@@ -2,6 +2,7 @@ import type { OrgRole } from "@4mica/db";
 import { requireRecentAuth } from "@auth/security";
 import type { Tenant } from "@auth/tenant";
 import { requireApproval } from "@controllers/approvals/gate";
+import { trackExternalOperation } from "@controllers/audit/external-operations";
 import { GOVERNED_ROLES } from "@controllers/organizations/schema";
 import {
   invalidBody,
@@ -197,12 +198,22 @@ export const createSsoConnectionHandler: RouteHandler = async (
 
   let clerkConnection: ClerkSamlConnection;
   try {
-    clerkConnection = await createSamlConnection({
-      name: input.name,
-      provider: PROVIDER_SLUGS[input.provider],
-      domain: domain.domain,
-      ...idp,
-    });
+    clerkConnection = await trackExternalOperation(
+      {
+        orgId: tenant.orgId,
+        actorUserId: tenant.userId,
+        kind: "clerk.saml_connection.create",
+        targetType: "organization_domain",
+        targetId: domain.id,
+      },
+      () =>
+        createSamlConnection({
+          name: input.name,
+          provider: PROVIDER_SLUGS[input.provider],
+          domain: domain.domain,
+          ...idp,
+        }),
+    );
   } catch (error) {
     appLogger.warn("Clerk refused a SAML connection", {
       orgId: tenant.orgId,
@@ -353,9 +364,16 @@ export const updateSsoConnectionHandler: RouteHandler = async (
       return sendClerkFailure(reply, { kind: "not_found" });
     }
     try {
-      clerkConnection = await updateSamlConnection(
-        current.clerkConnectionId,
-        changes,
+      const clerkConnectionId = current.clerkConnectionId;
+      clerkConnection = await trackExternalOperation(
+        {
+          orgId: tenant.orgId,
+          actorUserId: tenant.userId,
+          kind: "clerk.saml_connection.update",
+          targetType: "sso_connection",
+          targetId: id,
+        },
+        () => updateSamlConnection(clerkConnectionId, changes),
       );
     } catch (error) {
       appLogger.warn("Clerk refused a SAML connection update", {
@@ -434,7 +452,17 @@ export const deleteSsoConnectionHandler: RouteHandler = async (
 
   if (current.clerkConnectionId) {
     try {
-      await deleteSamlConnection(current.clerkConnectionId);
+      const clerkConnectionId = current.clerkConnectionId;
+      await trackExternalOperation(
+        {
+          orgId: tenant.orgId,
+          actorUserId: tenant.userId,
+          kind: "clerk.saml_connection.delete",
+          targetType: "sso_connection",
+          targetId: id,
+        },
+        () => deleteSamlConnection(clerkConnectionId),
+      );
     } catch (error) {
       appLogger.warn("Clerk refused to delete a SAML connection", {
         orgId: tenant.orgId,
