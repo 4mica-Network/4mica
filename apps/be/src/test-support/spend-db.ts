@@ -1,3 +1,7 @@
+import type {
+  MatchableAuthorization,
+  MatchablePayment,
+} from "@controllers/spend/matching";
 import { fromUnits, toUnits } from "@utils/units";
 import { vi } from "vitest";
 import { memoryTable } from "./memory-table";
@@ -25,6 +29,10 @@ export const createSpendDb = () => {
       policyId: null,
       approvalRequestId: null,
       paymentId: null,
+      matchedAt: null,
+      authorizedAmount: null,
+      settledAmount: null,
+      reqIdConflict: null,
       consumedAt: null,
     }),
     {
@@ -115,30 +123,62 @@ export const createSpendDb = () => {
   const project = tenancy.project;
   const $executeRaw = vi.fn(async () => 0);
 
-  const unmatchedPayments = (values: unknown[]) => {
-    const [dayStart, reqId, list, network, assetAddress, monthStart, orgId] =
-      values as [
-        Date,
-        string | null,
-        { values: string[] },
-        string,
-        string | null,
-        Date,
-        string,
-      ];
+  const unmatchedPayments = async (values: unknown[]) => {
+    const { coversPayment } = await import("@controllers/spend/matching");
+    const [
+      dayStart,
+      claimReqId,
+      claimPayer,
+      claimRecipient,
+      list,
+      network,
+      assetAddress,
+      monthStart,
+      orgId,
+      ,
+      ,
+      ,
+      now,
+    ] = values as [
+      Date,
+      string | null,
+      string | null,
+      string | null,
+      { values: string[] },
+      string,
+      string | null,
+      Date,
+      string,
+      unknown,
+      unknown,
+      Date,
+      Date,
+    ];
     const addresses: unknown[] = list.values;
-    const now = values[10] as Date;
-    const covers = (row: Row, reqId: unknown, amount: bigint) =>
+    const counted = (row: Row) =>
       row.organizationId === orgId &&
-      row.reqId === reqId &&
-      row.network === network &&
-      (row.assetAddress ?? null) === assetAddress &&
       (row.createdAt as Date) >= monthStart &&
-      toUnits(row.amount as string) >= amount &&
       (row.status === "CONSUMED" ||
         ((row.status === "RESERVED" || row.status === "PENDING_APPROVAL") &&
           (row.expiresAt as Date) > now));
-    const first = new Map<unknown, Row>();
+    const covered = (payment: Row) =>
+      spendAuthorization.rows.some((row) => {
+        if (!counted(row)) {
+          return false;
+        }
+        const authorization = {
+          ...row,
+          assetAddress: row.assetAddress ?? null,
+          authorizedAmount: row.authorizedAmount ?? null,
+          paymentId: row.paymentId ?? null,
+        } as unknown as MatchableAuthorization;
+        const reported = {
+          ...payment,
+          assetAddress: payment.assetAddress ?? null,
+        } as unknown as MatchablePayment;
+        return coversPayment(authorization, reported);
+      });
+    const first = new Map<string, Row>();
     for (const row of payment.rows
       .filter(
         (entry) =>
@@ -147,21 +187,24 @@ export const createSpendDb = () => {
           (entry.assetAddress ?? null) === assetAddress &&
           entry.status !== "FAILED" &&
           (entry.createdAt as Date) >= monthStart &&
-          !spendAuthorization.rows.some((authorization) =>
-            covers(authorization, entry.reqId, toUnits(entry.amount as string)),
-          ),
+          !covered(entry),
       )
       .sort(
         (a, b) =>
           (a.createdAt as Date).getTime() - (b.createdAt as Date).getTime(),
       )) {
-      if (!first.has(row.reqId)) {
-        first.set(row.reqId, row);
+      const identity = `${row.payerAddress}|${row.reqId}`;
+      if (!first.has(identity)) {
+        first.set(identity, row);
       }
     }
     const totals = new Map<string, bigint>();
     for (const row of first.values()) {
-      const key = `${row.payerAddress}|${(row.createdAt as Date) >= dayStart}|${row.reqId === reqId ? row.reqId : ""}`;
+      const claimed =
+        row.reqId === claimReqId &&
+        row.payerAddress === claimPayer &&
+        row.recipientAddress === claimRecipient;
+      const key = `${row.payerAddress}|${(row.createdAt as Date) >= dayStart}|${claimed ? row.reqId : ""}`;
       totals.set(key, (totals.get(key) ?? 0n) + toUnits(row.amount as string));
     }
     return [...totals].map(([key, total]) => {

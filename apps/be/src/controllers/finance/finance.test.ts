@@ -601,7 +601,15 @@ describe("finance routes", () => {
       expect(query.sql).toContain("SELECT a.project_id AS key");
       expect(query.sql).toContain("LEFT JOIN LATERAL");
       expect(query.sql).toContain("a.organization_id = ?");
-      expect(query.sql).toContain("a.payment_id = p.id OR a.req_id = p.req_id");
+      expect(query.sql).toContain(
+        "a.organization_id = ? AND a.payment_id = p.id",
+      );
+      expect(
+        query.sql.slice(
+          query.sql.indexOf("LEFT JOIN LATERAL"),
+          query.sql.indexOf(") a ON TRUE"),
+        ),
+      ).not.toContain("req_id");
       expect(query.sql).toContain("p.payer_address IN (?)");
       expect(query.values).toEqual(
         expect.arrayContaining([ORG_ID, MY_WALLET, ...SANDBOX_NETWORKS]),

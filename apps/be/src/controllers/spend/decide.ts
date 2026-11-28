@@ -14,6 +14,7 @@ import {
   raiseAlerts,
 } from "@controllers/finance-alerts/repository";
 import { appLogger } from "@logger/index";
+import { amountText } from "@utils/amount";
 import { payloadHash } from "@utils/canonical";
 import { fromUnits, toUnits } from "@utils/units";
 import {
@@ -27,7 +28,13 @@ import {
   type UsageData,
 } from "./engine";
 import {
-  AUTHORIZATION_SELECT,
+  LINKABLE_STATUSES,
+  linkPayment,
+  type MatchablePayment,
+  type PaymentMismatch,
+  paymentMismatch,
+} from "./matching";
+import {
   type AuthorizationOwner,
   type AuthorizationRow,
   approvalTtlHours,
@@ -35,7 +42,7 @@ import {
   expirePendingApproval,
   expireReservation,
   findAuthorization,
-  findReportedPayment,
+  findReportedPayments,
   hasEnforcingPolicy,
   isReqIdConflict,
   loadPolicies,
@@ -45,7 +52,9 @@ import {
   ownersOfPayerWallet,
   reqIdInUse,
   runInTransaction,
+  settlementCandidates,
   transitionAuthorization,
+  type UsageOptions,
 } from "./repository";
 
 type Db = Prisma.TransactionClient;
@@ -82,7 +91,7 @@ const usageFor = async (
   assetAddress: string | null,
   policies: EnginePolicy[],
   now: Date,
-  options: { excludeId?: string; reqId?: string | null } = {},
+  options: UsageOptions = {},
 ): Promise<UsageData> =>
   policies.some((policy) => policy.network !== null)
     ? loadUsage(
@@ -227,7 +236,15 @@ const decideSpend = async (
       input.assetAddress,
       policies,
       now,
-      { reqId: input.reqId },
+      {
+        claim: input.reqId
+          ? {
+              reqId: input.reqId,
+              payerAddress: input.payerAddress,
+              recipientAddress: input.recipientAddress,
+            }
+          : null,
+      },
     );
     const decision = evaluate(subject, policies, usage, now);
 
@@ -621,19 +638,11 @@ export const consumeAuthorization = async (
           return { kind: "req_id_in_use" };
         }
         const finalReqId = reqId ?? current.reqId;
-        const payment = finalReqId
-          ? await findReportedPayment(tx, current.payerAddress, finalReqId)
-          : null;
         const { count } = await transitionAuthorization(
           tx,
           id,
           ["RESERVED"],
-          {
-            status: "CONSUMED",
-            consumedAt: now,
-            reqId: finalReqId,
-            ...(payment ? { paymentId: payment.id } : {}),
-          },
+          { status: "CONSUMED", consumedAt: now, reqId: finalReqId },
           { ...scope, expiresAt: { gt: now } },
         );
         const row = await findAuthorization(tx, id, scope);
@@ -641,7 +650,27 @@ export const consumeAuthorization = async (
           return { kind: "not_found" };
         }
         if (count > 0) {
-          return { kind: "ok", row };
+          await writeAudit(tx, {
+            orgId: row.organizationId,
+            projectId: row.projectId,
+            actorApiKeyId: owner.keyId,
+            action: "spend.consumed",
+            targetType: "spend_authorization",
+            targetId: row.id,
+            metadata: {
+              reqId: finalReqId,
+              amount: amountText(row.amount),
+              network: row.network,
+              assetAddress: row.assetAddress,
+            },
+          });
+          const settled = await settleWithReportedPayment(tx, row, now);
+          return {
+            kind: "ok",
+            row: settled
+              ? ((await findAuthorization(tx, id, scope)) ?? row)
+              : row,
+          };
         }
         return row.status === "CONSUMED"
           ? alreadyConsumed(row, reqId)
@@ -676,6 +705,21 @@ export const releaseAuthorization = async (
       { status: "RELEASED" },
       scope,
     );
+    if (count > 0) {
+      await writeAudit(tx, {
+        orgId: current.organizationId,
+        projectId: current.projectId,
+        actorApiKeyId: owner.keyId,
+        action: "spend.released",
+        targetType: "spend_authorization",
+        targetId: current.id,
+        metadata: {
+          from: current.status,
+          amount: amountText(current.amount),
+          approvalRequestId: current.approvalRequestId,
+        },
+      });
+    }
     if (count > 0 && current.approvalRequestId) {
       await cancelPendingApproval(tx, current.approvalRequestId);
     }
@@ -689,51 +733,96 @@ export const releaseAuthorization = async (
   });
 };
 
-export interface ReportedPayment {
-  id: string;
-  reqId: string;
-  payerAddress: string;
-  recipientAddress: string;
-  network: PaymentNetwork;
-  assetAddress: string | null;
-  amount: string;
-  status: string;
-}
+export type ReportedPayment = MatchablePayment & { amount: string };
 
-type Mismatch =
-  | "not_authorized"
-  | "recipient_mismatch"
-  | "exceeds_authorization";
+type Unmatched = PaymentMismatch | "not_authorized";
 
-const mismatchOf = (
-  candidate: AuthorizationRow | null,
-  payment: ReportedPayment,
-): Mismatch | null => {
-  if (candidate === null) {
-    return "not_authorized";
-  }
-  if (candidate.recipientAddress !== payment.recipientAddress) {
-    return "recipient_mismatch";
-  }
-  return candidate.network === payment.network &&
-    candidate.assetAddress === payment.assetAddress &&
-    candidate.payerAddress === payment.payerAddress &&
-    toUnits(candidate.authorizedAmount ?? candidate.amount) >=
-      toUnits(payment.amount) &&
-    (candidate.paymentId === null || candidate.paymentId === payment.id)
-    ? null
-    : "exceeds_authorization";
-};
-
-const MISMATCH_LINES: Record<Mismatch, string> = {
+const MISMATCH_LINES: Record<Unmatched, string> = {
   not_authorized:
     "No spend authorization was requested for it. It still counts toward your limits.",
+  payment_failed: "The payment failed.",
+  req_id_mismatch: "Its reqId differs from its authorization's.",
+  network_mismatch:
+    "It was paid on a different network than its authorization named.",
+  asset_mismatch:
+    "It was paid in a different asset than its authorization named.",
+  payer_mismatch:
+    "It was paid from a different wallet than its authorization named.",
   recipient_mismatch:
     "It paid a different recipient than its authorization named.",
-  exceeds_authorization: "The payment does not match its authorization.",
+  exceeds_authorization: "It paid more than its authorization allowed.",
+  already_settled: "Its authorization was already settled by another payment.",
 };
 
-const RECONCILABLE = ["RESERVED", "EXPIRED", "RELEASED", "CONSUMED"] as const;
+const settlementAudit = (
+  tx: Db,
+  authorization: AuthorizationRow,
+  payment: MatchablePayment,
+) =>
+  writeAudit(tx, {
+    orgId: authorization.organizationId,
+    projectId: authorization.projectId,
+    action: "spend.reconciled",
+    targetType: "spend_authorization",
+    targetId: authorization.id,
+    metadata: {
+      paymentId: payment.id,
+      reqId: payment.reqId,
+      authorizedAmount: amountText(
+        authorization.authorizedAmount ?? authorization.amount,
+      ),
+      settledAmount: amountText(payment.amount),
+      network: payment.network,
+      assetAddress: payment.assetAddress,
+      recipientAddress: payment.recipientAddress,
+    },
+  });
+
+const settleWithReportedPayment = async (
+  tx: Db,
+  authorization: AuthorizationRow,
+  now: Date,
+): Promise<MatchablePayment | null> => {
+  if (authorization.paymentId !== null) {
+    return null;
+  }
+  for (const payment of await findReportedPayments(tx, authorization)) {
+    if (await linkPayment(tx, authorization, payment, now)) {
+      await settlementAudit(tx, authorization, payment);
+      return payment;
+    }
+  }
+  return null;
+};
+
+const HOLDS_REQ_ID = new Set<string>([
+  "RESERVED",
+  "PENDING_APPROVAL",
+  "CONSUMED",
+]);
+
+const settlementCandidate = (
+  candidates: AuthorizationRow[],
+  payment: MatchablePayment,
+): { candidate: AuthorizationRow | null; reason: Unmatched | null } => {
+  const holder = candidates.find(
+    (row) => HOLDS_REQ_ID.has(row.status) && row.reqIdConflict === null,
+  );
+  const pool = (holder ? [holder] : candidates).filter((row) =>
+    LINKABLE_STATUSES.includes(row.status),
+  );
+  const match =
+    pool.find((row) => row.paymentId === payment.id) ??
+    pool.find((row) => paymentMismatch(row, payment) === null);
+  if (match) {
+    return { candidate: match, reason: null };
+  }
+  const nearest = pool[0] ?? holder ?? null;
+  return {
+    candidate: nearest,
+    reason: (nearest && paymentMismatch(nearest, payment)) ?? "not_authorized",
+  };
+};
 
 const reconcileForOrg = async (
   orgId: string,
@@ -743,55 +832,61 @@ const reconcileForOrg = async (
   runInTransaction(async (tx) => {
     await lockSpend(tx, orgId, payment.network, payment.assetAddress);
 
-    const candidate = await tx.spendAuthorization.findFirst({
-      where: {
-        organizationId: orgId,
-        reqId: payment.reqId,
-        status: { in: [...RECONCILABLE] },
-      },
-      orderBy: { createdAt: "desc" },
-      select: AUTHORIZATION_SELECT,
-    });
-
-    const reason = mismatchOf(candidate, payment);
+    const { candidate, reason } = settlementCandidate(
+      await settlementCandidates(tx, orgId, payment),
+      payment,
+    );
     const alerts: AlertInput[] = [];
 
     if (candidate && reason === null) {
-      if (candidate.paymentId === null) {
-        await tx.spendAuthorization.updateMany({
-          where: { id: candidate.id, paymentId: null },
-          data: {
-            status: "CONSUMED",
-            paymentId: payment.id,
+      if (await linkPayment(tx, candidate, payment, now)) {
+        await settlementAudit(tx, candidate, payment);
+      }
+    } else if (reason !== null) {
+      const enforcing = await hasEnforcingPolicy(tx, orgId);
+      if (candidate || enforcing) {
+        await writeAudit(tx, {
+          orgId,
+          projectId: candidate?.projectId ?? null,
+          action: "spend.reconciliation_unmatched",
+          targetType: "payment",
+          targetId: payment.id,
+          metadata: {
+            reason,
+            reqId: payment.reqId,
+            authorizationId: candidate?.id ?? null,
             amount: payment.amount,
-            settledAmount: payment.amount,
-            consumedAt: candidate.consumedAt ?? now,
+            network: payment.network,
+            assetAddress: payment.assetAddress,
+            payerAddress: payment.payerAddress,
+            recipientAddress: payment.recipientAddress,
           },
         });
       }
-    } else if (reason !== null && (await hasEnforcingPolicy(tx, orgId))) {
-      alerts.push({
-        orgId,
-        projectId: candidate?.projectId ?? null,
-        kind: "UNAUTHORIZED_SPEND",
-        title: `Payment of ${money(payment.amount, payment.network, payment.assetAddress)} was made without an authorization`,
-        dedupeKey: `unauthorized:${payment.id}`,
-        detail: {
-          paymentId: payment.id,
-          reqId: payment.reqId,
-          reason,
-          amount: payment.amount,
-          network: payment.network,
-          assetAddress: payment.assetAddress,
-          payerAddress: payment.payerAddress,
-          recipientAddress: payment.recipientAddress,
-          authorizationId: candidate?.id ?? null,
-          lines: [
-            `${shortAddress(payment.payerAddress)} paid ${money(payment.amount, payment.network, payment.assetAddress)} to ${shortAddress(payment.recipientAddress)} on ${networkLabel(payment.network)}.`,
-            MISMATCH_LINES[reason],
-          ],
-        },
-      });
+      if (enforcing) {
+        alerts.push({
+          orgId,
+          projectId: candidate?.projectId ?? null,
+          kind: "UNAUTHORIZED_SPEND",
+          title: `Payment of ${money(payment.amount, payment.network, payment.assetAddress)} was made without an authorization`,
+          dedupeKey: `unauthorized:${payment.id}`,
+          detail: {
+            paymentId: payment.id,
+            reqId: payment.reqId,
+            reason,
+            amount: payment.amount,
+            network: payment.network,
+            assetAddress: payment.assetAddress,
+            payerAddress: payment.payerAddress,
+            recipientAddress: payment.recipientAddress,
+            authorizationId: candidate?.id ?? null,
+            lines: [
+              `${shortAddress(payment.payerAddress)} paid ${money(payment.amount, payment.network, payment.assetAddress)} to ${shortAddress(payment.recipientAddress)} on ${networkLabel(payment.network)}.`,
+              MISMATCH_LINES[reason],
+            ],
+          },
+        });
+      }
     }
 
     const policies = await loadPolicies(

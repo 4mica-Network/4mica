@@ -473,6 +473,7 @@ describe("POST /v1/spend/authorize", () => {
     h.db.payment.seed({
       reqId: "0xabc",
       payerAddress: PAYER,
+      recipientAddress: RECIPIENT,
       network: "BASE_SEPOLIA",
       assetAddress: USDC,
       amount: "5",
@@ -483,6 +484,51 @@ describe("POST /v1/spend/authorize", () => {
     );
     expect(res.json().status).toBe("RESERVED");
     expect(h.db.financialAlert.rows).toEqual([]);
+  });
+
+  it("does not let an authorization cover an earlier payment to another recipient", async () => {
+    h.db.spendingPolicy.seed(
+      orgPolicy({ dailyLimit: "10", alertThresholds: [100] }),
+    );
+    h.db.payment.seed({
+      reqId: "0xabc",
+      payerAddress: PAYER,
+      recipientAddress: "0x9999999999999999999999999999999999999999",
+      network: "BASE_SEPOLIA",
+      assetAddress: USDC,
+      amount: "5",
+    });
+    const res = await post(
+      "/v1/spend/authorize",
+      body({ amount: "5", reqId: "0xabc" }),
+    );
+    expect(res.json().status).toBe("RESERVED");
+    expect(h.db.financialAlert.rows).toHaveLength(1);
+  });
+
+  it("counts two payers' payments that share a reqId separately", async () => {
+    h.db.spendingPolicy.seed(orgPolicy({ dailyLimit: "10" }));
+    h.db.payment.seed(
+      {
+        reqId: "0xabc",
+        payerAddress: PAYER,
+        recipientAddress: RECIPIENT,
+        network: "BASE_SEPOLIA",
+        assetAddress: USDC,
+        amount: "4",
+      },
+      {
+        reqId: "0xabc",
+        payerAddress: AGENT_PAYER,
+        recipientAddress: RECIPIENT,
+        network: "BASE_SEPOLIA",
+        assetAddress: USDC,
+        amount: "4",
+      },
+    );
+    expect(
+      (await post("/v1/spend/authorize", body({ amount: "3" }))).json(),
+    ).toMatchObject({ status: "DENIED", deniedReason: "daily_limit" });
   });
 
   it("never denies under a MONITOR policy, and raises its budget alert once", async () => {
@@ -692,7 +738,9 @@ describe("consume and release", () => {
     const [payment] = h.db.payment.seed({
       reqId: "0xfeed",
       payerAddress: PAYER,
+      recipientAddress: RECIPIENT,
       network: "BASE_SEPOLIA",
+      assetAddress: USDC,
       amount: "10",
     });
     const [row] = h.db.spendAuthorization.seed(authRow());
@@ -789,6 +837,118 @@ describe("consume and release", () => {
     });
     expect(other.statusCode).toBe(409);
     expect(other.json().error).toBe("invalid_transition");
+  });
+});
+
+describe("canonical payment matching on consume", () => {
+  const ELSEWHERE = "0x9999999999999999999999999999999999999999";
+  const paymentRow = (over: Record<string, unknown> = {}) => ({
+    reqId: "0xfeed",
+    payerAddress: PAYER,
+    recipientAddress: RECIPIENT,
+    network: "BASE_SEPOLIA",
+    assetAddress: USDC,
+    amount: "10",
+    status: "SETTLED",
+    ...over,
+  });
+  const actions = () =>
+    h.db.auditLog.create.mock.calls.map(
+      ([arg]) => (arg as { data: { action: string } }).data.action,
+    );
+
+  const mismatches: [string, Record<string, unknown>][] = [
+    ["recipient", { recipientAddress: ELSEWHERE }],
+    ["payer", { payerAddress: AGENT_PAYER }],
+    ["network", { network: "ETHEREUM_SEPOLIA" }],
+    ["asset", { assetAddress: null }],
+    ["amount", { amount: "10.000001" }],
+    ["status", { status: "FAILED" }],
+  ];
+
+  for (const [field, over] of mismatches) {
+    it(`never links a reported payment whose ${field} differs`, async () => {
+      h.db.payment.seed(paymentRow(over));
+      const [row] = h.db.spendAuthorization.seed(
+        authRow({ authorizedAmount: "10" }),
+      );
+      const res = await post(`/v1/spend/authorizations/${row?.id}/consume`, {
+        reqId: "0xfeed",
+      });
+      expect(res.statusCode, field).toBe(200);
+      expect(h.db.spendAuthorization.rows[0], field).toMatchObject({
+        status: "CONSUMED",
+        paymentId: null,
+        settledAmount: null,
+        amount: "10",
+      });
+      expect(actions(), field).toEqual(["spend.consumed"]);
+    });
+  }
+
+  it("links the matching payment reported before consumption and settles it", async () => {
+    const [, payment] = h.db.payment.seed(
+      paymentRow({ recipientAddress: ELSEWHERE }),
+      paymentRow({ amount: "6" }),
+    );
+    const [row] = h.db.spendAuthorization.seed(
+      authRow({ authorizedAmount: "10" }),
+    );
+    await post(`/v1/spend/authorizations/${row?.id}/consume`, {
+      reqId: "0xfeed",
+    });
+    expect(h.db.spendAuthorization.rows[0]).toMatchObject({
+      status: "CONSUMED",
+      paymentId: payment?.id,
+      amount: "6",
+      authorizedAmount: "10",
+      settledAmount: "6",
+      matchedAt: NOW,
+    });
+    expect(actions()).toEqual(["spend.consumed", "spend.reconciled"]);
+  });
+
+  it("links a payment reported after consumption through reconciliation", async () => {
+    const [row] = h.db.spendAuthorization.seed(
+      authRow({ authorizedAmount: "10" }),
+    );
+    await post(`/v1/spend/authorizations/${row?.id}/consume`, {
+      reqId: "0xfeed",
+    });
+    expect(h.db.spendAuthorization.rows[0]?.paymentId).toBeNull();
+    const [payment] = h.db.payment.seed(paymentRow());
+    await reconcileReportedPayment(
+      { ...paymentRow(), id: payment?.id as string } as never,
+      null,
+      NOW,
+    );
+    expect(h.db.spendAuthorization.rows[0]).toMatchObject({
+      paymentId: payment?.id,
+      settledAmount: "10",
+    });
+    expect(actions()).toEqual(["spend.consumed", "spend.reconciled"]);
+  });
+
+  it("audits a release in the same transaction", async () => {
+    const [row] = h.db.spendAuthorization.seed(authRow());
+    await post(`/v1/spend/authorizations/${row?.id}/release`);
+    expect(actions()).toEqual(["spend.released"]);
+    expect(h.db.auditLog.create.mock.calls[0]?.[0]).toMatchObject({
+      data: {
+        actorApiKeyId: KEY_ID,
+        targetId: row?.id,
+        metadata: { from: "RESERVED" },
+      },
+    });
+  });
+
+  it("fails the consumption when its audit cannot be written", async () => {
+    const [row] = h.db.spendAuthorization.seed(authRow());
+    h.db.auditLog.create.mockRejectedValueOnce(new Error("audit down"));
+    const res = await post(`/v1/spend/authorizations/${row?.id}/consume`, {
+      reqId: "0xfeed",
+    });
+    expect(res.statusCode).toBe(500);
   });
 });
 

@@ -31,7 +31,23 @@ A wallet linked to an organization is evidence of control (SIWE), not custody. A
 
 ## What "governed" means per field
 
-An authorization is bound to the payer, recipient, network, asset and amount it was granted for, and to the project, environment and API key (or service account) that requested it. Reconciliation only consumes it for a reported payment with the same `reqId`, payer, recipient, network and asset and an amount no larger than the authorized amount; the authorization is then cut down to the paid amount so the remainder is released. A mismatch never consumes it and raises an `UNAUTHORIZED_SPEND` alert.
+An authorization is bound to the payer, recipient, network, asset and amount it was granted for, and to the project, environment and API key (or service account) that requested it.
+
+## Payment matching
+
+One rule, in `apps/be/src/controllers/spend/matching.ts`, decides whether a reported payment settles an authorization: same `reqId`, network, asset, payer and recipient, an amount no larger than the authorized amount, a payment that is not FAILED, and an authorization not already settled by a different payment. Receipt verification happens before a payment is stored: when core is configured, `POST /v1/payments` refuses a non-FAILED report whose guarantee receipt does not verify, so the payment table holds no unverified non-failed rows and records no separate verification flag. `paymentMismatch()` is the TypeScript form and `paymentMatchSql()` the SQL form; an integration test runs a table of authorization/payment pairs through both, and through usage, reconciliation and every finance view, against real PostgreSQL and requires them to agree.
+
+The association is persisted only by `linkPayment()`, which sets `paymentId`, `settledAmount` and `matchedAt` together (a check constraint requires all three or none) and only while `paymentId` is null; a trigger refuses any later change. Consuming an authorization links a payment reported earlier, and reconciling a payment links an authorization consumed earlier, both through that function, so the order of the two events does not matter. A mismatch never links and, for an organization with an enforcing policy, raises an `UNAUTHORIZED_SPEND` alert.
+
+Everything downstream reads the persisted association rather than re-matching on `reqId`:
+
+- Finance reconciliation counts a sent payment as matched only if an authorization of the organization has its `paymentId`; usage attribution by project, agent or key comes from that authorization alone. A payment that only shares a `reqId` with an authorization is unmatched.
+- A project-limited viewer does not see a sent payment that settled an authorization in a project they cannot access, nor an unmatched one that claims the payment identity (`reqId`, network, asset and payer) of such an authorization, since that would disclose the restricted project's activity. Every other unmatched payment stays visible.
+- Spend limits count a reported payment unless a counted authorization covers it: it matches under the same rule, or it already settled another report of the same payment identity (two sellers reporting one payment are counted once). `coversPayment()` and `coversPaymentSql()` are the twins for this and are part of the differential test. Payments are counted once per identity (payer and `reqId`, within the network and asset being checked).
+
+Consumption, release, reconciliation and unmatched reconciliation are mandatory audit events (`spend.consumed`, `spend.released`, `spend.reconciled`, `spend.reconciliation_unmatched`), written in the transaction that makes the change.
+
+Migration `20261202123000_verify_spend_payment_links` re-checked every association stored before the rule existed: links that satisfy it keep their payment and are settled at its amount; the others, including links the old consume path made on `reqId` and payer alone, are cleared. No authorization or payment row is deleted.
 
 ## Authorized, settled and committed amounts
 

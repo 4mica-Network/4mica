@@ -119,6 +119,27 @@ describe("audit classification", () => {
     expect(isMandatoryAuditAction("customer.updated")).toBe(false);
   });
 
+  it("treats every spend lifecycle transition as mandatory and writes it transactionally", () => {
+    const lifecycle = [
+      "spend.approval_requested",
+      "spend.consumed",
+      "spend.denied",
+      "spend.reconciled",
+      "spend.reconciliation_unmatched",
+      "spend.released",
+    ];
+    for (const action of lifecycle) {
+      expect(isMandatoryAuditAction(action), action).toBe(true);
+    }
+    const spend = sources(join(SRC, "controllers", "spend"))
+      .map((path) => readFileSync(path, "utf8"))
+      .join("\n");
+    expect(spend).not.toContain("writeAudit(prisma");
+    for (const action of lifecycle) {
+      expect(spend, action).toContain(`"${action}"`);
+    }
+  });
+
   it("never writes a mandatory event outside a transaction", () => {
     const direct = callsOf(/writeAudit\(prisma,/g).filter(({ action }) =>
       isMandatoryAuditAction(action),

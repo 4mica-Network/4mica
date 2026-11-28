@@ -468,6 +468,7 @@ model SpendAuthorization {
   policyId          String?                  @map("policy_id")
   approvalRequestId String?                  @unique @map("approval_request_id")
   paymentId         String?                  @map("payment_id")
+  matchedAt         DateTime?                @map("matched_at")
   expiresAt         DateTime                 @map("expires_at")
   consumedAt        DateTime?                @map("consumed_at")
   createdAt         DateTime                 @default(now()) @map("created_at")

@@ -17,6 +17,7 @@ process.env.UNSUBSCRIBE_SECRET ??= "bench-unsubscribe-secret-at-least-32-chars";
 
 const { Prisma, prisma } = await import("@4mica/db");
 const { authorizeSpend } = await import("@controllers/spend/decide");
+const { coversPaymentSql } = await import("@controllers/spend/matching");
 
 const sizes = (process.env.BENCH_SIZES ?? "1000,10000,100000")
   .split(",")
@@ -194,7 +195,8 @@ const report = async (size: number) => {
     Prisma.sql`SELECT u.payer_address, u.created_at >= ${dayStart} AS today, SUM(u.amount) AS amount,
             CASE WHEN u.req_id = ${null}::varchar THEN u.req_id END AS req_id
        FROM (
-         SELECT DISTINCT ON (p.req_id) p.req_id, p.payer_address, p.amount, p.created_at
+         SELECT DISTINCT ON (p.payer_address, p.req_id)
+                p.req_id, p.payer_address, p.recipient_address, p.amount, p.created_at
            FROM payments p
           WHERE p.payer_address IN (${PAYER})
             AND p.network = 'BASE_SEPOLIA' AND p.asset_address IS NOT DISTINCT FROM ${USDC}
@@ -203,9 +205,10 @@ const report = async (size: number) => {
               SELECT 1 FROM spend_authorizations a
                WHERE a.organization_id = ${org.id} AND a.req_id = p.req_id
                  AND a.network = 'BASE_SEPOLIA' AND a.asset_address IS NOT DISTINCT FROM ${USDC}
-                 AND a.created_at >= ${monthStart} AND a.amount >= p.amount
-                 AND (a.status = 'CONSUMED' OR (a.status IN ('RESERVED','PENDING_APPROVAL') AND a.expires_at > ${now})))
-          ORDER BY p.req_id, p.created_at, p.id
+                 AND a.created_at >= ${monthStart}
+                 AND (a.status = 'CONSUMED' OR (a.status IN ('RESERVED','PENDING_APPROVAL') AND a.expires_at > ${now}))
+                 AND ${coversPaymentSql()})
+          ORDER BY p.payer_address, p.req_id, p.created_at, p.id
        ) u
       GROUP BY 1, 2, 4`,
   );

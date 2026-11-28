@@ -206,9 +206,20 @@ const paymentWindow = (scope: FinanceScope, range: DateRange): Prisma.Sql =>
      AND p.created_at <  ${range.to}
      AND p.status <> 'FAILED'`;
 
-const authorizationMatch = (orgId: string): Prisma.Sql =>
+const settledBy = (orgId: string): Prisma.Sql =>
+  Prisma.sql`a.organization_id = ${orgId} AND a.payment_id = p.id`;
+
+const claimedBy = (orgId: string): Prisma.Sql =>
   Prisma.sql`a.organization_id = ${orgId}
-     AND (a.payment_id = p.id OR a.req_id = p.req_id)`;
+     AND (a.payment_id = p.id
+          OR (a.req_id = p.req_id
+              AND a.network = p.network
+              AND a.asset_address IS NOT DISTINCT FROM p.asset_address
+              AND a.payer_address = p.payer_address
+              AND NOT EXISTS (
+                    SELECT 1 FROM spend_authorizations s
+                     WHERE s.organization_id = ${orgId}
+                       AND s.payment_id = p.id)))`;
 
 const receivedVisible = (scope: FinanceScope): Prisma.Sql =>
   scope.projects === null
@@ -222,7 +233,7 @@ const sentVisible = (scope: FinanceScope): Prisma.Sql =>
     ? Prisma.sql`TRUE`
     : Prisma.sql`NOT EXISTS (
         SELECT 1 FROM spend_authorizations a
-         WHERE ${authorizationMatch(scope.orgId)}
+         WHERE ${claimedBy(scope.orgId)}
            AND ${
              scope.projects.length === 0
                ? Prisma.sql`TRUE`
@@ -325,9 +336,8 @@ export const financeUsage = async (
         LEFT JOIN LATERAL (
           SELECT a.project_id, a.agent_id, a.issued_by_key_id
             FROM spend_authorizations a
-           WHERE ${authorizationMatch(scope.orgId)}
-           ORDER BY (a.payment_id IS NOT DISTINCT FROM p.id) DESC,
-                    a.created_at DESC
+           WHERE ${settledBy(scope.orgId)}
+           ORDER BY a.created_at DESC, a.id DESC
            LIMIT 1
         ) a ON TRUE
        WHERE p.payer_address IN (${Prisma.join(addresses)})
@@ -474,7 +484,7 @@ export const financeReconciliation = async (
   const sent = Prisma.sql`p.payer_address IN (${Prisma.join(addresses)})
      AND ${paymentWindow(scope, range)}
      AND ${sentVisible(scope)}`;
-  const match = authorizationMatch(scope.orgId);
+  const match = settledBy(scope.orgId);
 
   const [authorized, counted, unauthorized] = await Promise.all([
     authorizedNotReported,

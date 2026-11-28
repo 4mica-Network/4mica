@@ -6,7 +6,7 @@ import {
   type SpendAuthorizationStatus,
 } from "@4mica/db";
 import type { ApiKeyContext } from "@auth/api-key";
-import { optionalAmountText } from "@utils/amount";
+import { amountText, optionalAmountText } from "@utils/amount";
 import { type ProjectAccess, projectIn } from "@utils/scope";
 import { toUnits } from "@utils/units";
 import type {
@@ -16,6 +16,12 @@ import type {
   UsagePayment,
 } from "./engine";
 import { windowsAt } from "./engine";
+import {
+  coversPaymentSql,
+  LINKABLE_STATUSES,
+  MATCH_PAYMENT_SELECT,
+  type MatchablePayment,
+} from "./matching";
 
 type Db = Prisma.TransactionClient;
 
@@ -116,6 +122,15 @@ interface UnmatchedPaymentRow {
   amount: Prisma.Decimal;
 }
 
+export interface UsageOptions {
+  excludeId?: string;
+  claim?: {
+    reqId: string;
+    payerAddress: string;
+    recipientAddress: string;
+  } | null;
+}
+
 const groupKey = (row: {
   projectId: string;
   agentId: string | null;
@@ -130,9 +145,9 @@ export const loadUsage = async (
   assetAddress: string | null,
   agentIds: string[],
   now: Date,
-  options: { excludeId?: string; reqId?: string | null } = {},
+  options: UsageOptions = {},
 ): Promise<UsageData> => {
-  const { excludeId, reqId = null } = options;
+  const { excludeId, claim = null } = options;
   const { dayStart, monthStart } = windowsAt(now);
   const counted = (since: Date) =>
     db.spendAuthorization.groupBy({
@@ -160,9 +175,13 @@ export const loadUsage = async (
       SELECT u.payer_address,
              u.created_at >= ${dayStart} AS today,
              SUM(u.amount) AS amount,
-             CASE WHEN u.req_id = ${reqId}::varchar THEN u.req_id END AS req_id
+             CASE WHEN u.req_id = ${claim?.reqId ?? null}::varchar
+                   AND u.payer_address = ${claim?.payerAddress ?? null}::varchar
+                   AND u.recipient_address = ${claim?.recipientAddress ?? null}::varchar
+                  THEN u.req_id END AS req_id
         FROM (
-          SELECT DISTINCT ON (p.req_id) p.req_id, p.payer_address, p.amount, p.created_at
+          SELECT DISTINCT ON (p.payer_address, p.req_id)
+                 p.req_id, p.payer_address, p.recipient_address, p.amount, p.created_at
             FROM payments p
            WHERE p.payer_address IN (${Prisma.join(addresses)})
              AND p.network = ${network}::"PaymentNetwork"
@@ -176,11 +195,11 @@ export const loadUsage = async (
                       AND a.network = ${network}::"PaymentNetwork"
                       AND a.asset_address IS NOT DISTINCT FROM ${assetAddress}::varchar
                       AND a.created_at >= ${monthStart}
-                      AND a.amount >= p.amount
                       AND (a.status = 'CONSUMED'
                            OR (a.status IN ('RESERVED', 'PENDING_APPROVAL')
-                               AND a.expires_at > ${now})))
-           ORDER BY p.req_id, p.created_at, p.id
+                               AND a.expires_at > ${now}))
+                      AND ${coversPaymentSql()})
+           ORDER BY p.payer_address, p.req_id, p.created_at, p.id
         ) u
        GROUP BY 1, 2, 4
     `;
@@ -320,6 +339,8 @@ export const AUTHORIZATION_SELECT = {
   policyId: true,
   approvalRequestId: true,
   paymentId: true,
+  matchedAt: true,
+  reqIdConflict: true,
   expiresAt: true,
   consumedAt: true,
   createdAt: true,
@@ -447,14 +468,48 @@ export const expirePendingApproval = (
     data: { status: "EXPIRED" },
   });
 
-export const findReportedPayment = (
+export type ReportedPaymentRow = MatchablePayment & { amount: string };
+
+export const findReportedPayments = async (
   db: Pick<Db, "payment">,
-  payerAddress: string,
-  reqId: string,
-) =>
-  db.payment.findFirst({
-    where: { payerAddress, reqId },
-    select: { id: true },
+  authorization: {
+    reqId: string | null;
+    network: PaymentNetwork;
+    assetAddress: string | null;
+    payerAddress: string;
+  },
+): Promise<ReportedPaymentRow[]> =>
+  authorization.reqId === null
+    ? []
+    : (
+        await db.payment.findMany({
+          where: {
+            reqId: authorization.reqId,
+            network: authorization.network,
+            assetAddress: authorization.assetAddress,
+            payerAddress: authorization.payerAddress,
+            status: { not: "FAILED" },
+          },
+          orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+          select: MATCH_PAYMENT_SELECT,
+        })
+      ).map((row) => ({ ...row, amount: amountText(row.amount) }));
+
+export const settlementCandidates = (
+  db: Pick<Db, "spendAuthorization">,
+  orgId: string,
+  payment: MatchablePayment,
+): Promise<AuthorizationRow[]> =>
+  db.spendAuthorization.findMany({
+    where: {
+      organizationId: orgId,
+      reqId: payment.reqId,
+      network: payment.network,
+      assetAddress: payment.assetAddress,
+      status: { in: [...LINKABLE_STATUSES, "PENDING_APPROVAL"] },
+    },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    select: AUTHORIZATION_SELECT,
   });
 
 export interface ListAuthorizationsFilter {
