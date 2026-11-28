@@ -7,6 +7,7 @@ import {
   notFound,
   parseBody,
   requireProject,
+  withProjectAudit,
 } from "@controllers/shared";
 import type { RouteHandler } from "fastify";
 import {
@@ -85,12 +86,17 @@ export const upsertPolicyHandler = (kind: ResourceKind): RouteHandler =>
         return invalidBody(reply, parsed.issues);
       }
 
-      const policy = await upsertPolicy(kind, id, parsed.data);
-      await auditProject(request, scope, {
-        action: "resource_policy.updated",
-        targetType: auditTarget(kind),
-        targetId: id,
-      });
+      const policy = await withProjectAudit(
+        request,
+        scope,
+        (tx) => upsertPolicy(kind, id, parsed.data, tx),
+        {
+          action: "resource_policy.updated",
+          targetType: auditTarget(kind),
+          targetId: id,
+          metadata: { fields: Object.keys(parsed.data) },
+        },
+      );
 
       return reply.send({ policy });
     },

@@ -100,6 +100,25 @@ describe("audit classification", () => {
     expect(unclassified).toEqual([]);
   });
 
+  it("classifies limit, policy, compliance and ownership changes as mandatory", () => {
+    for (const action of [
+      "beneficial_owner.added",
+      "beneficial_owner.removed",
+      "beneficial_owner.updated",
+      "business.updated",
+      "compliance.submitted",
+      "compliance.updated",
+      "customer.deleted",
+      "customer.identity_changed",
+      "customer.limits_updated",
+      "customer.status_changed",
+      "resource_policy.updated",
+    ]) {
+      expect(isMandatoryAuditAction(action), action).toBe(true);
+    }
+    expect(isMandatoryAuditAction("customer.updated")).toBe(false);
+  });
+
   it("never writes a mandatory event outside a transaction", () => {
     const direct = callsOf(/writeAudit\(prisma,/g).filter(({ action }) =>
       isMandatoryAuditAction(action),
@@ -120,7 +139,18 @@ describe("audit classification", () => {
       "api_key.rotated",
       "approval.approved",
       "approval.requested",
+      "beneficial_owner.added",
+      "beneficial_owner.removed",
+      "beneficial_owner.updated",
+      "business.updated",
+      "compliance.submitted",
+      "compliance.updated",
       "customer.credit_adjusted",
+      "customer.deleted",
+      "customer.identity_changed",
+      "customer.limits_updated",
+      "customer.status_changed",
+      "resource_policy.updated",
       "domain.removed",
       "governance.updated",
       "member.sessions_revoked",

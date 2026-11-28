@@ -51,8 +51,13 @@ vi.mock("@4mica/db", () => ({
     $transaction: vi.fn(async (arg: unknown) =>
       typeof arg === "function"
         ? (arg as (tx: unknown) => unknown)({
+            ...tenancy,
             user: { findUnique, update },
             organization,
+            business: {
+              findUnique: businessFindUnique,
+              upsert: businessUpsert,
+            },
           })
         : Promise.all(arg as Promise<unknown>[]),
     ),
@@ -895,7 +900,24 @@ describe("account routes", () => {
         actorUserId: AUTH_USER.id,
         action: "business.updated",
         targetId: "b1",
+        metadata: { fields: ["legalName"] },
       });
+
+      await app.close();
+    });
+
+    it("fails a business update when its audit entry cannot be written", async () => {
+      businessUpsert.mockResolvedValue({ id: "b1" });
+      tenancy.auditLog.create.mockRejectedValue(new Error("audit down"));
+      const app = await initApp([{ plugin: meRoutes }]);
+      const response = await app.inject({
+        method: "PUT",
+        url: "/me/business",
+        headers: AUTH,
+        payload: { legalName: "Acme Ltd" },
+      });
+
+      expect(response.statusCode).toBe(500);
 
       await app.close();
     });

@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import { requireRecentAuth } from "@auth/security";
 import type { Tenant } from "@auth/tenant";
 import { requireApproval } from "@controllers/approvals/gate";
+import { trackExternalOperation } from "@controllers/audit/external-operations";
 import { GOVERNED_ROLES } from "@controllers/organizations/schema";
 import {
   invalidBody,
@@ -257,8 +258,18 @@ export const deleteDomainHandler: RouteHandler = async (request, reply) => {
     if (!connection.clerkConnectionId) {
       continue;
     }
+    const clerkConnectionId = connection.clerkConnectionId;
     try {
-      await deleteSamlConnection(connection.clerkConnectionId);
+      await trackExternalOperation(
+        {
+          orgId: tenant.orgId,
+          actorUserId: tenant.userId,
+          kind: "clerk.saml_connection.delete",
+          targetType: "sso_connection",
+          targetId: connection.id,
+        },
+        () => deleteSamlConnection(clerkConnectionId),
+      );
     } catch (error) {
       appLogger.error("Could not remove SAML connection for a domain", {
         orgId: tenant.orgId,

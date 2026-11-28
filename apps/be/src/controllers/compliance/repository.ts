@@ -1,4 +1,4 @@
-import { prisma } from "@4mica/db";
+import { type Prisma, prisma } from "@4mica/db";
 import { missingRequirements } from "@utils/compliance-readiness";
 import type {
   CreateBeneficialOwnerInput,
@@ -60,6 +60,8 @@ const READINESS_BUSINESS_SELECT = {
 } as const;
 
 const LOCKED_STATUSES = new Set(["PENDING", "VERIFIED"]);
+
+type Db = Prisma.TransactionClient;
 
 const toIsoDate = (value: Date | null): string | null =>
   value ? value.toISOString().slice(0, 10) : null;
@@ -127,6 +129,7 @@ const attestation = (
 export const updateComplianceProfile = async (
   orgId: string,
   data: UpdateComplianceInput,
+  db: Db,
 ) => {
   const {
     sanctionsAttested,
@@ -136,7 +139,7 @@ export const updateComplianceProfile = async (
     ...fields
   } = data;
 
-  const current = await prisma.complianceProfile.findUnique({
+  const current = await db.complianceProfile.findUnique({
     where: { organizationId: orgId },
     select: {
       sanctionsAttestedAt: true,
@@ -168,13 +171,11 @@ export const updateComplianceProfile = async (
     ),
   };
 
-  await prisma.complianceProfile.upsert({
+  await db.complianceProfile.upsert({
     where: { organizationId: orgId },
     create: { ...write, organizationId: orgId },
     update: write,
   });
-
-  return getComplianceState(orgId);
 };
 
 export const listBeneficialOwners = async (orgId: string) =>
@@ -200,9 +201,10 @@ export const ownershipHeldByOthers = async (
 export const createBeneficialOwner = async (
   orgId: string,
   data: CreateBeneficialOwnerInput,
+  db: Db,
 ) =>
   shapeOwner(
-    await prisma.beneficialOwner.create({
+    await db.beneficialOwner.create({
       data: {
         ...data,
         dateOfBirth: fromIsoDate(data.dateOfBirth),
@@ -216,9 +218,10 @@ export const updateBeneficialOwner = async (
   orgId: string,
   id: string,
   data: UpdateBeneficialOwnerInput,
+  db: Db,
 ) => {
   const { dateOfBirth, ...fields } = data;
-  const { count } = await prisma.beneficialOwner.updateMany({
+  const { count } = await db.beneficialOwner.updateMany({
     where: { id, organizationId: orgId },
     data: {
       ...fields,
@@ -230,33 +233,33 @@ export const updateBeneficialOwner = async (
     return null;
   }
 
-  const owner = await prisma.beneficialOwner.findUnique({
+  const owner = await db.beneficialOwner.findUnique({
     where: { id },
     select: OWNER_SELECT,
   });
   return owner ? shapeOwner(owner) : null;
 };
 
-export const deleteBeneficialOwner = async (orgId: string, id: string) => {
-  const { count } = await prisma.beneficialOwner.deleteMany({
+export const deleteBeneficialOwner = async (
+  orgId: string,
+  id: string,
+  db: Db,
+) => {
+  const { count } = await db.beneficialOwner.deleteMany({
     where: { id, organizationId: orgId },
   });
   return count > 0;
 };
 
-export const submitForReview = async (orgId: string) => {
+export const submitForReview = async (orgId: string, db: Db) => {
   const now = new Date();
 
-  await prisma.$transaction([
-    prisma.complianceProfile.update({
-      where: { organizationId: orgId },
-      data: { submittedAt: now },
-    }),
-    prisma.business.update({
-      where: { organizationId: orgId },
-      data: { kybStatus: "PENDING" },
-    }),
-  ]);
-
-  return getComplianceState(orgId);
+  await db.complianceProfile.update({
+    where: { organizationId: orgId },
+    data: { submittedAt: now },
+  });
+  await db.business.update({
+    where: { organizationId: orgId },
+    data: { kybStatus: "PENDING" },
+  });
 };

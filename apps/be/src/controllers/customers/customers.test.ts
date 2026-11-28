@@ -25,6 +25,7 @@ const {
   customerPaymentIdentity,
   wallet,
   queryRaw,
+  executeRaw,
   FakeDecimal,
   tenancy,
 } = vi.hoisted(() => ({
@@ -69,6 +70,7 @@ const {
   apiKey: { findUnique: vi.fn(), update: vi.fn() },
   approvalRequest: { findFirst: vi.fn(), updateMany: vi.fn() },
   queryRaw: vi.fn(),
+  executeRaw: vi.fn(),
   FakeDecimal: class {
     private readonly raw: string;
     constructor(value: unknown) {
@@ -129,10 +131,12 @@ vi.mock("@4mica/db", () => ({
     user: { findUnique, upsert, update: vi.fn() },
     business: { findUnique: vi.fn(), upsert: vi.fn() },
     $queryRaw: queryRaw,
+    $executeRaw: executeRaw,
     $transaction: vi.fn(async (arg: unknown) =>
       typeof arg === "function"
         ? (arg as (tx: unknown) => unknown)({
             ...tenancy,
+            $executeRaw: executeRaw,
             customer,
             customerCoupon,
             customerCreditEntry,
@@ -354,6 +358,7 @@ describe("customer routes", () => {
       }
     }
     queryRaw.mockReset();
+    executeRaw.mockReset();
     clearUserCache();
     actAs(tenancy);
 
@@ -911,6 +916,160 @@ describe("customer routes", () => {
         targetId: CUSTOMER_ID,
         metadata: { status: "BLOCKED" },
       });
+
+      await instance.close();
+    });
+  });
+
+  describe("audit trail", () => {
+    const actions = () =>
+      tenancy.auditLog.create.mock.calls.map(([arg]) => arg.data.action);
+
+    it("records a limit change as a mandatory event with before and after", async () => {
+      customer.findFirst
+        .mockResolvedValueOnce(storedCustomer())
+        .mockResolvedValueOnce(
+          storedCustomer({ monthlyLimit: decimal("250"), dailyLimit: null }),
+        );
+
+      const instance = await app();
+      const response = await instance.inject({
+        method: "PATCH",
+        url: `/me/customers/${CUSTOMER_ID}`,
+        headers: AUTH,
+        payload: { name: "Renamed", monthlyLimit: "250" },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(executeRaw).toHaveBeenCalledOnce();
+      expect(actions()).toEqual(["customer.limits_updated"]);
+      expect(tenancy.auditLog.create.mock.calls[0][0].data).toMatchObject({
+        targetId: CUSTOMER_ID,
+        metadata: {
+          fields: ["name", "monthlyLimit"],
+          before: { monthlyLimit: "5000" },
+          after: { monthlyLimit: "250" },
+        },
+      });
+
+      await instance.close();
+    });
+
+    it("keeps a profile-only edit on customer.updated", async () => {
+      const instance = await app();
+      await instance.inject({
+        method: "PATCH",
+        url: `/me/customers/${CUSTOMER_ID}`,
+        headers: AUTH,
+        payload: { notes: "prefers invoices" },
+      });
+
+      expect(actions()).toEqual(["customer.updated"]);
+
+      await instance.close();
+    });
+
+    it("records a policy change with the approval threshold before and after", async () => {
+      customer.findFirst
+        .mockResolvedValueOnce(storedCustomer())
+        .mockResolvedValueOnce(
+          storedCustomer({ approvalThreshold: decimal("50") }),
+        );
+
+      const instance = await app();
+      await instance.inject({
+        method: "PATCH",
+        url: `/me/customers/${CUSTOMER_ID}/policy`,
+        headers: AUTH,
+        payload: { approvalThreshold: "50" },
+      });
+
+      expect(tenancy.auditLog.create.mock.calls[0][0].data).toMatchObject({
+        action: "customer.limits_updated",
+        metadata: {
+          fields: ["approvalThreshold"],
+          before: { approvalThreshold: null },
+          after: { approvalThreshold: "50" },
+        },
+      });
+
+      await instance.close();
+    });
+
+    it.each([
+      [
+        "a limit change",
+        {
+          method: "PATCH" as const,
+          url: `/me/customers/${CUSTOMER_ID}`,
+          payload: { dailyLimit: "10" },
+        },
+      ],
+      [
+        "a policy change",
+        {
+          method: "PATCH" as const,
+          url: `/me/customers/${CUSTOMER_ID}/policy`,
+          payload: { discountPercent: "10" },
+        },
+      ],
+      [
+        "a delete",
+        { method: "DELETE" as const, url: `/me/customers/${CUSTOMER_ID}` },
+      ],
+      [
+        "a batch delete",
+        {
+          method: "POST" as const,
+          url: "/me/customers/batch-delete",
+          payload: { ids: [CUSTOMER_ID] },
+        },
+      ],
+      [
+        "an identity removal",
+        {
+          method: "DELETE" as const,
+          url: `/me/customers/${CUSTOMER_ID}/identities/${IDENTITY_ID}`,
+        },
+      ],
+    ])("fails %s when its audit entry cannot be written", async (_label, route) => {
+      customer.findMany.mockResolvedValue([{ id: CUSTOMER_ID }]);
+      tenancy.auditLog.create.mockRejectedValue(new Error("audit down"));
+
+      const instance = await app();
+      const response = await instance.inject({ ...route, headers: AUTH });
+
+      expect(response.statusCode).toBe(500);
+
+      await instance.close();
+    });
+
+    it("records deletes and identity changes as mandatory events", async () => {
+      customer.findMany.mockResolvedValue([{ id: CUSTOMER_ID }]);
+      const instance = await app();
+
+      await instance.inject({
+        method: "DELETE",
+        url: `/me/customers/${CUSTOMER_ID}`,
+        headers: AUTH,
+      });
+      await instance.inject({
+        method: "POST",
+        url: "/me/customers/batch-delete",
+        headers: AUTH,
+        payload: { ids: [CUSTOMER_ID] },
+      });
+      await instance.inject({
+        method: "DELETE",
+        url: `/me/customers/${CUSTOMER_ID}/identities/${IDENTITY_ID}`,
+        headers: AUTH,
+      });
+
+      expect(actions()).toEqual([
+        "customer.deleted",
+        "customer.deleted",
+        "customer.identity_changed",
+      ]);
 
       await instance.close();
     });
@@ -1515,7 +1674,7 @@ describe("customer routes", () => {
     });
 
     it("404s a policy change for a customer that is not the caller's", async () => {
-      customer.updateMany.mockResolvedValue({ count: 0 });
+      customer.findFirst.mockResolvedValue(null);
 
       const instance = await app();
       const response = await instance.inject(
@@ -1523,6 +1682,8 @@ describe("customer routes", () => {
       );
 
       expect(response.statusCode).toBe(404);
+      expect(customer.updateMany).not.toHaveBeenCalled();
+      expect(tenancy.auditLog.create).not.toHaveBeenCalled();
 
       await instance.close();
     });

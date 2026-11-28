@@ -160,18 +160,36 @@ export const updateCustomerHandler: RouteHandler = async (request, reply) => {
   }
 
   const { id } = request.params as { id: string };
-  const updated = await updateCustomer(scope, id, parsed.data);
-  if (!updated) {
+  const fields = Object.keys(parsed.data);
+  const change = await withProjectAudit(
+    request,
+    scope,
+    (tx) => updateCustomer(scope, id, parsed.data, tx),
+    (result) =>
+      result && result.limitFields.length > 0
+        ? {
+            action: "customer.limits_updated",
+            targetType: "customer",
+            targetId: id,
+            metadata: { fields, before: result.before, after: result.after },
+          }
+        : null,
+  );
+  if (!change) {
     return notFound(reply, "customer");
   }
 
-  await auditProject(request, scope, {
-    action: "customer.updated",
-    targetType: "customer",
-    targetId: id,
-    metadata: { fields: Object.keys(parsed.data) },
-  });
-  return reply.send(updated);
+  if (change.limitFields.length === 0) {
+    await auditProject(request, scope, {
+      action: "customer.updated",
+      targetType: "customer",
+      targetId: id,
+      metadata: { fields },
+    });
+  }
+
+  const updated = await getCustomer(scope, id);
+  return updated ? reply.send(updated) : notFound(reply, "customer");
 };
 
 export const setCustomerStatusHandler: RouteHandler = async (
@@ -254,18 +272,30 @@ export const setCustomerPolicyHandler: RouteHandler = async (
     }
   }
 
-  const updated = await setCustomerPolicy(scope, id, parsed.data);
+  const change = await withProjectAudit(
+    request,
+    scope,
+    (tx) => setCustomerPolicy(scope, id, parsed.data, tx),
+    (result) =>
+      result && result.limitFields.length > 0
+        ? {
+            action: "customer.limits_updated",
+            targetType: "customer",
+            targetId: id,
+            metadata: {
+              fields: Object.keys(parsed.data),
+              before: result.before,
+              after: result.after,
+            },
+          }
+        : null,
+  );
+  const updated = change ? await getCustomer(scope, id) : null;
 
   if (!updated) {
     return notFound(reply, "customer");
   }
 
-  await auditProject(request, scope, {
-    action: "customer.updated",
-    targetType: "customer",
-    targetId: id,
-    metadata: { fields: Object.keys(parsed.data) },
-  });
   appLogger.info("Customer policy changed", {
     userId: scope.userId,
     customerId: id,
@@ -318,14 +348,17 @@ export const deleteCustomerHandler: RouteHandler = async (request, reply) => {
   }
 
   const { id } = request.params as { id: string };
-  const deleted = await softDeleteCustomer(scope, id);
+  const deleted = await withProjectAudit(
+    request,
+    scope,
+    (tx) => softDeleteCustomer(scope, id, tx),
+    (found) =>
+      found
+        ? { action: "customer.deleted", targetType: "customer", targetId: id }
+        : null,
+  );
 
   if (deleted) {
-    await auditProject(request, scope, {
-      action: "customer.deleted",
-      targetType: "customer",
-      targetId: id,
-    });
     appLogger.info("Customer removed", {
       userId: scope.userId,
       customerId: id,
@@ -350,14 +383,19 @@ export const batchDeleteCustomersHandler: RouteHandler = async (
     return invalidBody(reply, parsed.issues);
   }
 
-  const result = await batchSoftDeleteCustomers(scope, parsed.data.ids);
-  if (result.deleted.length > 0) {
-    await auditProject(request, scope, {
-      action: "customer.deleted",
-      targetType: "customer",
-      metadata: { ids: result.deleted },
-    });
-  }
+  const result = await withProjectAudit(
+    request,
+    scope,
+    (tx) => batchSoftDeleteCustomers(scope, parsed.data.ids, tx),
+    ({ deleted }) =>
+      deleted.length > 0
+        ? {
+            action: "customer.deleted",
+            targetType: "customer",
+            metadata: { ids: deleted },
+          }
+        : null,
+  );
   appLogger.info("Customers removed", {
     userId: scope.userId,
     count: result.deleted.length,
@@ -386,17 +424,21 @@ export const addCustomerIdentityHandler: RouteHandler = async (
   }
 
   try {
-    const customer = await addIdentity(scope, id, parsed.data);
+    await withProjectAudit(
+      request,
+      scope,
+      (tx) => addIdentity(scope, id, parsed.data, tx),
+      (identityId) => ({
+        action: "customer.identity_changed",
+        targetType: "customer",
+        targetId: id,
+        metadata: { identity: "added", identityId, type: parsed.data.type },
+      }),
+    );
+    const customer = await getCustomer(scope, id);
     if (!customer) {
       return notFound(reply, "customer");
     }
-
-    await auditProject(request, scope, {
-      action: "customer.updated",
-      targetType: "customer",
-      targetId: id,
-      metadata: { identity: "added", type: parsed.data.type },
-    });
 
     appLogger.info("Customer identity added", {
       userId: scope.userId,
@@ -437,17 +479,29 @@ export const updateCustomerIdentityHandler: RouteHandler = async (
     return notFound(reply, "customer");
   }
 
-  const updated = await updateIdentity(scope, id, identityId, parsed.data);
+  const changed = await withProjectAudit(
+    request,
+    scope,
+    (tx) => updateIdentity(scope, id, identityId, parsed.data, tx),
+    (found) =>
+      found
+        ? {
+            action: "customer.identity_changed",
+            targetType: "customer",
+            targetId: id,
+            metadata: {
+              identity: "updated",
+              identityId,
+              fields: Object.keys(parsed.data),
+            },
+          }
+        : null,
+  );
+  const updated = changed ? await getCustomer(scope, id) : null;
   if (!updated) {
     return notFound(reply, "identity");
   }
 
-  await auditProject(request, scope, {
-    action: "customer.updated",
-    targetType: "customer",
-    targetId: id,
-    metadata: { identity: "updated", identityId },
-  });
   return reply.send(updated);
 };
 
@@ -466,15 +520,22 @@ export const removeCustomerIdentityHandler: RouteHandler = async (
     return notFound(reply, "customer");
   }
 
-  const removed = await removeIdentity(scope.orgId, id, identityId);
+  const removed = await withProjectAudit(
+    request,
+    scope,
+    (tx) => removeIdentity(scope.orgId, id, identityId, tx),
+    (found) =>
+      found
+        ? {
+            action: "customer.identity_changed",
+            targetType: "customer",
+            targetId: id,
+            metadata: { identity: "removed", identityId },
+          }
+        : null,
+  );
 
   if (removed) {
-    await auditProject(request, scope, {
-      action: "customer.updated",
-      targetType: "customer",
-      targetId: id,
-      metadata: { identity: "removed", identityId },
-    });
     appLogger.info("Customer identity removed", {
       userId: scope.userId,
       customerId: id,

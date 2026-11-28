@@ -988,6 +988,15 @@ describe("deprovisioning", () => {
       status: "active",
     });
     expect(clerkApi.revokeSession).toHaveBeenCalledTimes(2);
+    expect(db.rows("externalOperation")).toEqual([
+      expect.objectContaining({
+        organizationId: orgA.id,
+        actorUserId: null,
+        kind: "clerk.sessions.revoke",
+        targetId: "user_ada",
+        status: "SUCCEEDED",
+      }),
+    ]);
     expect(audits("scim.user.deleted")[0]).toMatchObject({
       actorUserId: null,
       actorApiKeyId: null,

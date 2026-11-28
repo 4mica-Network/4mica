@@ -30,6 +30,39 @@ export const writeAudit = (db: Db, entry: AuditEntry) =>
     select: { id: true },
   });
 
+export interface ExternalOperationInput {
+  orgId: string;
+  actorUserId: string | null;
+  kind: string;
+  targetType?: string;
+  targetId?: string;
+}
+
+export type ExternalOperationOutcome = "SUCCEEDED" | "FAILED" | "UNKNOWN";
+
+export const startExternalOperation = (input: ExternalOperationInput) =>
+  prisma.externalOperation.create({
+    data: {
+      organizationId: input.orgId,
+      actorUserId: input.actorUserId,
+      kind: input.kind,
+      targetType: input.targetType ?? null,
+      targetId: input.targetId ?? null,
+    },
+    select: { id: true },
+  });
+
+export const settleExternalOperation = (
+  id: string,
+  status: ExternalOperationOutcome,
+  error: string | null,
+) =>
+  prisma.externalOperation.update({
+    where: { id },
+    data: { status, error, completedAt: new Date() },
+    select: { id: true },
+  });
+
 export interface AuditLogFilters {
   from?: Date;
   to?: Date;

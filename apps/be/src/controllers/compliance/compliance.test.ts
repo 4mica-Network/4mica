@@ -196,8 +196,15 @@ describe("compliance routes", () => {
     beneficialOwner.aggregate.mockResolvedValue({
       _sum: { ownershipPercent: 60 },
     });
-    $transaction.mockImplementation((ops: Promise<unknown>[]) =>
-      Promise.all(ops),
+    $transaction.mockImplementation(async (arg: unknown) =>
+      typeof arg === "function"
+        ? (arg as (tx: unknown) => unknown)({
+            ...tenancy,
+            business,
+            complianceProfile,
+            beneficialOwner,
+          })
+        : Promise.all(arg as Promise<unknown>[]),
     );
   });
 
@@ -569,6 +576,20 @@ describe("compliance routes", () => {
         actorUserId: USER_ID,
         targetId: STORED_OWNER.id,
       });
+    });
+
+    it.each([
+      ["PATCH", "/me/compliance", { regulator: "FCA" }],
+      ["POST", "/me/compliance/owners", NEW_OWNER],
+      ["PATCH", `/me/compliance/owners/${STORED_OWNER.id}`, { isPep: true }],
+      ["DELETE", `/me/compliance/owners/${STORED_OWNER.id}`, undefined],
+      ["POST", "/me/compliance/submit", undefined],
+    ] as const)("fails %s %s when its audit entry cannot be written", async (method, url, body) => {
+      tenancy.auditLog.create.mockRejectedValue(new Error("audit down"));
+
+      const res = await call(method, url, body);
+
+      expect(res.statusCode).toBe(500);
     });
   });
 });

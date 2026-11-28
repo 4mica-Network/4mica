@@ -80,7 +80,13 @@ vi.mock("@4mica/db", () => ({
     faqItem,
     $transaction: vi.fn(async (arg: unknown) =>
       typeof arg === "function"
-        ? (arg as (tx: unknown) => unknown)({ review, report, faqItem })
+        ? (arg as (tx: unknown) => unknown)({
+            ...tenancy,
+            review,
+            report,
+            faqItem,
+            resourcePolicy,
+          })
         : Promise.all(arg as Promise<unknown>[]),
     ),
   },
@@ -283,6 +289,29 @@ describe("policy", () => {
         }),
       }),
     );
+    await instance.close();
+  });
+
+  it("records the change in the same transaction and fails without it", async () => {
+    resourcePolicy.findFirst.mockResolvedValue({ id: "p1" });
+    resourcePolicy.update.mockResolvedValue({ id: "p1" });
+    const instance = await app();
+    const request = {
+      method: "PUT" as const,
+      url: `/me/api-listings/${LISTING_ID}/policy`,
+      headers: AUTH,
+      payload: { refundPolicy: "None." },
+    };
+
+    expect((await instance.inject(request)).statusCode).toBe(200);
+    expect(tenancy.auditLog.create.mock.calls[0][0].data).toMatchObject({
+      action: "resource_policy.updated",
+      targetId: LISTING_ID,
+      metadata: { fields: ["refundPolicy"] },
+    });
+
+    tenancy.auditLog.create.mockRejectedValue(new Error("audit down"));
+    expect((await instance.inject(request)).statusCode).toBe(500);
     await instance.close();
   });
 

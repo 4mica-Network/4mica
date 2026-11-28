@@ -2,11 +2,11 @@ import { usernameUnavailableReason } from "@4mica/url";
 import { resolveTenant } from "@auth/tenant";
 import { invalidateUser } from "@auth/user-store";
 import {
-  audit,
   invalidBody,
   parseBody,
   requireTenant,
   requireUserId,
+  withAudit,
 } from "@controllers/shared";
 import { deliverVerification } from "@controllers/verification/index";
 import { appLogger } from "@logger/index";
@@ -189,12 +189,17 @@ export const upsertBusinessHandler: RouteHandler = async (request, reply) => {
     return invalidBody(reply, parsed.issues);
   }
 
-  const business = await upsertBusiness(tenant.orgId, parsed.data);
-  await audit(request, tenant, {
-    action: "business.updated",
-    targetType: "business",
-    targetId: business.id,
-  });
+  const business = await withAudit(
+    request,
+    tenant,
+    (tx) => upsertBusiness(tenant.orgId, parsed.data, tx),
+    (row) => ({
+      action: "business.updated",
+      targetType: "business",
+      targetId: row.id,
+      metadata: { fields: Object.keys(parsed.data) },
+    }),
+  );
 
   return reply.send(business);
 };

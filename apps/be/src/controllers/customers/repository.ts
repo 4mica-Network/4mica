@@ -635,33 +635,98 @@ export const createCustomer = async (
   return toRow(row, spend.get(row.id) ?? emptySpend());
 };
 
-export const updateCustomer = async (
+export const LIMIT_FIELDS = [
+  "dailyLimit",
+  "monthlyLimit",
+  "limitCurrency",
+  "limitNetwork",
+  "limitAssetAddress",
+  "freeQuotaUnit",
+  "freeQuota",
+  "freeQuotaPeriod",
+  "discountPercent",
+  "discountFixed",
+  "minPaymentAmount",
+  "approvalThreshold",
+] as const;
+
+type LimitField = (typeof LIMIT_FIELDS)[number];
+
+const LIMIT_SELECT = Object.fromEntries(
+  LIMIT_FIELDS.map((field) => [field, true]),
+) as Record<LimitField, true>;
+
+export interface CustomerChange {
+  limitFields: LimitField[];
+  before: Record<string, string | null>;
+  after: Record<string, string | null>;
+}
+
+const limitValues = (
+  row: Partial<Record<LimitField, unknown>>,
+  fields: readonly LimitField[],
+): Record<string, string | null> =>
+  Object.fromEntries(
+    fields.map((field) => {
+      const value = row[field];
+      return [
+        field,
+        value === null || value === undefined ? null : String(value),
+      ];
+    }),
+  );
+
+const changeCustomer = async (
   scope: CustomerScope,
   id: string,
   data: Prisma.CustomerUpdateManyMutationInput,
-): Promise<CustomerRow | null> => {
-  const { count } = await prisma.customer.updateMany({
-    where: { id, ...customerWhere(scope) },
-    data,
-  });
+  db: Db,
+): Promise<CustomerChange | null> => {
+  await db.$executeRaw`SELECT 1 FROM customers WHERE id = ${id} FOR UPDATE`;
+  const where = { id, ...customerWhere(scope) };
+  const before = await db.customer.findFirst({ where, select: LIMIT_SELECT });
+  if (!before) {
+    return null;
+  }
 
-  return count > 0 ? getCustomer(scope, id) : null;
+  await db.customer.updateMany({ where, data });
+
+  const limitFields = LIMIT_FIELDS.filter((field) => field in data);
+  const after =
+    limitFields.length > 0
+      ? await db.customer.findFirst({ where, select: LIMIT_SELECT })
+      : before;
+
+  return {
+    limitFields,
+    before: limitValues(before, limitFields),
+    after: limitValues(after ?? before, limitFields),
+  };
 };
+
+export const updateCustomer = (
+  scope: CustomerScope,
+  id: string,
+  data: Prisma.CustomerUpdateManyMutationInput,
+  db: Db,
+): Promise<CustomerChange | null> => changeCustomer(scope, id, data, db);
 
 export const addIdentity = async (
   scope: CustomerScope,
   customerId: string,
   input: CustomerIdentityInput,
-): Promise<CustomerRow | null> => {
-  await prisma.customerPaymentIdentity.create({
+  db: Db,
+): Promise<string> => {
+  const identity = await db.customerPaymentIdentity.create({
     data: {
       organizationId: scope.orgId,
       customerId,
       ...toIdentityData(input),
     },
+    select: { id: true },
   });
 
-  return getCustomer(scope, customerId);
+  return identity.id;
 };
 
 export const setCustomerStatus = async (
@@ -697,7 +762,8 @@ export const setCustomerPolicy = async (
   scope: CustomerScope,
   id: string,
   input: SetCustomerPolicyInput,
-): Promise<CustomerRow | null> => {
+  db: Db,
+): Promise<CustomerChange | null> => {
   const data: Prisma.CustomerUpdateManyMutationInput = { ...input };
 
   if (input.limitNetwork === null) {
@@ -708,12 +774,7 @@ export const setCustomerPolicy = async (
     data.quotaResetAt = input.freeQuotaUnit === null ? null : new Date();
   }
 
-  const { count } = await prisma.customer.updateMany({
-    where: { id, ...customerWhere(scope) },
-    data,
-  });
-
-  return count > 0 ? getCustomer(scope, id) : null;
+  return changeCustomer(scope, id, data, db);
 };
 
 export const customerLimitNetwork = async (
@@ -1284,7 +1345,8 @@ export const updateIdentity = async (
   customerId: string,
   identityId: string,
   input: UpdateCustomerIdentityInput,
-): Promise<CustomerRow | null> => {
+  db: Db,
+): Promise<boolean> => {
   const data: Prisma.CustomerPaymentIdentityUpdateManyMutationInput = {};
 
   if (input.source !== undefined) {
@@ -1300,20 +1362,21 @@ export const updateIdentity = async (
     data.blockedAt = input.blocked ? new Date() : null;
   }
 
-  const { count } = await prisma.customerPaymentIdentity.updateMany({
+  const { count } = await db.customerPaymentIdentity.updateMany({
     where: { id: identityId, customerId, organizationId: scope.orgId },
     data,
   });
 
-  return count > 0 ? getCustomer(scope, customerId) : null;
+  return count > 0;
 };
 
 export const removeIdentity = async (
   orgId: string,
   customerId: string,
   identityId: string,
+  db: Db,
 ): Promise<boolean> => {
-  const { count } = await prisma.customerPaymentIdentity.deleteMany({
+  const { count } = await db.customerPaymentIdentity.deleteMany({
     where: { id: identityId, customerId, organizationId: orgId },
   });
 
@@ -1323,8 +1386,9 @@ export const removeIdentity = async (
 export const softDeleteCustomer = async (
   scope: CustomerScope,
   id: string,
+  db: Db,
 ): Promise<boolean> => {
-  const row = await prisma.customer.findFirst({
+  const row = await db.customer.findFirst({
     where: { id, ...customerWhere(scope) },
     select: { id: true },
   });
@@ -1333,15 +1397,13 @@ export const softDeleteCustomer = async (
     return false;
   }
 
-  await prisma.$transaction([
-    prisma.customerPaymentIdentity.deleteMany({
-      where: { customerId: row.id },
-    }),
-    prisma.customer.update({
-      where: { id: row.id },
-      data: { deletedAt: new Date() },
-    }),
-  ]);
+  await db.customerPaymentIdentity.deleteMany({
+    where: { customerId: row.id },
+  });
+  await db.customer.update({
+    where: { id: row.id },
+    data: { deletedAt: new Date() },
+  });
 
   return true;
 };
@@ -1349,8 +1411,9 @@ export const softDeleteCustomer = async (
 export const batchSoftDeleteCustomers = async (
   scope: CustomerScope,
   ids: string[],
+  db: Db,
 ): Promise<{ deleted: string[]; notFound: string[] }> => {
-  const owned = await prisma.customer.findMany({
+  const owned = await db.customer.findMany({
     where: { id: { in: ids }, ...customerWhere(scope) },
     select: { id: true },
   });
@@ -1358,15 +1421,13 @@ export const batchSoftDeleteCustomers = async (
   const deleted = owned.map((row) => row.id);
 
   if (deleted.length > 0) {
-    await prisma.$transaction([
-      prisma.customerPaymentIdentity.deleteMany({
-        where: { customerId: { in: deleted } },
-      }),
-      prisma.customer.updateMany({
-        where: { id: { in: deleted } },
-        data: { deletedAt: new Date() },
-      }),
-    ]);
+    await db.customerPaymentIdentity.deleteMany({
+      where: { customerId: { in: deleted } },
+    });
+    await db.customer.updateMany({
+      where: { id: { in: deleted } },
+      data: { deletedAt: new Date() },
+    });
   }
 
   const deletedSet = new Set(deleted);

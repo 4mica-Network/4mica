@@ -1,5 +1,6 @@
 import type { OrgRole, Prisma } from "@4mica/db";
 import { loadUser } from "@auth/user-store";
+import { trackExternalOperation } from "@controllers/audit/external-operations";
 import type { AuditEntry } from "@controllers/audit/repository";
 import { appLogger } from "@logger/index";
 import { clerk } from "@services/clerk";
@@ -391,14 +392,27 @@ const revokeManagedClerkSessions = async (
     return 0;
   }
   try {
-    const sessions = await clerk.sessions.getSessionList({
-      userId: clerkUserId,
-      status: "active",
-    });
-    await Promise.all(
-      sessions.data.map((session) => clerk.sessions.revokeSession(session.id)),
+    return await trackExternalOperation(
+      {
+        orgId,
+        actorUserId: null,
+        kind: "clerk.sessions.revoke",
+        targetType: "clerk_user",
+        targetId: clerkUserId,
+      },
+      async () => {
+        const sessions = await clerk.sessions.getSessionList({
+          userId: clerkUserId,
+          status: "active",
+        });
+        await Promise.all(
+          sessions.data.map((session) =>
+            clerk.sessions.revokeSession(session.id),
+          ),
+        );
+        return sessions.data.length;
+      },
     );
-    return sessions.data.length;
   } catch (error) {
     appLogger.error("Could not revoke Clerk sessions of a deprovisioned user", {
       orgId,

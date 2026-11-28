@@ -4,6 +4,7 @@ import { requireRecentAuth } from "@auth/security";
 import type { Tenant } from "@auth/tenant";
 import { config } from "@config/index";
 import { requireApproval } from "@controllers/approvals/gate";
+import { trackExternalOperation } from "@controllers/audit/external-operations";
 import {
   AUDIT_EXPORT_HEADER,
   exportAuditLogs,
@@ -677,7 +678,16 @@ export const revokeMemberSessionsHandler: RouteHandler = async (
 
   let revoked: number;
   try {
-    revoked = await revokeClerkSessions(clerkUserId);
+    revoked = await trackExternalOperation(
+      {
+        orgId: tenant.orgId,
+        actorUserId: tenant.userId,
+        kind: "clerk.sessions.revoke",
+        targetType: "user",
+        targetId: userId,
+      },
+      () => revokeClerkSessions(clerkUserId),
+    );
   } catch (error) {
     appLogger.error("Could not revoke the member's sessions", {
       orgId: tenant.orgId,

@@ -787,6 +787,30 @@ model AuditLog {
   @@map("audit_logs")
 }
 
+enum ExternalOperationStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  UNKNOWN
+}
+
+model ExternalOperation {
+  id             String                  @id @default(uuid(7))
+  organizationId String                  @map("organization_id")
+  actorUserId    String?                 @map("actor_user_id")
+  kind           String                  @db.VarChar(64)
+  targetType     String?                 @map("target_type") @db.VarChar(64)
+  targetId       String?                 @map("target_id") @db.VarChar(64)
+  status         ExternalOperationStatus @default(PENDING)
+  error          String?                 @db.VarChar(500)
+  createdAt      DateTime                @default(now()) @map("created_at")
+  completedAt    DateTime?               @map("completed_at")
+
+  @@index([organizationId, createdAt(sort: Desc)])
+  @@index([status, createdAt])
+  @@map("external_operations")
+}
+
 model User {
   id                             String                   @id @default(uuid(7))
   clerkUserId                    String                   @unique @map("clerk_user_id")

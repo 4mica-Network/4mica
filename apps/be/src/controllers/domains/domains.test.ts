@@ -375,6 +375,13 @@ describe("deleting a domain", () => {
     expect(saml.deleteSamlConnection).toHaveBeenCalledWith("samlc_9");
     expect(tables.organizationDomain).toHaveLength(0);
     expect(auditActions()).toContain("domain.removed");
+    expect(tables.externalOperations).toEqual([
+      expect.objectContaining({
+        kind: "clerk.saml_connection.delete",
+        targetType: "sso_connection",
+        status: "SUCCEEDED",
+      }),
+    ]);
   });
 
   it("keeps the domain when Clerk cannot remove its connection", async () => {
@@ -389,6 +396,13 @@ describe("deleting a domain", () => {
     });
     expect(res.statusCode).toBe(502);
     expect(tables.organizationDomain).toHaveLength(1);
+    expect(tables.externalOperations).toEqual([
+      expect.objectContaining({
+        kind: "clerk.saml_connection.delete",
+        status: "UNKNOWN",
+        error: "down",
+      }),
+    ]);
   });
 });
 

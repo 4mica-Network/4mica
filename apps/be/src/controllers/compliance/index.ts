@@ -1,9 +1,9 @@
 import {
-  audit,
   invalidBody,
   notFound,
   parseBody,
   requireTenant,
+  withAudit,
 } from "@controllers/shared";
 import { appLogger } from "@logger/index";
 import type { FastifyReply, RouteHandler } from "fastify";
@@ -64,14 +64,19 @@ export const updateComplianceHandler: RouteHandler = async (request, reply) => {
     return locked(reply);
   }
 
-  const state = await updateComplianceProfile(tenant.orgId, parsed.data);
-  await audit(request, tenant, {
-    action: "compliance.updated",
-    targetType: "compliance",
-    targetId: tenant.orgId,
-  });
+  await withAudit(
+    request,
+    tenant,
+    (tx) => updateComplianceProfile(tenant.orgId, parsed.data, tx),
+    {
+      action: "compliance.updated",
+      targetType: "compliance",
+      targetId: tenant.orgId,
+      metadata: { fields: Object.keys(parsed.data) },
+    },
+  );
 
-  return reply.send(state);
+  return reply.send(await getComplianceState(tenant.orgId));
 };
 
 export const listBeneficialOwnersHandler: RouteHandler = async (
@@ -115,12 +120,16 @@ export const createBeneficialOwnerHandler: RouteHandler = async (
     return ownershipExceeded(reply, 100 - held);
   }
 
-  const owner = await createBeneficialOwner(tenant.orgId, parsed.data);
-  await audit(request, tenant, {
-    action: "beneficial_owner.added",
-    targetType: "beneficial_owner",
-    targetId: owner.id,
-  });
+  const owner = await withAudit(
+    request,
+    tenant,
+    (tx) => createBeneficialOwner(tenant.orgId, parsed.data, tx),
+    (created) => ({
+      action: "beneficial_owner.added",
+      targetType: "beneficial_owner",
+      targetId: created.id,
+    }),
+  );
   appLogger.info("Beneficial owner added", {
     userId: tenant.userId,
     beneficialOwnerId: owner.id,
@@ -156,16 +165,23 @@ export const updateBeneficialOwnerHandler: RouteHandler = async (
     }
   }
 
-  const updated = await updateBeneficialOwner(tenant.orgId, id, parsed.data);
+  const updated = await withAudit(
+    request,
+    tenant,
+    (tx) => updateBeneficialOwner(tenant.orgId, id, parsed.data, tx),
+    (owner) =>
+      owner
+        ? {
+            action: "beneficial_owner.updated",
+            targetType: "beneficial_owner",
+            targetId: id,
+            metadata: { fields: Object.keys(parsed.data) },
+          }
+        : null,
+  );
   if (!updated) {
     return notFound(reply, "person");
   }
-
-  await audit(request, tenant, {
-    action: "beneficial_owner.updated",
-    targetType: "beneficial_owner",
-    targetId: id,
-  });
 
   return reply.send(updated);
 };
@@ -184,16 +200,22 @@ export const deleteBeneficialOwnerHandler: RouteHandler = async (
   }
 
   const { id } = request.params as { id: string };
-  const deleted = await deleteBeneficialOwner(tenant.orgId, id);
+  const deleted = await withAudit(
+    request,
+    tenant,
+    (tx) => deleteBeneficialOwner(tenant.orgId, id, tx),
+    (found) =>
+      found
+        ? {
+            action: "beneficial_owner.removed",
+            targetType: "beneficial_owner",
+            targetId: id,
+          }
+        : null,
+  );
   if (!deleted) {
     return notFound(reply, "person");
   }
-
-  await audit(request, tenant, {
-    action: "beneficial_owner.removed",
-    targetType: "beneficial_owner",
-    targetId: id,
-  });
 
   return reply.code(204).send();
 };
@@ -227,8 +249,7 @@ export const submitComplianceHandler: RouteHandler = async (request, reply) => {
     });
   }
 
-  const submitted = await submitForReview(tenant.orgId);
-  await audit(request, tenant, {
+  await withAudit(request, tenant, (tx) => submitForReview(tenant.orgId, tx), {
     action: "compliance.submitted",
     targetType: "compliance",
     targetId: tenant.orgId,
@@ -237,5 +258,5 @@ export const submitComplianceHandler: RouteHandler = async (request, reply) => {
     userId: tenant.userId,
   });
 
-  return reply.send(submitted);
+  return reply.send(await getComplianceState(tenant.orgId));
 };

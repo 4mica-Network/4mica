@@ -223,8 +223,9 @@ export const markPhoneVerified = async (userId: string) =>
 export const upsertBusiness = async (
   orgId: string,
   data: UpsertBusinessInput,
+  db: Prisma.TransactionClient,
 ) =>
-  prisma.business.upsert({
+  db.business.upsert({
     where: { organizationId: orgId },
     create: { legalName: "", ...data, organizationId: orgId },
     update: data,

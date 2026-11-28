@@ -96,6 +96,13 @@ const DEFAULTS: Record<string, () => Row> = {
     metadata: null,
     ip: null,
   }),
+  externalOperation: () => ({
+    status: "PENDING",
+    targetType: null,
+    targetId: null,
+    error: null,
+    completedAt: null,
+  }),
   securitySettings: () => ({}),
   governanceSettings: () => ({ approvalsRequired: 0, governedActions: [] }),
   approvalRequest: () => ({ status: "PENDING", executedAt: null }),

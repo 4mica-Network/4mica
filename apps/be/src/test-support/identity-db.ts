@@ -45,6 +45,7 @@ export const createIdentityDb = () => {
     ssoConnection: [] as Row[],
     memberships: [] as Row[],
     auditLogs: [] as Row[],
+    externalOperations: [] as Row[],
   };
 
   let seq = 0;
@@ -149,6 +150,23 @@ export const createIdentityDb = () => {
         tables.auditLogs.filter((row) => matches(row, where)),
       ),
     },
+    externalOperation: {
+      create: vi.fn(async ({ data }: { data: Row }) => {
+        const row: Row = { id: id(), status: "PENDING", ...data };
+        tables.externalOperations.push(row);
+        return { id: row.id };
+      }),
+      update: vi.fn(
+        async ({ where, data }: { where: { id: string }; data: Row }) => {
+          const row = tables.externalOperations.find((r) => r.id === where.id);
+          if (!row) {
+            throw new Error("not found");
+          }
+          Object.assign(row, data);
+          return { id: row.id };
+        },
+      ),
+    },
     securitySettings: { findUnique: vi.fn(async () => null) },
     governanceSettings: { findUnique: vi.fn() },
     approvalRequest: {
@@ -171,6 +189,7 @@ export const createIdentityDb = () => {
       tables.ssoConnection = [];
       tables.memberships = [];
       tables.auditLogs = [];
+      tables.externalOperations = [];
     },
     domain: (over: Row = {}) => {
       const row: Row = {

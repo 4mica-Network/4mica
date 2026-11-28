@@ -60,21 +60,22 @@ export const upsertPolicy = async (
   kind: ResourceKind,
   id: string,
   input: UpsertPolicyInput,
+  db: Prisma.TransactionClient,
 ) => {
-  const existing = await prisma.resourcePolicy.findFirst({
+  const existing = await db.resourcePolicy.findFirst({
     where: target(kind, id),
     select: { id: true },
   });
 
   if (existing) {
-    return prisma.resourcePolicy.update({
+    return db.resourcePolicy.update({
       where: { id: existing.id },
       data: input,
       select: POLICY_SELECT,
     });
   }
 
-  return prisma.resourcePolicy.create({
+  return db.resourcePolicy.create({
     data: { ...target(kind, id), ...input },
     select: POLICY_SELECT,
   });

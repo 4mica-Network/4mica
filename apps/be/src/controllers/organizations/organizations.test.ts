@@ -58,6 +58,7 @@ const { authenticateRequest, getUser, getSessionList, revokeSession, db } =
       governanceSettings: { findUnique: vi.fn() },
       securitySettings: { findUnique: vi.fn() },
       ssoConnection: { findMany: vi.fn() },
+      externalOperation: { create: vi.fn(), update: vi.fn() },
       approvalRequest: {
         findFirst: vi.fn(),
         create: vi.fn(),
@@ -1868,6 +1869,69 @@ describe("organization routes", () => {
         totalCount: 2,
       });
       revokeSession.mockResolvedValue({});
+      db.externalOperation.create.mockResolvedValue({ id: "op_1" });
+      db.externalOperation.update.mockResolvedValue({ id: "op_1" });
+    });
+
+    const settledAs = () =>
+      db.externalOperation.update.mock.calls.map(([arg]) => arg.data.status);
+
+    it("records the Clerk call as pending before it starts and settles it after", async () => {
+      getUser.mockResolvedValue(clerkUser("grace@acme.com"));
+      db.organizationDomain.findFirst.mockResolvedValue({ id: "domain_1" });
+      getSessionList.mockImplementation(async () => {
+        expect(db.externalOperation.create).toHaveBeenCalledOnce();
+        expect(db.externalOperation.update).not.toHaveBeenCalled();
+        return { data: [{ id: "sess_a" }], totalCount: 1 };
+      });
+
+      expect((await revoke()).statusCode).toBe(200);
+      expect(db.externalOperation.create.mock.calls[0][0].data).toEqual({
+        organizationId: ORG_ID,
+        actorUserId: USER_ID,
+        kind: "clerk.sessions.revoke",
+        targetType: "user",
+        targetId: OTHER_USER_ID,
+      });
+      expect(settledAs()).toEqual(["SUCCEEDED"]);
+    });
+
+    it("leaves an ambiguous Clerk failure visible as UNKNOWN", async () => {
+      getUser.mockResolvedValue(clerkUser("grace@acme.com"));
+      db.organizationDomain.findFirst.mockResolvedValue({ id: "domain_1" });
+      revokeSession
+        .mockResolvedValueOnce({})
+        .mockRejectedValueOnce(new TypeError("fetch failed"));
+
+      const res = await revoke();
+
+      expect(res.statusCode).toBe(503);
+      expect(settledAs()).toEqual(["UNKNOWN"]);
+      expect(db.externalOperation.update.mock.calls[0][0].data).toMatchObject({
+        error: "fetch failed",
+      });
+      expect(auditActions()).toEqual([]);
+    });
+
+    it("records a definitive Clerk refusal as FAILED", async () => {
+      getUser.mockResolvedValue(clerkUser("grace@acme.com"));
+      db.organizationDomain.findFirst.mockResolvedValue({ id: "domain_1" });
+      revokeSession.mockRejectedValue(
+        Object.assign(new Error("forbidden"), { status: 403, errors: [] }),
+      );
+
+      expect((await revoke()).statusCode).toBe(503);
+      expect(settledAs()).toEqual(["FAILED"]);
+    });
+
+    it("does not call Clerk when the operation cannot be recorded", async () => {
+      getUser.mockResolvedValue(clerkUser("grace@acme.com"));
+      db.organizationDomain.findFirst.mockResolvedValue({ id: "domain_1" });
+      db.externalOperation.create.mockRejectedValue(new Error("db down"));
+
+      expect((await revoke()).statusCode).toBe(503);
+      expect(getSessionList).not.toHaveBeenCalled();
+      expect(revokeSession).not.toHaveBeenCalled();
     });
 
     it("revokes every Clerk session of a member on a verified domain", async () => {
