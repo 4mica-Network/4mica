@@ -373,19 +373,40 @@ export const findAuthorization = (
     select: AUTHORIZATION_SELECT,
   });
 
+export interface PaymentIdentity {
+  orgId: string;
+  network: PaymentNetwork;
+  assetAddress: string | null;
+}
+
+export const LIVE_REQ_ID_INDEX = "spend_authorizations_live_req_id_key";
+
 export const reqIdInUse = async (
   db: Pick<Db, "spendAuthorization">,
-  orgId: string,
+  identity: PaymentIdentity,
   reqId: string,
+  excludeId?: string,
 ): Promise<boolean> =>
   (await db.spendAuthorization.findFirst({
     where: {
-      organizationId: orgId,
+      ...(excludeId ? { id: { not: excludeId } } : {}),
+      organizationId: identity.orgId,
+      network: identity.network,
+      assetAddress: identity.assetAddress,
       reqId,
+      reqIdConflict: null,
       status: { in: USAGE_STATUSES },
     },
     select: { id: true },
   })) !== null;
+
+export const isReqIdConflict = (error: unknown): boolean => {
+  const failure = error as { code?: unknown; meta?: unknown } | null;
+  return (
+    failure?.code === "P2002" &&
+    JSON.stringify(failure.meta ?? {}).includes(LIVE_REQ_ID_INDEX)
+  );
+};
 
 export const expireReservation = (
   db: Pick<Db, "spendAuthorization">,

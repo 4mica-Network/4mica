@@ -96,7 +96,7 @@ export const spendRoutes: FastifyPluginCallback = (app, _opts, done) => {
         tags: ["spend"],
         summary: "Ask before paying: check a payment against spending policies",
         description:
-          "Cooperative, buyer-side control: 4mica is not in the payment path, so this only works when the paying SDK asks before it signs. Returns RESERVED (pay within `expiresAt`, then consume), PENDING_APPROVAL (poll until a person approves) or DENIED with `deniedReason`. Payments reported without an authorization still count toward limits and raise an alert. Needs the SPEND_AUTHORIZE scope.",
+          "Cooperative, buyer-side control: 4mica is not in the payment path, so this only works when the paying SDK asks before it signs. Returns RESERVED (pay within `expiresAt`, then consume), PENDING_APPROVAL (poll until a person approves) or DENIED with `deniedReason`. Payments reported without an authorization still count toward limits and raise an alert. A `reqId` identifies one payment per organization, network and asset: while another RESERVED, PENDING_APPROVAL or CONSUMED authorization of that identity holds it, the answer is 409 `req_id_in_use`. Needs the SPEND_AUTHORIZE scope.",
         security: [{ apiKeyAuth: [] }],
         body: {
           type: "object",
@@ -142,7 +142,7 @@ export const spendRoutes: FastifyPluginCallback = (app, _opts, done) => {
         tags: ["spend"],
         summary: "Mark a reserved authorization as spent",
         description:
-          "Pass the payment's `reqId` so the reported payment reconciles to this authorization.",
+          "Pass the payment's `reqId` so the reported payment reconciles to this authorization. A `reqId` that another live or consumed authorization of the same organization, network and asset already holds is refused with 409 `req_id_in_use`.",
         security: [{ apiKeyAuth: [] }],
         params: idParamSchema,
         body: {

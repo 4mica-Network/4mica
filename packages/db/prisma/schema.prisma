@@ -455,6 +455,7 @@ model SpendAuthorization {
   recipientAddress  String                   @map("recipient_address") @db.VarChar(42)
   amount            Decimal                  @db.Decimal(38, 18)
   reqId             String?                  @map("req_id") @db.VarChar(66)
+  reqIdConflict     String?                  @map("req_id_conflict") @db.VarChar(64)
   status            SpendAuthorizationStatus
   deniedReason      String?                  @map("denied_reason") @db.VarChar(64)
   policyId          String?                  @map("policy_id")

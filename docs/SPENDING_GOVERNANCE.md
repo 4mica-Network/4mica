@@ -33,6 +33,12 @@ A wallet linked to an organization is evidence of control (SIWE), not custody. A
 
 An authorization is bound to the payer, recipient, network, asset and amount it was granted for, and to the project, environment and API key (or service account) that requested it. Reconciliation only consumes it for a reported payment with the same `reqId`, payer, recipient, network and asset and an amount no larger than the authorized amount; the authorization is then cut down to the paid amount so the remainder is released. A mismatch never consumes it and raises an `UNAUTHORIZED_SPEND` alert.
 
+## Payment identity and `reqId` uniqueness
+
+A payment is identified by its organization, network, asset (or the native currency) and `reqId`. At most one authorization per identity may be RESERVED, PENDING_APPROVAL or CONSUMED; DENIED, RELEASED and EXPIRED ones give the `reqId` back, so a payer may retry under the same `reqId` after a release. The rule is a partial unique index on `spend_authorizations` (`spend_authorizations_live_req_id_key`), and authorizing and consuming both take the same per-organization, network and asset advisory lock before checking it, so a lost race is answered with 409 `req_id_in_use` rather than a database error. The same `reqId` on another network or asset is a different payment.
+
+Rows that held a duplicate before the index existed were resolved by migration `20261202120000_enforce_spend_req_id_uniqueness`: in each identity the earliest CONSUMED authorization (or, failing that, the earliest live one) keeps the `reqId`; every other one is marked `req_id_conflict = 'duplicate_req_id'`, and the live ones among them are RELEASED (cancelling a pending approval). Consumed duplicates stay CONSUMED, so recorded spend is unchanged, and nothing is deleted.
+
 ## What hard enforcement would require
 
 Hard enforcement is possible only at a boundary every payment must cross:

@@ -788,6 +788,117 @@ describe("consume and release", () => {
   });
 });
 
+describe("request id uniqueness", () => {
+  const uniqueViolation = () =>
+    Object.assign(new Error("Unique constraint failed"), {
+      code: "P2002",
+      meta: {
+        driverAdapterError: {
+          cause: {
+            originalMessage:
+              'duplicate key value violates unique constraint "spend_authorizations_live_req_id_key"',
+          },
+        },
+      },
+    });
+
+  it("scopes a held reqId to its network and asset", async () => {
+    h.db.spendAuthorization.seed(
+      authRow({ reqId: "0xabc", status: "CONSUMED" }),
+    );
+    const otherAsset = await post(
+      "/v1/spend/authorize",
+      body({ reqId: "0xabc", assetAddress: null }),
+    );
+    expect(otherAsset.statusCode).toBe(200);
+    expect(otherAsset.json().status).toBe("RESERVED");
+
+    const sameAsset = await post(
+      "/v1/spend/authorize",
+      body({ reqId: "0xabc" }),
+    );
+    expect(sameAsset.statusCode).toBe(409);
+    expect(sameAsset.json().error).toBe("req_id_in_use");
+  });
+
+  it("lets a terminal or superseded holder release its reqId", async () => {
+    h.db.spendAuthorization.seed(
+      authRow({ reqId: "0xabc", status: "RELEASED" }),
+      authRow({ reqId: "0xabc", status: "EXPIRED" }),
+      authRow({ reqId: "0xabc", status: "DENIED" }),
+      authRow({
+        reqId: "0xabc",
+        status: "CONSUMED",
+        reqIdConflict: "duplicate_req_id",
+      }),
+    );
+    const res = await post("/v1/spend/authorize", body({ reqId: "0xabc" }));
+    expect(res.statusCode).toBe(200);
+  });
+
+  it("consumes under the same advisory lock as authorization", async () => {
+    const [row] = h.db.spendAuthorization.seed(authRow());
+    await post(`/v1/spend/authorizations/${row?.id}/consume`, {
+      reqId: "0xfeed",
+    });
+    expect(h.db.$executeRaw).toHaveBeenCalledTimes(1);
+    const [, lockKey] = h.db.$executeRaw.mock.calls[0] as unknown as [
+      unknown,
+      string,
+    ];
+    expect(lockKey).toBe(`spend:${ORG_ID}:BASE_SEPOLIA:${USDC}`);
+  });
+
+  it("refuses to attach a reqId another authorization of the same identity holds", async () => {
+    const [, otherAsset, row] = h.db.spendAuthorization.seed(
+      authRow({ reqId: "0xfeed", status: "CONSUMED" }),
+      authRow({ assetAddress: null }),
+      authRow(),
+    );
+    const res = await post(`/v1/spend/authorizations/${row?.id}/consume`, {
+      reqId: "0xfeed",
+    });
+    expect(res.statusCode).toBe(409);
+    expect(res.json().error).toBe("req_id_in_use");
+    expect(h.db.spendAuthorization.rows[2]?.status).toBe("RESERVED");
+
+    const elsewhere = await post(
+      `/v1/spend/authorizations/${otherAsset?.id}/consume`,
+      { reqId: "0xfeed" },
+    );
+    expect(elsewhere.statusCode).toBe(200);
+  });
+
+  it("maps a lost race on the database index to req_id_in_use when authorizing", async () => {
+    const spy = vi
+      .spyOn(h.db.spendAuthorization, "create")
+      .mockRejectedValueOnce(uniqueViolation());
+    try {
+      const res = await post("/v1/spend/authorize", body({ reqId: "0xabc" }));
+      expect(res.statusCode).toBe(409);
+      expect(res.json().error).toBe("req_id_in_use");
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it("maps a lost race on the database index to req_id_in_use when consuming", async () => {
+    const [row] = h.db.spendAuthorization.seed(authRow());
+    const spy = vi
+      .spyOn(h.db.spendAuthorization, "updateMany")
+      .mockRejectedValueOnce(uniqueViolation());
+    try {
+      const res = await post(`/v1/spend/authorizations/${row?.id}/consume`, {
+        reqId: "0xfeed",
+      });
+      expect(res.statusCode).toBe(409);
+      expect(res.json().error).toBe("req_id_in_use");
+    } finally {
+      spy.mockRestore();
+    }
+  });
+});
+
 describe("authorization ownership", () => {
   const SERVICE_ACCOUNT_ID = "019fce62-0000-7000-8000-0000000000aa";
   const ROTATED_KEY_ID = "019fce62-0000-7000-8000-0000000000f2";

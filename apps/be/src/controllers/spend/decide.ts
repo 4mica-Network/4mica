@@ -37,6 +37,7 @@ import {
   findAuthorization,
   findReportedPayment,
   hasEnforcingPolicy,
+  isReqIdConflict,
   loadPolicies,
   loadUsage,
   lockSpend,
@@ -160,14 +161,47 @@ export const paymentSummary = (input: {
     280,
   );
 
+const reqIdConflictAs = async <T>(
+  work: () => Promise<T>,
+  conflict: T,
+): Promise<T> => {
+  try {
+    return await work();
+  } catch (error) {
+    if (isReqIdConflict(error)) {
+      return conflict;
+    }
+    throw error;
+  }
+};
+
 export const authorizeSpend = async (
   input: AuthorizeInput,
   now: Date = new Date(),
 ): Promise<AuthorizeOutcome> =>
+  reqIdConflictAs(() => decideSpend(input, now), {
+    kind: "req_id_in_use",
+  } as const);
+
+const decideSpend = async (
+  input: AuthorizeInput,
+  now: Date,
+): Promise<AuthorizeOutcome> =>
   runInTransaction(async (tx) => {
     await lockSpend(tx, input.orgId, input.network, input.assetAddress);
 
-    if (input.reqId && (await reqIdInUse(tx, input.orgId, input.reqId))) {
+    if (
+      input.reqId &&
+      (await reqIdInUse(
+        tx,
+        {
+          orgId: input.orgId,
+          network: input.network,
+          assetAddress: input.assetAddress,
+        },
+        input.reqId,
+      ))
+    ) {
       return { kind: "req_id_in_use" as const };
     }
 
@@ -555,37 +589,60 @@ export const consumeAuthorization = async (
   }
 
   const scope = ownedBy(owner);
-  return runInTransaction(async (tx): Promise<TransitionOutcome> => {
-    if (reqId && !current.reqId && (await reqIdInUse(tx, owner.orgId, reqId))) {
-      return { kind: "req_id_in_use" };
-    }
-    const finalReqId = reqId ?? current.reqId;
-    const payment = finalReqId
-      ? await findReportedPayment(tx, current.payerAddress, finalReqId)
-      : null;
-    const { count } = await transitionAuthorization(
-      tx,
-      id,
-      ["RESERVED"],
-      {
-        status: "CONSUMED",
-        consumedAt: now,
-        reqId: finalReqId,
-        ...(payment ? { paymentId: payment.id } : {}),
-      },
-      { ...scope, expiresAt: { gt: now } },
-    );
-    const row = await findAuthorization(tx, id, scope);
-    if (!row) {
-      return { kind: "not_found" };
-    }
-    if (count > 0) {
-      return { kind: "ok", row };
-    }
-    return row.status === "CONSUMED"
-      ? alreadyConsumed(row, reqId)
-      : { kind: "conflict", row };
-  });
+  return reqIdConflictAs(
+    () =>
+      runInTransaction(async (tx): Promise<TransitionOutcome> => {
+        await lockSpend(
+          tx,
+          current.organizationId,
+          current.network,
+          current.assetAddress,
+        );
+        if (
+          reqId &&
+          !current.reqId &&
+          (await reqIdInUse(
+            tx,
+            {
+              orgId: current.organizationId,
+              network: current.network,
+              assetAddress: current.assetAddress,
+            },
+            reqId,
+            current.id,
+          ))
+        ) {
+          return { kind: "req_id_in_use" };
+        }
+        const finalReqId = reqId ?? current.reqId;
+        const payment = finalReqId
+          ? await findReportedPayment(tx, current.payerAddress, finalReqId)
+          : null;
+        const { count } = await transitionAuthorization(
+          tx,
+          id,
+          ["RESERVED"],
+          {
+            status: "CONSUMED",
+            consumedAt: now,
+            reqId: finalReqId,
+            ...(payment ? { paymentId: payment.id } : {}),
+          },
+          { ...scope, expiresAt: { gt: now } },
+        );
+        const row = await findAuthorization(tx, id, scope);
+        if (!row) {
+          return { kind: "not_found" };
+        }
+        if (count > 0) {
+          return { kind: "ok", row };
+        }
+        return row.status === "CONSUMED"
+          ? alreadyConsumed(row, reqId)
+          : { kind: "conflict", row };
+      }),
+    { kind: "req_id_in_use" },
+  );
 };
 
 export const releaseAuthorization = async (
