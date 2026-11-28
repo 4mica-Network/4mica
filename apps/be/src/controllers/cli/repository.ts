@@ -1,4 +1,4 @@
-import { prisma } from "@4mica/db";
+import { type Prisma, prisma } from "@4mica/db";
 import type { CliScope } from "@auth/cli-token";
 import { isUniqueViolation } from "@utils/prisma-errors";
 import {
@@ -290,8 +290,9 @@ export const listOrganizationCliSessions = (organizationId: string) =>
 export const revokeOrganizationCliSession = async (
   organizationId: string,
   id: string,
+  db: Pick<Prisma.TransactionClient, "cliSession"> = prisma,
 ): Promise<{ userId: string } | null> => {
-  const session = await prisma.cliSession.findFirst({
+  const session = await db.cliSession.findFirst({
     where: { id, ...liveIn(organizationId) },
     select: { userId: true },
   });
@@ -299,7 +300,7 @@ export const revokeOrganizationCliSession = async (
     return null;
   }
 
-  const { count } = await prisma.cliSession.updateMany({
+  const { count } = await db.cliSession.updateMany({
     where: { id, organizationId, revokedAt: null },
     data: { revokedAt: new Date() },
   });

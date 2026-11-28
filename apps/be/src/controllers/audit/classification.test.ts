@@ -23,10 +23,7 @@ const { audit, recordAudit, withAudit, withProjectAudit } = await import(
 
 const SRC = join(import.meta.dirname, "..", "..");
 
-const PENDING_ELSEWHERE = [
-  "controllers/cli/index.ts:cli_session.revoked",
-  "controllers/finance/index.ts:report.exported",
-];
+const PENDING_ELSEWHERE = ["controllers/finance/index.ts:report.exported"];
 
 const sources = (dir: string): string[] =>
   readdirSync(dir).flatMap((name) => {

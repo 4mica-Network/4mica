@@ -8,12 +8,12 @@ import {
 import { findMembership } from "@auth/repository";
 import { enforceAccessPolicy, factorAges } from "@auth/security";
 import {
-  audit,
   invalidBody,
   notFound,
   parseBody,
   requireTenant,
   requireUserId,
+  withAudit,
 } from "@controllers/shared";
 import { appLogger } from "@logger/index";
 import { formatUserCode, normalizeUserCode } from "@utils/secrets";
@@ -466,17 +466,21 @@ export const revokeOrganizationCliSessionHandler: RouteHandler = async (
   }
 
   const { id } = request.params as { id: string };
-  const revoked = await revokeOrganizationCliSession(tenant.orgId, id);
+  const revoked = await withAudit(
+    request,
+    tenant,
+    (tx) => revokeOrganizationCliSession(tenant.orgId, id, tx),
+    (result) =>
+      result && {
+        action: "cli_session.revoked",
+        targetType: "cli_session",
+        targetId: id,
+        metadata: { userId: result.userId },
+      },
+  );
   if (!revoked) {
     return notFound(reply, "CLI session");
   }
-
-  await audit(request, tenant, {
-    action: "cli_session.revoked",
-    targetType: "cli_session",
-    targetId: id,
-    metadata: { userId: revoked.userId },
-  });
   appLogger.info("CLI session revoked", {
     userId: tenant.userId,
     sessionId: id,
