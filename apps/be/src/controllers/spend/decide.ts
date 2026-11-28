@@ -39,6 +39,7 @@ import {
   type AuthorizationRow,
   approvalTtlHours,
   cancelPendingApproval,
+  claimReconciliation,
   expirePendingApproval,
   expireReservation,
   findAuthorization,
@@ -48,8 +49,10 @@ import {
   loadPolicies,
   loadUsage,
   lockSpend,
+  markReconciled,
   ownedBy,
   ownersOfPayerWallet,
+  recordReconcileFailure,
   reqIdInUse,
   runInTransaction,
   settlementCandidates,
@@ -825,111 +828,135 @@ const settlementCandidate = (
 };
 
 const reconcileForOrg = async (
+  tx: Db,
   orgId: string,
   payment: ReportedPayment,
   now: Date,
-): Promise<AlertRow[]> =>
-  runInTransaction(async (tx) => {
-    await lockSpend(tx, orgId, payment.network, payment.assetAddress);
+): Promise<AlertRow[]> => {
+  await lockSpend(tx, orgId, payment.network, payment.assetAddress);
 
-    const { candidate, reason } = settlementCandidate(
-      await settlementCandidates(tx, orgId, payment),
-      payment,
-    );
-    const alerts: AlertInput[] = [];
+  const { candidate, reason } = settlementCandidate(
+    await settlementCandidates(tx, orgId, payment),
+    payment,
+  );
+  const alerts: AlertInput[] = [];
 
-    if (candidate && reason === null) {
-      if (await linkPayment(tx, candidate, payment, now)) {
-        await settlementAudit(tx, candidate, payment);
-      }
-    } else if (reason !== null) {
-      const enforcing = await hasEnforcingPolicy(tx, orgId);
-      if (candidate || enforcing) {
-        await writeAudit(tx, {
-          orgId,
-          projectId: candidate?.projectId ?? null,
-          action: "spend.reconciliation_unmatched",
-          targetType: "payment",
-          targetId: payment.id,
-          metadata: {
-            reason,
-            reqId: payment.reqId,
-            authorizationId: candidate?.id ?? null,
-            amount: payment.amount,
-            network: payment.network,
-            assetAddress: payment.assetAddress,
-            payerAddress: payment.payerAddress,
-            recipientAddress: payment.recipientAddress,
-          },
-        });
-      }
-      if (enforcing) {
-        alerts.push({
-          orgId,
-          projectId: candidate?.projectId ?? null,
-          kind: "UNAUTHORIZED_SPEND",
-          title: `Payment of ${money(payment.amount, payment.network, payment.assetAddress)} was made without an authorization`,
-          dedupeKey: `unauthorized:${payment.id}`,
-          detail: {
-            paymentId: payment.id,
-            reqId: payment.reqId,
-            reason,
-            amount: payment.amount,
-            network: payment.network,
-            assetAddress: payment.assetAddress,
-            payerAddress: payment.payerAddress,
-            recipientAddress: payment.recipientAddress,
-            authorizationId: candidate?.id ?? null,
-            lines: [
-              `${shortAddress(payment.payerAddress)} paid ${money(payment.amount, payment.network, payment.assetAddress)} to ${shortAddress(payment.recipientAddress)} on ${networkLabel(payment.network)}.`,
-              MISMATCH_LINES[reason],
-            ],
-          },
-        });
-      }
+  if (candidate && reason === null) {
+    if (await linkPayment(tx, candidate, payment, now)) {
+      await settlementAudit(tx, candidate, payment);
     }
+  } else if (reason !== null) {
+    const enforcing = await hasEnforcingPolicy(tx, orgId);
+    if (candidate || enforcing) {
+      await writeAudit(tx, {
+        orgId,
+        projectId: candidate?.projectId ?? null,
+        action: "spend.reconciliation_unmatched",
+        targetType: "payment",
+        targetId: payment.id,
+        metadata: {
+          reason,
+          reqId: payment.reqId,
+          authorizationId: candidate?.id ?? null,
+          amount: payment.amount,
+          network: payment.network,
+          assetAddress: payment.assetAddress,
+          payerAddress: payment.payerAddress,
+          recipientAddress: payment.recipientAddress,
+        },
+      });
+    }
+    if (enforcing) {
+      alerts.push({
+        orgId,
+        projectId: candidate?.projectId ?? null,
+        kind: "UNAUTHORIZED_SPEND",
+        title: `Payment of ${money(payment.amount, payment.network, payment.assetAddress)} was made without an authorization`,
+        dedupeKey: `unauthorized:${payment.id}`,
+        detail: {
+          paymentId: payment.id,
+          reqId: payment.reqId,
+          reason,
+          amount: payment.amount,
+          network: payment.network,
+          assetAddress: payment.assetAddress,
+          payerAddress: payment.payerAddress,
+          recipientAddress: payment.recipientAddress,
+          authorizationId: candidate?.id ?? null,
+          lines: [
+            `${shortAddress(payment.payerAddress)} paid ${money(payment.amount, payment.network, payment.assetAddress)} to ${shortAddress(payment.recipientAddress)} on ${networkLabel(payment.network)}.`,
+            MISMATCH_LINES[reason],
+          ],
+        },
+      });
+    }
+  }
 
-    const policies = await loadPolicies(
-      tx,
-      orgId,
-      payment.network,
-      payment.assetAddress,
-    );
-    const usage = await usageFor(
-      tx,
-      orgId,
-      payment.network,
-      payment.assetAddress,
-      policies,
-      now,
-    );
-    alerts.push(...budgetAlerts(orgId, budgetCrossings(policies, usage, now)));
+  const policies = await loadPolicies(
+    tx,
+    orgId,
+    payment.network,
+    payment.assetAddress,
+  );
+  const usage = await usageFor(
+    tx,
+    orgId,
+    payment.network,
+    payment.assetAddress,
+    policies,
+    now,
+  );
+  alerts.push(...budgetAlerts(orgId, budgetCrossings(policies, usage, now)));
 
-    return raiseAlerts(tx, alerts);
-  });
+  return raiseAlerts(tx, alerts);
+};
+
+export type ReconcileOutcome =
+  | "reconciled"
+  | "skipped"
+  | "failed"
+  | "unresolved";
 
 export const reconcileReportedPayment = async (
   payment: ReportedPayment,
   email: EmailClient | null = null,
   now: Date = new Date(),
-): Promise<void> => {
-  if (payment.status === "FAILED") {
-    return;
+): Promise<ReconcileOutcome> => {
+  let raised: [string, AlertRow[]][] | null;
+  try {
+    raised = await runInTransaction(async (tx) => {
+      if ((await claimReconciliation(tx, payment.id)) === "RECONCILED") {
+        return null;
+      }
+      const done: [string, AlertRow[]][] = [];
+      if (payment.status !== "FAILED") {
+        for (const orgId of await ownersOfPayerWallet(
+          tx,
+          payment.payerAddress,
+          payment.network,
+        )) {
+          done.push([orgId, await reconcileForOrg(tx, orgId, payment, now)]);
+        }
+      }
+      await markReconciled(tx, payment.id, now);
+      return done;
+    });
+  } catch (error) {
+    const state = await recordReconcileFailure(payment.id, error, now).catch(
+      () => null,
+    );
+    appLogger.error("Could not reconcile a reported payment", {
+      paymentId: payment.id,
+      state,
+      error,
+    });
+    return state === "UNRESOLVED" ? "unresolved" : "failed";
   }
-  const owners = await ownersOfPayerWallet(
-    payment.payerAddress,
-    payment.network,
-  );
-  for (const orgId of owners) {
-    try {
-      const raised = await reconcileForOrg(orgId, payment, now);
-      void notifyFinance(email, orgId, raised);
-    } catch (error) {
-      appLogger.error("Could not reconcile a reported payment", {
-        orgId,
-        paymentId: payment.id,
-        error,
-      });
-    }
+  if (raised === null) {
+    return "skipped";
   }
+  for (const [orgId, alerts] of raised) {
+    void notifyFinance(email, orgId, alerts);
+  }
+  return "reconciled";
 };

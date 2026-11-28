@@ -3,6 +3,7 @@ import {
   type PaymentNetwork,
   Prisma,
   prisma,
+  type ReconciliationState,
   type SpendAuthorizationStatus,
 } from "@4mica/db";
 import type { ApiKeyContext } from "@auth/api-key";
@@ -562,14 +563,74 @@ export const listAuthorizations = async (
 };
 
 export const ownersOfPayerWallet = async (
+  db: Pick<Db, "wallet">,
   address: string,
   network: PaymentNetwork,
 ): Promise<string[]> => {
-  const rows = await prisma.wallet.findMany({
+  const rows = await db.wallet.findMany({
     where: { address, network, status: "ACTIVE" },
     select: { organizationId: true },
   });
-  return [...new Set(rows.map((row) => row.organizationId))];
+  return [...new Set(rows.map((row) => row.organizationId))].sort();
+};
+
+export const RECONCILE_MAX_ATTEMPTS = 8;
+const RECONCILE_BASE_DELAY_MS = 30_000;
+const RECONCILE_MAX_DELAY_MS = 3_600_000;
+
+export const reconcileDelayMs = (attempts: number): number =>
+  Math.min(RECONCILE_BASE_DELAY_MS * 2 ** attempts, RECONCILE_MAX_DELAY_MS);
+
+export const claimReconciliation = async (
+  db: Pick<Db, "$queryRaw">,
+  paymentId: string,
+): Promise<ReconciliationState | null> =>
+  (
+    await db.$queryRaw<{ state: ReconciliationState }[]>`
+      SELECT reconciliation_state::text AS state
+        FROM payments
+       WHERE id = ${paymentId}
+         FOR UPDATE`
+  )[0]?.state ?? null;
+
+export const markReconciled = (
+  db: Pick<Db, "payment">,
+  paymentId: string,
+  now: Date,
+) =>
+  db.payment.updateMany({
+    where: { id: paymentId },
+    data: {
+      reconciliationState: "RECONCILED",
+      reconciledAt: now,
+      reconcileError: null,
+    },
+  });
+
+export const recordReconcileFailure = async (
+  paymentId: string,
+  error: unknown,
+  now: Date,
+): Promise<ReconciliationState | null> => {
+  const message = (
+    error instanceof Error ? error.message : String(error)
+  ).slice(0, 500);
+  const rows = await prisma.$queryRaw<{ state: ReconciliationState }[]>`
+    UPDATE payments
+       SET reconcile_attempts = reconcile_attempts + 1,
+           reconcile_error = ${message},
+           reconcile_after = ${now}::timestamp
+                           + LEAST(${RECONCILE_BASE_DELAY_MS}::float8 * power(2, reconcile_attempts),
+                                   ${RECONCILE_MAX_DELAY_MS}::float8) * interval '1 millisecond',
+           reconciliation_state = CASE
+             WHEN reconcile_attempts + 1 >= ${RECONCILE_MAX_ATTEMPTS}
+             THEN 'UNRESOLVED'::"ReconciliationState"
+             ELSE 'PENDING'::"ReconciliationState" END,
+           updated_at = ${now}::timestamp
+     WHERE id = ${paymentId}
+       AND reconciliation_state <> 'RECONCILED'
+ RETURNING reconciliation_state::text AS state`;
+  return rows[0]?.state ?? null;
 };
 
 export const hasEnforcingPolicy = async (

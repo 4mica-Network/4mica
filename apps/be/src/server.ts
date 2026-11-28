@@ -17,6 +17,10 @@ import {
   startOnboardingDrip,
   stopOnboardingDrip,
 } from "./jobs/onboarding/index";
+import {
+  startReconciliation,
+  stopReconciliation,
+} from "./jobs/reconciliation/index";
 import { installShutdownHandlers, isAcceptingTraffic } from "./lifecycle/index";
 import { appLogger } from "./logger/index";
 import { genReqId, installHttpHardening } from "./plugins/http-hardening";
@@ -94,6 +98,8 @@ export const initApp = async (
   app.addHook("onClose", stopAuditRetention);
 
   app.addHook("onClose", stopAuditStreams);
+
+  app.addHook("onClose", stopReconciliation);
 
   app.addHook("onClose", closeCoreClient);
 
@@ -273,6 +279,7 @@ export const runServer = async (): Promise<FastifyInstance> => {
   await startOnboardingDrip(app);
   await startAuditRetention();
   await startAuditStreams();
+  await startReconciliation();
 
   return app;
 };

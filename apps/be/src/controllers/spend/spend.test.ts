@@ -1480,6 +1480,56 @@ describe("reconcileReportedPayment", () => {
     expect(h.db.financialAlert.rows).toEqual([]);
   });
 
+  it("marks the payment reconciled in the transaction that settles it", async () => {
+    const [stored] = h.db.payment.seed({
+      ...reported(),
+      reconciliationState: "PENDING",
+    });
+    h.db.spendAuthorization.seed(authRow({ reqId: "0xfeed" }));
+    expect(
+      await reconcileReportedPayment(
+        reported({ id: stored?.id }),
+        email(),
+        NOW,
+      ),
+    ).toBe("reconciled");
+    expect(h.db.payment.rows[0]).toMatchObject({
+      reconciliationState: "RECONCILED",
+      reconciledAt: NOW,
+      reconcileError: null,
+    });
+    expect(String(h.db.$queryRaw.mock.calls[0]?.[0])).toContain("FOR UPDATE");
+  });
+
+  it("skips a payment another worker already reconciled", async () => {
+    h.db.spendAuthorization.seed(authRow({ reqId: "0xfeed" }));
+    h.db.$queryRaw.mockResolvedValueOnce([{ state: "RECONCILED" }] as never);
+    expect(await reconcileReportedPayment(reported(), email(), NOW)).toBe(
+      "skipped",
+    );
+    expect(h.db.spendAuthorization.rows[0]?.status).toBe("RESERVED");
+  });
+
+  it("records a failed attempt for retry instead of only logging it", async () => {
+    h.db.spendAuthorization.seed(authRow({ reqId: "0xfeed" }));
+    const spy = vi
+      .spyOn(h.db.spendAuthorization, "findMany")
+      .mockRejectedValueOnce(new Error("connection reset"));
+    try {
+      expect(await reconcileReportedPayment(reported(), email(), NOW)).toBe(
+        "failed",
+      );
+    } finally {
+      spy.mockRestore();
+    }
+    const failure = h.db.$queryRaw.mock.calls.find(([strings]) =>
+      strings.join("?").includes("UPDATE payments"),
+    );
+    expect(failure).toBeDefined();
+    expect(failure).toContain("connection reset");
+    expect(h.db.spendAuthorization.rows[0]?.status).toBe("RESERVED");
+  });
+
   it("re-evaluates budgets after the payment lands", async () => {
     const [policy] = h.db.spendingPolicy.seed(
       orgPolicy({ dailyLimit: "10", alertThresholds: [100] }),

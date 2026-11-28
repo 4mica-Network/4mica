@@ -566,6 +566,10 @@ export const reportPayment = async (
       if (data.status === "SETTLED") {
         update.settledAt = reportedSettledAt ?? new Date();
       }
+      update.reconciliationState = "PENDING";
+      update.reconcileAttempts = 0;
+      update.reconcileAfter = new Date();
+      update.reconcileError = null;
     }
 
     if (Object.keys(update).length > 0) {

@@ -1111,8 +1111,12 @@ describe("payment routes", () => {
       expect(call[0].data).toMatchObject({
         status: "SETTLED",
         txHash: "0xfeed",
+        reconciliationState: "PENDING",
+        reconcileAttempts: 0,
+        reconcileError: null,
       });
       expect(call[0].data.settledAt).toBeInstanceOf(Date);
+      expect(call[0].data.reconcileAfter).toBeInstanceOf(Date);
 
       await instance.close();
     });

@@ -1086,6 +1086,12 @@ enum PaymentStatus {
   FAILED
 }
 
+enum ReconciliationState {
+  PENDING
+  RECONCILED
+  UNRESOLVED
+}
+
 /**
  * One x402 payment, as reported by the resource server that took it.
  * 4Mica is not in the payment path — the seller's own service calls the
@@ -1135,6 +1141,12 @@ model Payment {
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
 
+  reconciliationState ReconciliationState @default(PENDING) @map("reconciliation_state")
+  reconcileAttempts   Int                 @default(0) @map("reconcile_attempts")
+  reconcileAfter      DateTime            @default(now()) @map("reconcile_after")
+  reconcileError      String?             @map("reconcile_error") @db.VarChar(500)
+  reconciledAt        DateTime?           @map("reconciled_at")
+
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   project      Project?     @relation(fields: [projectId], references: [id], onDelete: SetNull)
   apiKey       ApiKey?      @relation(fields: [apiKeyId], references: [id], onDelete: SetNull)
@@ -1147,6 +1159,7 @@ model Payment {
   @@index([recipientAddress, createdAt(sort: Desc)])
   @@index([projectId, createdAt(sort: Desc)])
   @@index([apiKeyId, createdAt(sort: Desc)])
+  @@index([reconciliationState, reconcileAfter])
   @@map("payments")
 }
 

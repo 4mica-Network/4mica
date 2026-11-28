@@ -441,11 +441,44 @@ interface UnauthorizedRow {
   created_at: Date;
 }
 
+export interface ReconciliationBacklog {
+  pending: number;
+  unresolved: number;
+  oldestPendingAt: string | null;
+  oldestUnresolvedAt: string | null;
+}
+
 export interface Reconciliation {
   matched: number;
   authorizedNotReported: AuthorizationRow[];
   reportedNotAuthorized: UnauthorizedPayment[];
+  backlog: ReconciliationBacklog;
 }
+
+const EMPTY_BACKLOG: ReconciliationBacklog = {
+  pending: 0,
+  unresolved: 0,
+  oldestPendingAt: null,
+  oldestUnresolvedAt: null,
+};
+
+interface BacklogRow {
+  state: string;
+  count: bigint | number;
+  oldest: Date | null;
+}
+
+const toBacklog = (rows: BacklogRow[]): ReconciliationBacklog => {
+  const of = (state: string) => rows.find((row) => row.state === state);
+  const pending = of("PENDING");
+  const unresolved = of("UNRESOLVED");
+  return {
+    pending: Number(pending?.count ?? 0),
+    unresolved: Number(unresolved?.count ?? 0),
+    oldestPendingAt: pending?.oldest?.toISOString() ?? null,
+    oldestUnresolvedAt: unresolved?.oldest?.toISOString() ?? null,
+  };
+};
 
 export const financeReconciliation = async (
   scope: FinanceScope,
@@ -478,6 +511,7 @@ export const financeReconciliation = async (
         toAuthorizationRow(row, now),
       ),
       reportedNotAuthorized: [],
+      backlog: EMPTY_BACKLOG,
     };
   }
 
@@ -486,7 +520,7 @@ export const financeReconciliation = async (
      AND ${sentVisible(scope)}`;
   const match = settledBy(scope.orgId);
 
-  const [authorized, counted, unauthorized] = await Promise.all([
+  const [authorized, counted, unauthorized, backlog] = await Promise.all([
     authorizedNotReported,
     prisma.$queryRaw<{ matched: bigint | number }[]>`
       SELECT COUNT(*) AS matched
@@ -510,6 +544,17 @@ export const financeReconciliation = async (
        ORDER BY p.created_at DESC, p.id DESC
        LIMIT ${RECONCILIATION_LIMIT}
     `,
+    prisma.$queryRaw<BacklogRow[]>`
+      SELECT p.reconciliation_state::text AS state,
+             COUNT(*) AS count,
+             MIN(p.created_at) AS oldest
+        FROM payments p
+       WHERE p.payer_address IN (${Prisma.join(addresses)})
+         AND p.network::text IN (${Prisma.join(networksOf(scope.environment))})
+         AND p.reconciliation_state <> 'RECONCILED'
+         AND ${sentVisible(scope)}
+       GROUP BY 1
+    `,
   ]);
 
   return {
@@ -528,6 +573,7 @@ export const financeReconciliation = async (
       status: row.status,
       createdAt: row.created_at.toISOString(),
     })),
+    backlog: toBacklog(backlog),
   };
 };
 

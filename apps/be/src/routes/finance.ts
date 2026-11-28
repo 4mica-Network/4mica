@@ -135,11 +135,31 @@ const unauthorizedPaymentSchema = {
 
 const reconciliationSchema = {
   type: "object",
-  required: ["matched", "authorizedNotReported", "reportedNotAuthorized"],
+  required: [
+    "matched",
+    "authorizedNotReported",
+    "reportedNotAuthorized",
+    "backlog",
+  ],
   properties: {
     matched: int,
     authorizedNotReported: { type: "array", items: authorizationSchema },
     reportedNotAuthorized: { type: "array", items: unauthorizedPaymentSchema },
+    backlog: {
+      type: "object",
+      required: [
+        "pending",
+        "unresolved",
+        "oldestPendingAt",
+        "oldestUnresolvedAt",
+      ],
+      properties: {
+        pending: int,
+        unresolved: int,
+        oldestPendingAt: { type: ["string", "null"], format: "date-time" },
+        oldestUnresolvedAt: { type: ["string", "null"], format: "date-time" },
+      },
+    },
   },
 } as const;
 
@@ -200,7 +220,7 @@ export const financeRoutes: FastifyPluginCallback = (app, _opts, done) => {
       schema: {
         ...doc(
           "Authorizations and reported payments that do not line up",
-          `\`matched\` counts sent payments reconciliation settled an authorization with: same \`reqId\`, network, asset, payer and recipient, an amount within the authorized one, and not FAILED. \`authorizedNotReported\` lists consumed or lapsed reservations no payment settled; \`reportedNotAuthorized\` lists sent payments that settled no authorization, including ones that only share a \`reqId\` with one. Each list holds at most 500 entries, newest first. ${RANGE_NOTE}`,
+          `\`matched\` counts sent payments reconciliation settled an authorization with: same \`reqId\`, network, asset, payer and recipient, an amount within the authorized one, and not FAILED. \`authorizedNotReported\` lists consumed or lapsed reservations no payment settled; \`reportedNotAuthorized\` lists sent payments that settled no authorization, including ones that only share a \`reqId\` with one. \`backlog\` counts sent payments whose reconciliation has not completed, across all time: \`pending\` ones are retried with backoff, \`unresolved\` ones failed every retry and need attention. Each list holds at most 500 entries, newest first. ${RANGE_NOTE}`,
           { 200: reconciliationSchema },
         ),
         querystring: { type: "object", properties: range },

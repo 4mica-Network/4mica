@@ -278,6 +278,7 @@ export const createSpendDb = () => {
     user,
     organization,
     $executeRaw,
+    $queryRaw,
     tenancy: { membership, auditLog: tenancy.auditLog, project },
     reset: () => {
       for (const table of tables) {
@@ -290,6 +291,7 @@ export const createSpendDb = () => {
       }
       membership.findMany.mockReset();
       $executeRaw.mockClear();
+      $queryRaw.mockClear();
     },
   };
 };
