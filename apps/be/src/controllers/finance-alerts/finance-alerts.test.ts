@@ -13,6 +13,7 @@ import { initApp } from "@/server";
 import type { SpendDb } from "@/test-support/spend-db";
 import {
   actAs,
+  membershipRow,
   ORG_ID,
   OTHER_ORG_ID,
   OTHER_PROJECT_ID,
@@ -390,5 +391,93 @@ describe("alert routes", () => {
     expect(res.json().acknowledgedBy).toEqual({ id: USER_ID, name: "Ada" });
     expect((await ack(foreign?.id)).statusCode).toBe(404);
     expect(h.db.financialAlert.rows[1]?.acknowledgedAt).toBeNull();
+  });
+
+  describe("acknowledging in restricted projects", () => {
+    const ack = (id: unknown) =>
+      app.inject({
+        method: "POST",
+        url: `/me/finance/alerts/${id}/acknowledge`,
+        headers: AUTH,
+      });
+
+    const restricted = (memberRole: "VIEWER" | null = null) => {
+      h.db.tenancy.project.findMany?.mockResolvedValue([
+        { id: PROJECT_ID, restricted: false, members: [] },
+        {
+          id: OTHER_PROJECT_ID,
+          restricted: true,
+          members: memberRole ? [{ role: memberRole }] : [],
+        },
+      ]);
+      const [hidden] = h.db.financialAlert.seed({
+        organizationId: ORG_ID,
+        projectId: OTHER_PROJECT_ID,
+        kind: "POLICY_DENIAL",
+        title: "restricted title",
+        detail: { lines: ["restricted detail"] },
+      });
+      return hidden;
+    };
+
+    const acknowledgedAudits = () =>
+      h.db.tenancy.auditLog.create.mock.calls.filter(
+        ([arg]) =>
+          (arg as { data: { action: string } }).data.action ===
+          "finance_alert.acknowledged",
+      );
+
+    it("404s a finance member outside the project without acknowledging or disclosing", async () => {
+      actAs(h.db.tenancy, "FINANCE");
+      const hidden = restricted();
+
+      const res = await ack(hidden?.id);
+
+      expect(res.statusCode).toBe(404);
+      expect(res.body).not.toContain("restricted");
+      expect(h.db.financialAlert.rows[0]?.acknowledgedAt).toBeNull();
+      expect(h.db.financialAlert.rows[0]?.acknowledgedById ?? null).toBeNull();
+      expect(acknowledgedAudits()).toEqual([]);
+    });
+
+    it("404s a custom role with finance.manage outside the project", async () => {
+      actAs(h.db.tenancy, "FINANCE");
+      h.db.tenancy.membership.findFirst.mockResolvedValue({
+        ...membershipRow("DEVELOPER"),
+        customRole: {
+          id: "019fce62-0000-7000-8000-0000000000c1",
+          permissions: ["finance.read", "finance.manage"],
+          projectRole: "VIEWER",
+          deletedAt: null,
+        },
+      });
+      const hidden = restricted();
+
+      const res = await ack(hidden?.id);
+
+      expect(res.statusCode).toBe(404);
+      expect(h.db.financialAlert.rows[0]?.acknowledgedAt).toBeNull();
+      expect(acknowledgedAudits()).toEqual([]);
+    });
+
+    it("acknowledges for a project member and audits only the first acknowledgement", async () => {
+      actAs(h.db.tenancy, "FINANCE");
+      const visible = restricted("VIEWER");
+
+      const first = await ack(visible?.id);
+      const second = await ack(visible?.id);
+
+      expect(first.statusCode).toBe(200);
+      expect(second.statusCode).toBe(200);
+      expect(h.db.financialAlert.rows[0]?.acknowledgedAt).not.toBeNull();
+      expect(acknowledgedAudits()).toHaveLength(1);
+      expect(acknowledgedAudits()[0]?.[0]).toMatchObject({
+        data: {
+          action: "finance_alert.acknowledged",
+          targetId: visible?.id,
+          projectId: OTHER_PROJECT_ID,
+        },
+      });
+    });
   });
 });

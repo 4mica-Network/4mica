@@ -5,7 +5,11 @@ import {
   prisma,
 } from "@4mica/db";
 import { can, ROLE_PERMISSIONS } from "@auth/permissions";
-import { type ProjectAccess, projectInOrNone } from "@utils/scope";
+import {
+  lockVisibility,
+  type Visibility,
+  visibleWhere,
+} from "@auth/visibility";
 
 type Db = Pick<Prisma.TransactionClient, "financialAlert">;
 
@@ -145,14 +149,12 @@ export interface ListAlertsFilter {
 }
 
 export const listAlerts = async (
-  orgId: string,
+  scope: Visibility,
   filter: ListAlertsFilter,
-  projects: ProjectAccess,
 ) => {
   const rows = await prisma.financialAlert.findMany({
     where: {
-      organizationId: orgId,
-      ...projectInOrNone(projects),
+      ...visibleWhere(scope),
       ...(filter.acknowledged === undefined
         ? {}
         : { acknowledgedAt: filter.acknowledged ? { not: null } : null }),
@@ -172,18 +174,24 @@ export const listAlerts = async (
 };
 
 export const acknowledgeAlert = async (
-  orgId: string,
+  tx: Prisma.TransactionClient,
+  scope: Visibility,
   id: string,
-  userId: string,
-): Promise<AlertRow | null> => {
-  await prisma.financialAlert.updateMany({
-    where: { id, organizationId: orgId, acknowledgedAt: null },
-    data: { acknowledgedAt: new Date(), acknowledgedById: userId },
+): Promise<{ row: AlertRow; acknowledged: boolean } | null> => {
+  const access = await lockVisibility(tx, scope, "finance.manage");
+  if (!access) {
+    return null;
+  }
+  const where = { id, ...visibleWhere(access.visibility) };
+  const { count } = await tx.financialAlert.updateMany({
+    where: { ...where, acknowledgedAt: null },
+    data: { acknowledgedAt: new Date(), acknowledgedById: scope.userId },
   });
-  return prisma.financialAlert.findFirst({
-    where: { id, organizationId: orgId },
+  const row = await tx.financialAlert.findFirst({
+    where,
     select: ALERT_SELECT,
   });
+  return row ? { row, acknowledged: count > 0 } : null;
 };
 
 export const userNames = async (

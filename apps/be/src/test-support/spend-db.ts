@@ -1,7 +1,7 @@
 import { fromUnits, toUnits } from "@utils/units";
 import { vi } from "vitest";
 import { memoryTable } from "./memory-table";
-import { tenancyMocks } from "./tenancy";
+import { tenancyMocks, visibilityRows } from "./tenancy";
 
 type Row = Record<string, unknown>;
 
@@ -179,7 +179,7 @@ export const createSpendDb = () => {
     async (strings: TemplateStringsArray, ...values: unknown[]) =>
       strings.join("?").includes("FROM payments p")
         ? unmatchedPayments(values)
-        : [],
+        : ((await visibilityRows(tenancy, strings, values)) ?? []),
   );
 
   const prisma: Record<string, unknown> = {

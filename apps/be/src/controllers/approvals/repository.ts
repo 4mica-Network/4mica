@@ -7,9 +7,13 @@ import {
   prisma,
 } from "@4mica/db";
 import { can, type RoleSubject } from "@auth/permissions";
+import {
+  lockVisibility,
+  type Visibility,
+  visibleWhere,
+} from "@auth/visibility";
 import { onApprovalResolved } from "@controllers/spend/approval-hook";
 import { payloadHash } from "@utils/canonical";
-import { type ProjectAccess, projectInOrNone } from "@utils/scope";
 import {
   type CreateSellerApprovalInput,
   DEFAULT_APPROVAL_TTL_HOURS,
@@ -115,9 +119,10 @@ const closeAs = async (
   tx: Tx,
   row: { id: string; organizationId: string; kind: ApprovalRow["kind"] },
   status: ApprovalStatus,
+  scope: Prisma.ApprovalRequestWhereInput = {},
 ): Promise<boolean> => {
   const { count } = await tx.approvalRequest.updateMany({
-    where: { id: row.id, status: "PENDING" },
+    where: { ...scope, id: row.id, status: "PENDING" },
     data: { status, decidedAt: new Date() },
   });
   if (count === 0) {
@@ -127,14 +132,12 @@ const closeAs = async (
   return true;
 };
 
-export const expireStaleApprovals = async (
-  orgId: string,
-  id?: string,
+const expireStaleApprovals = async (
+  scope: Prisma.ApprovalRequestWhereInput,
 ): Promise<number> => {
   const stale = await prisma.approvalRequest.findMany({
     where: {
-      organizationId: orgId,
-      ...(id ? { id } : {}),
+      ...scope,
       status: "PENDING",
       expiresAt: { lte: new Date() },
     },
@@ -145,7 +148,7 @@ export const expireStaleApprovals = async (
 
   let expired = 0;
   for (const row of stale) {
-    if (await prisma.$transaction((tx) => closeAs(tx, row, "EXPIRED"))) {
+    if (await prisma.$transaction((tx) => closeAs(tx, row, "EXPIRED", scope))) {
       expired++;
     }
   }
@@ -153,16 +156,14 @@ export const expireStaleApprovals = async (
 };
 
 export const listApprovals = async (
-  orgId: string,
+  scope: Visibility,
   { status, kind, cursor, limit }: ListApprovalsQuery,
-  projects: ProjectAccess,
 ) => {
-  await expireStaleApprovals(orgId);
+  await expireStaleApprovals(visibleWhere(scope));
 
   const rows = await prisma.approvalRequest.findMany({
     where: {
-      organizationId: orgId,
-      ...projectInOrNone(projects),
+      ...visibleWhere(scope),
       ...(status ? { status } : {}),
       ...(kind ? { kind } : {}),
       ...(cursor ? { id: { lt: cursor } } : {}),
@@ -179,16 +180,10 @@ export const listApprovals = async (
   };
 };
 
-export const findApproval = async (
-  orgId: string,
-  id: string,
-  projects: ProjectAccess,
-) => {
-  await expireStaleApprovals(orgId, id);
-  return prisma.approvalRequest.findFirst({
-    where: { id, organizationId: orgId, ...projectInOrNone(projects) },
-    select: APPROVAL_SELECT,
-  });
+export const findApproval = async (scope: Visibility, id: string) => {
+  const where = { id, ...visibleWhere(scope) };
+  await expireStaleApprovals(where);
+  return prisma.approvalRequest.findFirst({ where, select: APPROVAL_SELECT });
 };
 
 export type DecideFailure =
@@ -203,12 +198,31 @@ export type ApprovalChange =
   | { ok: true; row: ApprovalRow; status: ApprovalStatus }
   | { ok: false; reason: DecideFailure };
 
-const lockApproval = async (tx: Tx, orgId: string, id: string) => {
-  await tx.$queryRaw`SELECT id FROM approval_requests WHERE id = ${id} AND organization_id = ${orgId} FOR UPDATE`;
+const lockApproval = async (tx: Tx, scope: Visibility, id: string) => {
+  const locked = await tx.$queryRaw<
+    { id: string }[]
+  >`SELECT id FROM approval_requests WHERE id = ${id} AND organization_id = ${scope.orgId} AND (${scope.projects === null}::boolean OR project_id IS NULL OR project_id = ANY(${scope.projects ?? []}::text[])) FOR UPDATE`;
+  if (locked.length === 0) {
+    return null;
+  }
   return tx.approvalRequest.findFirst({
-    where: { id, organizationId: orgId },
+    where: { id, ...visibleWhere(scope) },
     select: APPROVAL_SELECT,
   });
+};
+
+const lockVisible = async (
+  tx: Tx,
+  scope: Visibility,
+  id: string,
+  permission: "approvals.decide" | "finance.read",
+) => {
+  const access = await lockVisibility(tx, scope, permission);
+  if (!access) {
+    return null;
+  }
+  const row = await lockApproval(tx, access.visibility, id);
+  return row ? { row, viewer: access.viewer } : null;
 };
 
 const reread = (tx: Tx, id: string) =>
@@ -219,16 +233,16 @@ const reread = (tx: Tx, id: string) =>
 
 export const decideApproval = async (
   tx: Tx,
-  orgId: string,
+  scope: Visibility,
   id: string,
-  viewer: Viewer,
   vote: ApprovalVote,
   comment: string | null,
 ): Promise<ApprovalChange> => {
-  const row = await lockApproval(tx, orgId, id);
-  if (!row) {
+  const locked = await lockVisible(tx, scope, id, "approvals.decide");
+  if (!locked) {
     return { ok: false, reason: "not_found" };
   }
+  const { row, viewer } = locked;
   if (isExpired(row)) {
     await closeAs(tx, row, "EXPIRED");
     return { ok: false, reason: "closed" };
@@ -261,14 +275,14 @@ export const decideApproval = async (
 
 export const cancelApproval = async (
   tx: Tx,
-  orgId: string,
+  scope: Visibility,
   id: string,
-  userId: string,
 ): Promise<ApprovalChange> => {
-  const row = await lockApproval(tx, orgId, id);
-  if (!row) {
+  const locked = await lockVisible(tx, scope, id, "finance.read");
+  if (!locked) {
     return { ok: false, reason: "not_found" };
   }
+  const { row } = locked;
   if (isExpired(row)) {
     await closeAs(tx, row, "EXPIRED");
     return { ok: false, reason: "closed" };
@@ -276,7 +290,7 @@ export const cancelApproval = async (
   if (row.status !== "PENDING") {
     return { ok: false, reason: "closed" };
   }
-  if (row.requestedById !== userId) {
+  if (row.requestedById !== scope.userId) {
     return { ok: false, reason: "not_requester" };
   }
 
@@ -359,9 +373,15 @@ export const findSellerApproval = async (
   projectId: string,
   id: string,
 ) => {
-  await expireStaleApprovals(orgId, id);
+  const where = {
+    id,
+    organizationId: orgId,
+    projectId,
+    kind: "SELLER_PAYMENT" as const,
+  };
+  await expireStaleApprovals(where);
   return prisma.approvalRequest.findFirst({
-    where: { id, organizationId: orgId, projectId, kind: "SELLER_PAYMENT" },
+    where,
     select: SELLER_APPROVAL_SELECT,
   });
 };

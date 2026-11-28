@@ -1,4 +1,4 @@
-import type { OrgRole } from "@4mica/db";
+import type { OrgRole, ProjectRole } from "@4mica/db";
 import { clearUserCache } from "@auth/user-store";
 import { approvalRoutes } from "@routes/approvals";
 import { getAddress } from "viem";
@@ -7,11 +7,13 @@ import { initApp } from "@/server";
 import { AUDIT_DOWN, failAuditInTransaction } from "@/test-support/audit";
 import {
   actAs,
+  membershipRow,
   ORG_ID,
   OTHER_PROJECT_ID,
   PRODUCTION_ENV_ID,
   PROJECT_ID,
   SANDBOX_ENV_ID,
+  visibilityRows,
 } from "@/test-support/tenancy";
 
 const { authenticateRequest, getUser, db, onApprovalResolved } = vi.hoisted(
@@ -176,6 +178,25 @@ const resetAll = () => {
 
 const as = (role: OrgRole) => actAs(db, role);
 
+let lockTarget: string | null = null;
+
+const fakeQueryRaw = async (
+  strings: TemplateStringsArray,
+  ...values: unknown[]
+) => {
+  const rows = await visibilityRows(db, strings, values);
+  if (rows) {
+    return rows;
+  }
+  if (strings.join("?").includes("FROM approval_requests")) {
+    const [id, , all, ids] = values as [string, string, boolean, string[]];
+    return all || lockTarget === null || ids.includes(lockTarget)
+      ? [{ id }]
+      : [];
+  }
+  return [];
+};
+
 describe("approval routes", () => {
   beforeEach(() => {
     resetAll();
@@ -190,7 +211,8 @@ describe("approval routes", () => {
         ? (arg as (tx: unknown) => unknown)(db)
         : Promise.all(arg as Promise<unknown>[]),
     );
-    db.$queryRaw.mockResolvedValue([]);
+    lockTarget = null;
+    db.$queryRaw.mockImplementation(fakeQueryRaw);
     db.approvalRequest.findMany.mockResolvedValue([]);
     db.approvalRequest.updateMany.mockResolvedValue({ count: 1 });
     db.apiKey.update.mockResolvedValue({});
@@ -497,7 +519,7 @@ describe("approval routes", () => {
     it("records no decision when the decision cannot be audited", async () => {
       const row = stored({ decisions: [decision(OTHER_ID, "APPROVE")] });
       const tx = failAuditInTransaction(db, {
-        $queryRaw: vi.fn().mockResolvedValue([]),
+        $queryRaw: vi.fn(fakeQueryRaw),
         approvalRequest: {
           findFirst: vi.fn().mockResolvedValue(row),
           updateMany: vi.fn().mockResolvedValue({ count: 1 }),
@@ -570,6 +592,145 @@ describe("approval routes", () => {
       );
       expect(onApprovalResolved.mock.calls[0][1].status).toBe("CANCELLED");
       expect(auditActions()).toEqual(["approval.cancelled"]);
+    });
+  });
+
+  describe("restricted projects", () => {
+    const decide = () =>
+      call("POST", `/me/approvals/${APPROVAL_ID}/decide`, { vote: "APPROVE" });
+    const cancel = () => call("POST", `/me/approvals/${APPROVAL_ID}/cancel`);
+
+    const restricted = (memberRole: ProjectRole | null = null) => {
+      db.project.findMany.mockResolvedValue([
+        { id: PROJECT_ID, restricted: false, members: [] },
+        {
+          id: OTHER_PROJECT_ID,
+          restricted: true,
+          members: memberRole ? [{ role: memberRole }] : [],
+        },
+      ]);
+      lockTarget = OTHER_PROJECT_ID;
+      db.approvalRequest.findFirst.mockResolvedValue(
+        stored({ projectId: OTHER_PROJECT_ID, requiredApprovals: 1 }),
+      );
+    };
+
+    const nothingChanged = () => {
+      expect(db.approvalDecision.create).not.toHaveBeenCalled();
+      expect(db.approvalRequest.updateMany).not.toHaveBeenCalled();
+      expect(db.auditLog.create).not.toHaveBeenCalled();
+      expect(onApprovalResolved).not.toHaveBeenCalled();
+    };
+
+    it("404s a finance member deciding outside their restricted projects, with no side effect", async () => {
+      as("FINANCE");
+      restricted();
+
+      const res = await decide();
+
+      expect(res.statusCode).toBe(404);
+      expect(res.json().error).toBe("not_found");
+      nothingChanged();
+    });
+
+    it("404s a custom role that may decide but is not in the restricted project", async () => {
+      db.membership.findFirst.mockResolvedValue({
+        ...membershipRow("DEVELOPER"),
+        customRole: {
+          id: "019fce62-0000-7000-8000-0000000000c1",
+          permissions: ["finance.read", "approvals.decide"],
+          projectRole: "DEVELOPER",
+          deletedAt: null,
+        },
+      });
+      restricted();
+
+      const res = await decide();
+
+      expect(res.statusCode).toBe(404);
+      nothingChanged();
+    });
+
+    it("lets a member of the restricted project decide", async () => {
+      as("FINANCE");
+      restricted("VIEWER");
+      db.approvalRequest.findUniqueOrThrow.mockResolvedValue(
+        stored({ projectId: OTHER_PROJECT_ID, status: "APPROVED" }),
+      );
+
+      const res = await decide();
+
+      expect(res.statusCode).toBe(200);
+      expect(onApprovalResolved).toHaveBeenCalledOnce();
+    });
+
+    it("404s when the membership is gone by the time the request is locked", async () => {
+      as("FINANCE");
+      db.membership.findFirst
+        .mockReset()
+        .mockResolvedValueOnce(membershipRow("FINANCE"))
+        .mockResolvedValue(null);
+      db.approvalRequest.findFirst.mockResolvedValue(stored());
+
+      const res = await decide();
+
+      expect(res.statusCode).toBe(404);
+      nothingChanged();
+    });
+
+    it("404s when the role lost the permission by the time the request is locked", async () => {
+      as("FINANCE");
+      db.membership.findFirst
+        .mockReset()
+        .mockResolvedValueOnce(membershipRow("FINANCE"))
+        .mockResolvedValue(membershipRow("VIEWER"));
+      db.approvalRequest.findFirst.mockResolvedValue(stored());
+
+      const res = await decide();
+
+      expect(res.statusCode).toBe(404);
+      nothingChanged();
+    });
+
+    it("404s a requester cancelling a request in a project they can no longer see", async () => {
+      as("DEVELOPER");
+      restricted();
+      db.approvalRequest.findFirst.mockResolvedValue(
+        stored({ projectId: OTHER_PROJECT_ID, requestedById: USER_ID }),
+      );
+
+      const res = await cancel();
+
+      expect(res.statusCode).toBe(404);
+      nothingChanged();
+    });
+
+    it("only expires stale requests the caller can see", async () => {
+      as("FINANCE");
+      restricted();
+      db.approvalRequest.findFirst.mockResolvedValue(null);
+      const visible = {
+        AND: [
+          { OR: [{ projectId: null }, { projectId: { in: [PROJECT_ID] } }] },
+        ],
+      };
+
+      expect((await call("GET", "/me/approvals")).statusCode).toBe(200);
+      expect(
+        (await call("GET", `/me/approvals/${APPROVAL_ID}`)).statusCode,
+      ).toBe(404);
+
+      expect(db.approvalRequest.findMany.mock.calls[0][0].where).toMatchObject({
+        organizationId: ORG_ID,
+        ...visible,
+        status: "PENDING",
+      });
+      expect(db.approvalRequest.findMany.mock.calls[2][0].where).toMatchObject({
+        id: APPROVAL_ID,
+        organizationId: ORG_ID,
+        ...visible,
+      });
+      nothingChanged();
     });
   });
 

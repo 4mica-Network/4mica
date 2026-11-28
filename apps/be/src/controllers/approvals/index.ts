@@ -1,7 +1,7 @@
 import { environmentForNetwork } from "@4mica/rules";
 import { requireApiKeyScope } from "@auth/api-key";
-import { accessibleProjectIds } from "@auth/project";
 import { requireRecentAuth } from "@auth/security";
+import { visibilityFor } from "@auth/visibility";
 import {
   invalidBody,
   notFound,
@@ -77,9 +77,8 @@ export const listApprovalsHandler: RouteHandler = async (request, reply) => {
   }
 
   const { items, nextCursor } = await listApprovals(
-    tenant.orgId,
+    await visibilityFor(tenant),
     parsed.data,
-    await accessibleProjectIds(tenant),
   );
   return reply.send({
     items: items.map((row) => toApproval(row, tenant)),
@@ -94,11 +93,7 @@ export const getApprovalHandler: RouteHandler = async (request, reply) => {
   }
 
   const { id } = request.params as { id: string };
-  const row = await findApproval(
-    tenant.orgId,
-    id,
-    await accessibleProjectIds(tenant),
-  );
+  const row = await findApproval(await visibilityFor(tenant), id);
   return row
     ? reply.send(toApproval(row, tenant))
     : notFound(reply, "approval request");
@@ -117,10 +112,11 @@ export const decideApprovalHandler: RouteHandler = async (request, reply) => {
 
   const { id } = request.params as { id: string };
   const { vote, comment } = parsed.data;
+  const scope = await visibilityFor(tenant);
   const result = await withAudit(
     request,
     tenant,
-    (tx) => decideApproval(tx, tenant.orgId, id, tenant, vote, comment),
+    (tx) => decideApproval(tx, scope, id, vote, comment),
     (change) =>
       change.ok
         ? {
@@ -159,10 +155,11 @@ export const cancelApprovalHandler: RouteHandler = async (request, reply) => {
   }
 
   const { id } = request.params as { id: string };
+  const scope = await visibilityFor(tenant);
   const result = await withAudit(
     request,
     tenant,
-    (tx) => cancelApproval(tx, tenant.orgId, id, tenant.userId),
+    (tx) => cancelApproval(tx, scope, id),
     (change) =>
       change.ok
         ? {

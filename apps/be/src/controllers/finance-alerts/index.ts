@@ -1,9 +1,10 @@
-import { accessibleProjectIds } from "@auth/project";
+import { visibilityFor } from "@auth/visibility";
 import {
   invalidBody,
   notFound,
   parseBody,
   requireTenant,
+  withAudit,
 } from "@controllers/shared";
 import type { RouteHandler } from "fastify";
 import {
@@ -47,11 +48,7 @@ export const listAlertsHandler: RouteHandler = async (request, reply) => {
     return invalidBody(reply, parsed.issues);
   }
 
-  const page = await listAlerts(
-    tenant.orgId,
-    parsed.data,
-    await accessibleProjectIds(tenant),
-  );
+  const page = await listAlerts(await visibilityFor(tenant), parsed.data);
   const names = await acknowledgers(page.items);
   return reply.send({
     items: page.items.map((row) => toAlert(row, names)),
@@ -66,10 +63,25 @@ export const acknowledgeAlertHandler: RouteHandler = async (request, reply) => {
   }
 
   const { id } = request.params as { id: string };
-  const row = await acknowledgeAlert(tenant.orgId, id, tenant.userId);
-  if (!row) {
+  const scope = await visibilityFor(tenant);
+  const result = await withAudit(
+    request,
+    tenant,
+    (tx) => acknowledgeAlert(tx, scope, id),
+    (outcome) =>
+      outcome?.acknowledged
+        ? {
+            action: "finance_alert.acknowledged",
+            targetType: "financial_alert",
+            targetId: id,
+            projectId: outcome.row.projectId,
+            metadata: { kind: outcome.row.kind },
+          }
+        : null,
+  );
+  if (!result) {
     return notFound(reply, "alert");
   }
 
-  return reply.send(toAlert(row, await acknowledgers([row])));
+  return reply.send(toAlert(result.row, await acknowledgers([result.row])));
 };

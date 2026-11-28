@@ -125,24 +125,44 @@ export const resolveProject = (
   return pending;
 };
 
+type AccessSubject = Pick<Tenant, "role" | "custom">;
+
+const roleIn = (
+  tenant: AccessSubject,
+  restricted: boolean,
+  projectRole: ProjectRole | null,
+) =>
+  effectiveProjectRole({
+    orgRole: tenant.role,
+    customProjectRole: tenant.custom?.projectRole ?? null,
+    projectRole,
+    restricted,
+  });
+
+export const seesEveryProject = (tenant: AccessSubject): boolean =>
+  roleIn(tenant, true, null) !== null;
+
+export const visibleProjectIds = (
+  tenant: AccessSubject,
+  projects: { id: string; restricted: boolean; role: ProjectRole | null }[],
+): string[] =>
+  projects
+    .filter((project) => roleIn(tenant, project.restricted, project.role))
+    .map((project) => project.id);
+
 export const accessibleProjectIds = async (
   tenant: Pick<Tenant, "orgId" | "userId" | "role" | "custom">,
 ): Promise<string[] | null> => {
-  const customProjectRole = tenant.custom?.projectRole ?? null;
-  const roleIn = (restricted: boolean, projectRole: ProjectRole | null) =>
-    effectiveProjectRole({
-      orgRole: tenant.role,
-      customProjectRole,
-      projectRole,
-      restricted,
-    });
-  if (roleIn(true, null)) {
+  if (seesEveryProject(tenant)) {
     return null;
   }
   const projects = await findProjectsForMember(tenant.orgId, tenant.userId);
-  return projects
-    .filter((project) =>
-      roleIn(project.restricted, project.members[0]?.role ?? null),
-    )
-    .map((project) => project.id);
+  return visibleProjectIds(
+    tenant,
+    projects.map((project) => ({
+      id: project.id,
+      restricted: project.restricted,
+      role: project.members[0]?.role ?? null,
+    })),
+  );
 };

@@ -102,3 +102,104 @@ export const actAs = (
     );
   }
 };
+
+interface LockableTenancy {
+  membership: { findFirst: ReturnType<typeof vi.fn> };
+  project?: { findMany?: ReturnType<typeof vi.fn> };
+}
+
+interface MemberRow {
+  role: OrgRole;
+  suspendedAt?: Date | null;
+  customRole?: {
+    id: string;
+    permissions: string[];
+    projectRole: ProjectRole;
+    deletedAt: Date | null;
+  } | null;
+}
+
+interface ProjectAccessRow {
+  id: string;
+  restricted: boolean;
+  members: { role: ProjectRole }[];
+}
+
+type Lookup<T> = (args: unknown) => Promise<T>;
+
+const memberOf = (
+  mocks: LockableTenancy,
+  orgId: string,
+  userId: string,
+): Promise<MemberRow | null> =>
+  (mocks.membership.findFirst as unknown as Lookup<MemberRow | null>)({
+    where: { userId, organization: { id: orgId, deletedAt: null } },
+  });
+
+const projectsOf = async (
+  mocks: LockableTenancy,
+  orgId: string,
+  userId: string,
+): Promise<ProjectAccessRow[]> =>
+  (await (
+    mocks.project?.findMany as unknown as Lookup<ProjectAccessRow[]> | undefined
+  )?.({
+    where: { organizationId: orgId },
+    select: {
+      id: true,
+      restricted: true,
+      members: { where: { userId }, select: { role: true } },
+    },
+  })) ?? [];
+
+export const visibilityRows = async (
+  mocks: LockableTenancy,
+  strings: TemplateStringsArray,
+  values: unknown[],
+): Promise<unknown[] | null> => {
+  const sql = strings.join("?");
+  if (sql.includes("FROM memberships m")) {
+    const [orgId, userId] = values as [string, string];
+    const row = await memberOf(mocks, orgId, userId);
+    return row
+      ? [
+          {
+            role: row.role,
+            customRoleId: row.customRole?.id ?? null,
+            suspended: Boolean(row.suspendedAt),
+          },
+        ]
+      : [];
+  }
+  if (sql.includes("FROM custom_roles")) {
+    const [id] = values as [string];
+    const last = (await mocks.membership.findFirst.mock.results.at(-1)
+      ?.value) as MemberRow | null;
+    const custom = last?.customRole;
+    return custom && custom.id === id && custom.deletedAt === null
+      ? [
+          {
+            id: custom.id,
+            permissions: custom.permissions,
+            projectRole: custom.projectRole,
+          },
+        ]
+      : [];
+  }
+  if (sql.includes("FROM project_memberships")) {
+    const [userId, orgId] = values as [string, string];
+    return (await projectsOf(mocks, orgId, userId)).flatMap((project) =>
+      project.members[0]
+        ? [{ projectId: project.id, role: project.members[0].role }]
+        : [],
+    );
+  }
+  if (sql.includes("FROM projects")) {
+    const [orgId] = values as [string];
+    return (await projectsOf(mocks, orgId, "")).map(({ id, restricted }) => ({
+      id,
+      restricted,
+    }));
+  }
+  return null;
+};

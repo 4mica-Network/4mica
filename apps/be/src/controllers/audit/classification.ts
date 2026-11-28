@@ -27,6 +27,7 @@ export const MANDATORY_AUDIT_ACTIONS = [
   "domain.removed",
   "domain.updated",
   "domain.verified",
+  "finance_alert.acknowledged",
   "governance.updated",
   "invitation.revoked",
   "member.deprovisioned",
