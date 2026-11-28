@@ -113,6 +113,7 @@ const authorizationSchema = {
     projectId: str,
     agentId: nullStr,
     apiKeyId: nullStr,
+    issuedByKeyId: nullStr,
     createdAt: dateTime,
   },
 } as const;

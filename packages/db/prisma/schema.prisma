@@ -398,6 +398,8 @@ model ServiceAccount {
   createdBy    User?        @relation("ServiceAccountCreator", fields: [createdById], references: [id], onDelete: SetNull)
   apiKeys      ApiKey[]
 
+  spendAuthorizations SpendAuthorization[]
+
   @@index([projectId, createdAt(sort: Desc)])
   @@map("service_accounts")
 }
@@ -448,6 +450,9 @@ model SpendAuthorization {
   projectId         String                   @map("project_id")
   environment       EnvironmentKind
   apiKeyId          String?                  @map("api_key_id")
+  issuedByKeyId     String?                  @map("issued_by_key_id")
+  issuedByKeyPrefix String?                  @map("issued_by_key_prefix") @db.VarChar(32)
+  serviceAccountId  String?                  @map("service_account_id")
   agentId           String?                  @map("agent_id")
   network           PaymentNetwork
   assetAddress      String?                  @map("asset_address") @db.VarChar(42)
@@ -471,6 +476,7 @@ model SpendAuthorization {
   organization    Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   project         Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
   apiKey          ApiKey?          @relation(fields: [apiKeyId], references: [id], onDelete: SetNull)
+  serviceAccount  ServiceAccount?  @relation(fields: [serviceAccountId], references: [id], onDelete: SetNull)
   agent           Agent?           @relation(fields: [agentId], references: [id], onDelete: SetNull)
   policy          SpendingPolicy?  @relation(fields: [policyId], references: [id], onDelete: SetNull)
   approvalRequest ApprovalRequest? @relation(fields: [approvalRequestId], references: [id], onDelete: SetNull)
@@ -478,6 +484,7 @@ model SpendAuthorization {
   @@index([organizationId, network, assetAddress, createdAt])
   @@index([organizationId, reqId])
   @@index([apiKeyId, createdAt])
+  @@index([serviceAccountId, createdAt])
   @@index([agentId, createdAt])
   @@map("spend_authorizations")
 }

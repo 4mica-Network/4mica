@@ -614,7 +614,7 @@ describe("finance routes", () => {
 
     it.each([
       ["agent", "a.agent_id"],
-      ["api_key", "a.api_key_id"],
+      ["api_key", "a.issued_by_key_id"],
       ["recipient", "p.recipient_address"],
     ])("groups sent payments by %s", async (groupBy, column) => {
       await get(`/me/finance/usage?groupBy=${groupBy}&direction=sent`);

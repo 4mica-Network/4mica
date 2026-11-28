@@ -196,7 +196,7 @@ const RECEIVED_KEYS: Record<UsageGroup, () => Prisma.Sql> = {
 const SENT_KEYS: Record<Exclude<UsageGroup, "listing">, () => Prisma.Sql> = {
   project: () => Prisma.sql`a.project_id`,
   agent: () => Prisma.sql`a.agent_id`,
-  api_key: () => Prisma.sql`a.api_key_id`,
+  api_key: () => Prisma.sql`a.issued_by_key_id`,
   recipient: () => Prisma.sql`p.recipient_address`,
 };
 
@@ -323,7 +323,7 @@ export const financeUsage = async (
              COUNT(*) AS count
         FROM payments p
         LEFT JOIN LATERAL (
-          SELECT a.project_id, a.agent_id, a.api_key_id
+          SELECT a.project_id, a.agent_id, a.issued_by_key_id
             FROM spend_authorizations a
            WHERE ${authorizationMatch(scope.orgId)}
            ORDER BY (a.payment_id IS NOT DISTINCT FROM p.id) DESC,
@@ -371,6 +371,7 @@ const AUTHORIZATION_SELECT = {
   projectId: true,
   agentId: true,
   apiKeyId: true,
+  issuedByKeyId: true,
   createdAt: true,
 } satisfies Prisma.SpendAuthorizationSelect;
 

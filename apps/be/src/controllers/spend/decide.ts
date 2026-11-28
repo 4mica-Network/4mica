@@ -135,6 +135,8 @@ export interface AuthorizeInput {
   projectId: string;
   environment: EnvironmentKind;
   apiKeyId: string;
+  apiKeyPrefix: string | null;
+  serviceAccountId: string | null;
   agentId: string | null;
   agentName: string | null;
   network: PaymentNetwork;
@@ -234,6 +236,9 @@ const decideSpend = async (
       projectId: input.projectId,
       environment: input.environment,
       apiKeyId: input.apiKeyId,
+      issuedByKeyId: input.apiKeyId,
+      issuedByKeyPrefix: input.apiKeyPrefix,
+      serviceAccountId: input.serviceAccountId,
       agentId: input.agentId,
       network: input.network,
       assetAddress: input.assetAddress,

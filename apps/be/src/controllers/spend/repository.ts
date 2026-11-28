@@ -303,6 +303,9 @@ export const AUTHORIZATION_SELECT = {
   projectId: true,
   environment: true,
   apiKeyId: true,
+  issuedByKeyId: true,
+  issuedByKeyPrefix: true,
+  serviceAccountId: true,
   agentId: true,
   network: true,
   assetAddress: true,
@@ -331,7 +334,8 @@ export interface AuthorizationOwner {
   orgId: string;
   projectId: string;
   environment: EnvironmentKind;
-  apiKeyIds: string[];
+  keyId: string;
+  serviceAccountId: string | null;
   agentId: string | null;
 }
 
@@ -341,27 +345,18 @@ export const ownedBy = (
   organizationId: owner.orgId,
   projectId: owner.projectId,
   environment: owner.environment,
-  apiKeyId: { in: owner.apiKeyIds },
+  ...(owner.serviceAccountId
+    ? { serviceAccountId: owner.serviceAccountId }
+    : { issuedByKeyId: owner.keyId }),
   ...(owner.agentId ? { agentId: owner.agentId } : {}),
 });
 
-export const authorizationOwner = async (
-  key: ApiKeyContext,
-): Promise<AuthorizationOwner> => ({
+export const authorizationOwner = (key: ApiKeyContext): AuthorizationOwner => ({
   orgId: key.orgId,
   projectId: key.projectId,
   environment: key.environment,
-  apiKeyIds: key.serviceAccountId
-    ? (
-        await prisma.apiKey.findMany({
-          where: {
-            organizationId: key.orgId,
-            serviceAccountId: key.serviceAccountId,
-          },
-          select: { id: true },
-        })
-      ).map((row) => row.id)
-    : [key.id],
+  keyId: key.id,
+  serviceAccountId: key.serviceAccountId,
   agentId: key.agentId,
 });
 
@@ -489,7 +484,7 @@ export const listAuthorizations = async (
         filter.projectId ? { projectId: filter.projectId } : {},
       ],
       ...(filter.agentId ? { agentId: filter.agentId } : {}),
-      ...(filter.apiKeyId ? { apiKeyId: filter.apiKeyId } : {}),
+      ...(filter.apiKeyId ? { issuedByKeyId: filter.apiKeyId } : {}),
       ...(filter.from || filter.to
         ? {
             createdAt: {

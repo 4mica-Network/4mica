@@ -142,6 +142,8 @@ const report = async (size: number) => {
       projectId: project.id,
       environment: "SANDBOX",
       apiKeyId: key.id,
+      apiKeyPrefix: key.prefix,
+      serviceAccountId: null,
       agentId: null,
       agentName: null,
       network: "BASE_SEPOLIA",

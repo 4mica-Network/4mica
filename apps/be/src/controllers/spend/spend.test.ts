@@ -120,7 +120,9 @@ const authRow = (over: Record<string, unknown> = {}) => ({
   amount: "10",
   status: "RESERVED",
   expiresAt: new Date(NOW.getTime() + 600_000),
+  serviceAccountId: null,
   ...over,
+  issuedByKeyId: over.issuedByKeyId ?? over.apiKeyId ?? KEY_ID,
 });
 
 let app: Awaited<ReturnType<typeof initApp>>;
@@ -905,6 +907,7 @@ describe("authorization ownership", () => {
   const SERVICE_ACCOUNT_ID = "019fce62-0000-7000-8000-0000000000aa";
   const ROTATED_KEY_ID = "019fce62-0000-7000-8000-0000000000f2";
   const OTHER_KEY_ID = "019fce62-0000-7000-8000-0000000000f3";
+  const OTHER_SERVICE_ACCOUNT_ID = "019fce62-0000-7000-8000-0000000000ab";
 
   const seedTargets = (over: Record<string, unknown>) => {
     const [approved] = h.db.approvalRequest.seed({
@@ -943,8 +946,13 @@ describe("authorization ownership", () => {
     ["another key of the same project", { apiKeyId: OTHER_KEY_ID }, {}],
     [
       "a key of another service account",
-      { apiKeyId: OTHER_KEY_ID },
+      { apiKeyId: OTHER_KEY_ID, serviceAccountId: OTHER_SERVICE_ACCOUNT_ID },
       { serviceAccountId: SERVICE_ACCOUNT_ID },
+    ],
+    [
+      "a plain key's authorization, from a service account key",
+      {},
+      { id: ROTATED_KEY_ID, serviceAccountId: SERVICE_ACCOUNT_ID },
     ],
     [
       "another agent's authorization",
@@ -965,10 +973,6 @@ describe("authorization ownership", () => {
   for (const [label, rowOver, keyOver] of cases) {
     it(`404s ${label} on read, consume and release without side effects`, async () => {
       h.db.apiKey.findUnique.mockResolvedValue(storedKey(keyOver));
-      h.db.apiKey.findMany.mockResolvedValue([
-        { id: KEY_ID },
-        { id: ROTATED_KEY_ID },
-      ]);
       const targets = seedTargets({ reqId: "0xfeed", ...rowOver });
       const before = structuredClone([
         h.db.spendAuthorization.rows,
@@ -1000,11 +1004,9 @@ describe("authorization ownership", () => {
     h.db.apiKey.findUnique.mockResolvedValue(
       storedKey({ id: ROTATED_KEY_ID, serviceAccountId: SERVICE_ACCOUNT_ID }),
     );
-    h.db.apiKey.findMany.mockResolvedValue([
-      { id: KEY_ID },
-      { id: ROTATED_KEY_ID },
-    ]);
-    const [row] = h.db.spendAuthorization.seed(authRow({ apiKeyId: KEY_ID }));
+    const [row] = h.db.spendAuthorization.seed(
+      authRow({ apiKeyId: KEY_ID, serviceAccountId: SERVICE_ACCOUNT_ID }),
+    );
     expect((await get(`/v1/spend/authorizations/${row?.id}`)).statusCode).toBe(
       200,
     );
@@ -1012,9 +1014,41 @@ describe("authorization ownership", () => {
       (await post(`/v1/spend/authorizations/${row?.id}/consume`, {})).json()
         .status,
     ).toBe("CONSUMED");
-    expect(h.db.apiKey.findMany).toHaveBeenCalledWith({
-      where: { organizationId: ORG_ID, serviceAccountId: SERVICE_ACCOUNT_ID },
-      select: { id: true },
+  });
+
+  it("keeps a service account's authorization usable after the issuing key is deleted", async () => {
+    h.db.apiKey.findUnique.mockResolvedValue(
+      storedKey({ id: ROTATED_KEY_ID, serviceAccountId: SERVICE_ACCOUNT_ID }),
+    );
+    const [row] = h.db.spendAuthorization.seed(
+      authRow({
+        apiKeyId: null,
+        issuedByKeyId: KEY_ID,
+        issuedByKeyPrefix: "4mica_sk_test_ab",
+        serviceAccountId: SERVICE_ACCOUNT_ID,
+      }),
+    );
+    expect((await get(`/v1/spend/authorizations/${row?.id}`)).statusCode).toBe(
+      200,
+    );
+    expect(
+      (await post(`/v1/spend/authorizations/${row?.id}/release`)).json().status,
+    ).toBe("RELEASED");
+  });
+
+  it("records who asked, stably, when authorizing", async () => {
+    h.db.apiKey.findUnique.mockResolvedValue(
+      storedKey({
+        prefix: "4mica_sk_test_ab",
+        serviceAccountId: SERVICE_ACCOUNT_ID,
+      }),
+    );
+    expect((await post("/v1/spend/authorize", body())).statusCode).toBe(200);
+    expect(h.db.spendAuthorization.rows[0]).toMatchObject({
+      apiKeyId: KEY_ID,
+      issuedByKeyId: KEY_ID,
+      issuedByKeyPrefix: "4mica_sk_test_ab",
+      serviceAccountId: SERVICE_ACCOUNT_ID,
     });
   });
 
@@ -1368,6 +1402,25 @@ describe("GET /me/spend/authorizations", () => {
       }),
     );
     findMany.mockRestore();
+  });
+
+  it("finds a deleted key's authorizations by the key that issued them", async () => {
+    actAs(h.db.tenancy, "FINANCE");
+    projects();
+    h.db.spendAuthorization.seed(
+      authRow({ apiKeyId: null, issuedByKeyId: KEY_ID }),
+      authRow({
+        apiKeyId: null,
+        issuedByKeyId: "019fce62-0000-7000-8000-0000000000f3",
+      }),
+    );
+
+    const page = await listed(`?apiKeyId=${KEY_ID}`);
+    expect(page.items).toHaveLength(1);
+    expect(page.items[0]).toMatchObject({
+      apiKeyId: null,
+      issuedByKeyId: KEY_ID,
+    });
   });
 
   it("shows a restricted project to its members, with and without a project filter", async () => {

@@ -43,6 +43,10 @@ An authorization carries three amounts:
 
 Rows created before migration `20261202121000_preserve_spend_authorized_amount` were backfilled without inventing history: `authorizedAmount` is the stored `amount` only where reconciliation never cut it (no linked payment, not consumed, or a linked payment whose amount differs from it), otherwise the amount recorded in the payment's approval request, otherwise null. `settledAmount` is backfilled only where the linked payment's amount equals the stored amount.
 
+## Who asked
+
+An authorization records, when it is created, the key that asked for it (`issuedByKeyId`, a plain id with no foreign key, and `issuedByKeyPrefix`) and the key's service account (`serviceAccountId`). `apiKeyId` still points at the live key and becomes null when that key is deleted; the issuer fields do not. Only the issuer can read, consume or release an authorization: any key of the same service account (so rotation and deleting the old key do not strand a reservation), otherwise the issuing key itself, and in both cases only from the same project, environment and, for agent keys, agent. Migration `20261202122000_record_spend_authorization_issuer` backfilled the issuer from the key where it still existed, otherwise from the approval request or the audit trail; rows with no surviving evidence keep a null issuer.
+
 ## Payment identity and `reqId` uniqueness
 
 A payment is identified by its organization, network, asset (or the native currency) and `reqId`. At most one authorization per identity may be RESERVED, PENDING_APPROVAL or CONSUMED; DENIED, RELEASED and EXPIRED ones give the `reqId` back, so a payer may retry under the same `reqId` after a release. The rule is a partial unique index on `spend_authorizations` (`spend_authorizations_live_req_id_key`), and authorizing and consuming both take the same per-organization, network and asset advisory lock before checking it, so a lost race is answered with 409 `req_id_in_use` rather than a database error. The same `reqId` on another network or asset is a different payment.

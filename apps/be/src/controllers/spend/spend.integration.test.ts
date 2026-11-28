@@ -105,6 +105,8 @@ describe.skipIf(!url)("spend authorization on real Postgres", () => {
           projectId,
           environment: "SANDBOX",
           apiKeyId: principal.apiKeyId,
+          apiKeyPrefix: "4mica_sk_test",
+          serviceAccountId: null,
           agentId: principal.agentId,
           agentName: null,
           network: "BASE_SEPOLIA",
