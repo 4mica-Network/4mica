@@ -98,7 +98,12 @@ export const createSpendDb = () => {
 
   const tenancy = tenancyMocks();
   const membership = { ...tenancy.membership, findMany: vi.fn() };
-  const apiKey = { findUnique: vi.fn(), update: vi.fn(), findFirst: vi.fn() };
+  const apiKey = {
+    findUnique: vi.fn(),
+    update: vi.fn(),
+    findFirst: vi.fn(),
+    findMany: vi.fn(),
+  };
   const user = {
     findUnique: vi.fn(),
     upsert: vi.fn(),

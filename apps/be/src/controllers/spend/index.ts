@@ -22,6 +22,7 @@ import {
 } from "./decide";
 import {
   type AuthorizationRow,
+  authorizationOwner,
   findAgentInScope,
   findPayerWallet,
   listAuthorizations,
@@ -173,7 +174,10 @@ export const getAuthorizationHandler: RouteHandler = async (request, reply) => {
     return reply;
   }
 
-  const row = await refreshAuthorization(key.orgId, idOf(request.params));
+  const row = await refreshAuthorization(
+    await authorizationOwner(key),
+    idOf(request.params),
+  );
   return row
     ? reply.send(toAuthorization(row))
     : notFound(reply, "spend authorization");
@@ -196,7 +200,7 @@ export const consumeAuthorizationHandler: RouteHandler = async (
   return replyTransition(
     reply,
     await consumeAuthorization(
-      key.orgId,
+      await authorizationOwner(key),
       idOf(request.params),
       parsed.data.reqId,
     ),
@@ -214,7 +218,10 @@ export const releaseAuthorizationHandler: RouteHandler = async (
 
   return replyTransition(
     reply,
-    await releaseAuthorization(key.orgId, idOf(request.params)),
+    await releaseAuthorization(
+      await authorizationOwner(key),
+      idOf(request.params),
+    ),
   );
 };
 

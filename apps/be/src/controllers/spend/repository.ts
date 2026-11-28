@@ -1,9 +1,11 @@
 import {
+  type EnvironmentKind,
   type PaymentNetwork,
   type Prisma,
   prisma,
   type SpendAuthorizationStatus,
 } from "@4mica/db";
+import type { ApiKeyContext } from "@auth/api-key";
 import { optionalAmountText } from "@utils/amount";
 import { toUnits } from "@utils/units";
 import type {
@@ -264,13 +266,51 @@ export type AuthorizationRow = Prisma.SpendAuthorizationGetPayload<{
   select: typeof AUTHORIZATION_SELECT;
 }>;
 
+export interface AuthorizationOwner {
+  orgId: string;
+  projectId: string;
+  environment: EnvironmentKind;
+  apiKeyIds: string[];
+  agentId: string | null;
+}
+
+export const ownedBy = (
+  owner: AuthorizationOwner,
+): Prisma.SpendAuthorizationWhereInput => ({
+  organizationId: owner.orgId,
+  projectId: owner.projectId,
+  environment: owner.environment,
+  apiKeyId: { in: owner.apiKeyIds },
+  ...(owner.agentId ? { agentId: owner.agentId } : {}),
+});
+
+export const authorizationOwner = async (
+  key: ApiKeyContext,
+): Promise<AuthorizationOwner> => ({
+  orgId: key.orgId,
+  projectId: key.projectId,
+  environment: key.environment,
+  apiKeyIds: key.serviceAccountId
+    ? (
+        await prisma.apiKey.findMany({
+          where: {
+            organizationId: key.orgId,
+            serviceAccountId: key.serviceAccountId,
+          },
+          select: { id: true },
+        })
+      ).map((row) => row.id)
+    : [key.id],
+  agentId: key.agentId,
+});
+
 export const findAuthorization = (
   db: Pick<Db, "spendAuthorization">,
-  orgId: string,
   id: string,
+  scope: Prisma.SpendAuthorizationWhereInput,
 ) =>
   db.spendAuthorization.findFirst({
-    where: { id, organizationId: orgId },
+    where: { ...scope, id },
     select: AUTHORIZATION_SELECT,
   });
 
@@ -292,9 +332,10 @@ export const expireReservation = (
   db: Pick<Db, "spendAuthorization">,
   id: string,
   now: Date,
+  scope: Prisma.SpendAuthorizationWhereInput,
 ) =>
   db.spendAuthorization.updateMany({
-    where: { id, status: "RESERVED", expiresAt: { lte: now } },
+    where: { ...scope, id, status: "RESERVED", expiresAt: { lte: now } },
     data: { status: "EXPIRED" },
   });
 
@@ -303,10 +344,10 @@ export const transitionAuthorization = (
   id: string,
   from: SpendAuthorizationStatus[],
   data: Prisma.SpendAuthorizationUncheckedUpdateManyInput,
-  extra: Prisma.SpendAuthorizationWhereInput = {},
+  scope: Prisma.SpendAuthorizationWhereInput,
 ) =>
   db.spendAuthorization.updateMany({
-    where: { id, status: { in: from }, ...extra },
+    where: { ...scope, id, status: { in: from } },
     data,
   });
 

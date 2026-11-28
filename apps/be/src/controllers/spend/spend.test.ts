@@ -714,10 +714,160 @@ describe("consume and release", () => {
         .status,
     ).toBe("RELEASED");
     expect(h.db.approvalRequest.rows[0]?.status).toBe("CANCELLED");
+    const again = await post(
+      `/v1/spend/authorizations/${reserved?.id}/release`,
+    );
+    expect(again.statusCode).toBe(200);
+    expect(again.json().status).toBe("RELEASED");
+  });
+
+  it("answers a repeated consume with the same reqId idempotently and refuses a different one", async () => {
+    const [row] = h.db.spendAuthorization.seed(authRow({ reqId: "0xfeed" }));
+    const first = await post(`/v1/spend/authorizations/${row?.id}/consume`, {
+      reqId: "0xfeed",
+    });
+    expect(first.statusCode).toBe(200);
+    const consumedAt = h.db.spendAuthorization.rows[0]?.consumedAt;
+
+    vi.setSystemTime(new Date(NOW.getTime() + 60_000));
+    const again = await post(`/v1/spend/authorizations/${row?.id}/consume`, {
+      reqId: "0xFEED",
+    });
+    expect(again.statusCode).toBe(200);
+    expect(again.json().status).toBe("CONSUMED");
+    expect(h.db.spendAuthorization.rows[0]?.consumedAt).toEqual(consumedAt);
+
+    const other = await post(`/v1/spend/authorizations/${row?.id}/consume`, {
+      reqId: "0xbeef",
+    });
+    expect(other.statusCode).toBe(409);
+    expect(other.json().error).toBe("invalid_transition");
+  });
+});
+
+describe("authorization ownership", () => {
+  const SERVICE_ACCOUNT_ID = "019fce62-0000-7000-8000-0000000000aa";
+  const ROTATED_KEY_ID = "019fce62-0000-7000-8000-0000000000f2";
+  const OTHER_KEY_ID = "019fce62-0000-7000-8000-0000000000f3";
+
+  const seedTargets = (over: Record<string, unknown>) => {
+    const [approved] = h.db.approvalRequest.seed({
+      status: "APPROVED",
+      expiresAt: new Date(NOW.getTime() + 3_600_000),
+    });
+    const [lapsed] = h.db.approvalRequest.seed({
+      expiresAt: new Date(NOW.getTime() - 1),
+    });
+    return h.db.spendAuthorization.seed(
+      authRow(over),
+      authRow({ ...over, expiresAt: new Date(NOW.getTime() - 1) }),
+      authRow({
+        ...over,
+        status: "PENDING_APPROVAL",
+        approvalRequestId: approved?.id,
+      }),
+      authRow({
+        ...over,
+        status: "PENDING_APPROVAL",
+        approvalRequestId: lapsed?.id,
+      }),
+    );
+  };
+
+  const writes = () => [
+    vi.spyOn(h.db.spendAuthorization, "updateMany"),
+    vi.spyOn(h.db.spendAuthorization, "update"),
+    vi.spyOn(h.db.approvalRequest, "updateMany"),
+    vi.spyOn(h.db.approvalRequest, "update"),
+  ];
+
+  const cases: [string, Record<string, unknown>, Record<string, unknown>][] = [
+    ["another project of the same org", { projectId: OTHER_PROJECT_ID }, {}],
+    ["the other environment", { environment: "PRODUCTION" }, {}],
+    ["another key of the same project", { apiKeyId: OTHER_KEY_ID }, {}],
+    [
+      "a key of another service account",
+      { apiKeyId: OTHER_KEY_ID },
+      { serviceAccountId: SERVICE_ACCOUNT_ID },
+    ],
+    [
+      "another agent's authorization",
+      { agentId: OTHER_AGENT_ID },
+      { agentId: AGENT_ID },
+    ],
+    [
+      "an attacker who only knows the id",
+      {},
+      {
+        id: OTHER_KEY_ID,
+        organizationId: OTHER_ORG_ID,
+        projectId: OTHER_PROJECT_ID,
+      },
+    ],
+  ];
+
+  for (const [label, rowOver, keyOver] of cases) {
+    it(`404s ${label} on read, consume and release without side effects`, async () => {
+      h.db.apiKey.findUnique.mockResolvedValue(storedKey(keyOver));
+      h.db.apiKey.findMany.mockResolvedValue([
+        { id: KEY_ID },
+        { id: ROTATED_KEY_ID },
+      ]);
+      const targets = seedTargets({ reqId: "0xfeed", ...rowOver });
+      const before = structuredClone([
+        h.db.spendAuthorization.rows,
+        h.db.approvalRequest.rows,
+      ]);
+      const spies = writes();
+
+      for (const target of targets) {
+        const url = `/v1/spend/authorizations/${target.id}`;
+        expect((await get(url)).statusCode, label).toBe(404);
+        expect(
+          (await post(`${url}/consume`, { reqId: "0xfeed" })).statusCode,
+          label,
+        ).toBe(404);
+        expect((await post(`${url}/release`)).statusCode, label).toBe(404);
+      }
+
+      for (const spy of spies) {
+        expect(spy, label).not.toHaveBeenCalled();
+        spy.mockRestore();
+      }
+      expect([h.db.spendAuthorization.rows, h.db.approvalRequest.rows]).toEqual(
+        before,
+      );
+    });
+  }
+
+  it("lets any key of the owning service account use an authorization after rotation", async () => {
+    h.db.apiKey.findUnique.mockResolvedValue(
+      storedKey({ id: ROTATED_KEY_ID, serviceAccountId: SERVICE_ACCOUNT_ID }),
+    );
+    h.db.apiKey.findMany.mockResolvedValue([
+      { id: KEY_ID },
+      { id: ROTATED_KEY_ID },
+    ]);
+    const [row] = h.db.spendAuthorization.seed(authRow({ apiKeyId: KEY_ID }));
+    expect((await get(`/v1/spend/authorizations/${row?.id}`)).statusCode).toBe(
+      200,
+    );
     expect(
-      (await post(`/v1/spend/authorizations/${reserved?.id}/release`))
-        .statusCode,
-    ).toBe(409);
+      (await post(`/v1/spend/authorizations/${row?.id}/consume`, {})).json()
+        .status,
+    ).toBe("CONSUMED");
+    expect(h.db.apiKey.findMany).toHaveBeenCalledWith({
+      where: { organizationId: ORG_ID, serviceAccountId: SERVICE_ACCOUNT_ID },
+      select: { id: true },
+    });
+  });
+
+  it("lets an agent key use its own agent's authorization", async () => {
+    h.db.apiKey.findUnique.mockResolvedValue(storedKey({ agentId: AGENT_ID }));
+    const [row] = h.db.spendAuthorization.seed(authRow({ agentId: AGENT_ID }));
+    expect(
+      (await post(`/v1/spend/authorizations/${row?.id}/release`)).json().status,
+    ).toBe("RELEASED");
   });
 });
 

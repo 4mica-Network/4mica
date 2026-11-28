@@ -28,6 +28,7 @@ import {
 } from "./engine";
 import {
   AUTHORIZATION_SELECT,
+  type AuthorizationOwner,
   type AuthorizationRow,
   approvalTtlHours,
   cancelPendingApproval,
@@ -39,6 +40,7 @@ import {
   loadPolicies,
   loadUsage,
   lockSpend,
+  ownedBy,
   ownersOfPayerWallet,
   reqIdInUse,
   runInTransaction,
@@ -370,7 +372,9 @@ export const authorizeSpend = async (
     }
 
     const raised = await raiseAlerts(tx, alerts);
-    const row = await findAuthorization(tx, input.orgId, id);
+    const row = await findAuthorization(tx, id, {
+      organizationId: input.orgId,
+    });
     if (!row) {
       throw new Error("Spend authorization vanished inside its transaction");
     }
@@ -392,13 +396,16 @@ export const resolvePendingAuthorization = async (
   row: AuthorizationRow,
   status: ApprovalStatus,
   now: Date = new Date(),
+  scope: Prisma.SpendAuthorizationWhereInput = {
+    organizationId: row.organizationId,
+  },
 ): Promise<void> => {
   if (row.status !== "PENDING_APPROVAL" || status === "PENDING") {
     return;
   }
 
   const move = (data: Prisma.SpendAuthorizationUncheckedUpdateManyInput) =>
-    transitionAuthorization(tx, row.id, ["PENDING_APPROVAL"], data);
+    transitionAuthorization(tx, row.id, ["PENDING_APPROVAL"], data, scope);
 
   if (status === "CANCELLED") {
     await move({ status: "RELEASED" });
@@ -473,19 +480,20 @@ export const resolvePendingAuthorization = async (
 };
 
 export const refreshAuthorization = async (
-  orgId: string,
+  owner: AuthorizationOwner,
   id: string,
   now: Date = new Date(),
 ): Promise<AuthorizationRow | null> =>
   runInTransaction(async (tx) => {
-    const row = await findAuthorization(tx, orgId, id);
+    const scope = ownedBy(owner);
+    const row = await findAuthorization(tx, id, scope);
     if (!row) {
       return null;
     }
 
     if (row.status === "RESERVED" && row.expiresAt <= now) {
-      await expireReservation(tx, row.id, now);
-      return findAuthorization(tx, orgId, id);
+      await expireReservation(tx, row.id, now, scope);
+      return findAuthorization(tx, id, scope);
     }
 
     if (row.status !== "PENDING_APPROVAL") {
@@ -495,8 +503,8 @@ export const refreshAuthorization = async (
     const approval = row.approvalRequest;
     if (!approval) {
       if (row.expiresAt <= now) {
-        await resolvePendingAuthorization(tx, row, "EXPIRED", now);
-        return findAuthorization(tx, orgId, id);
+        await resolvePendingAuthorization(tx, row, "EXPIRED", now, scope);
+        return findAuthorization(tx, id, scope);
       }
       return row;
     }
@@ -510,8 +518,8 @@ export const refreshAuthorization = async (
       return row;
     }
 
-    await resolvePendingAuthorization(tx, row, status, now);
-    return findAuthorization(tx, orgId, id);
+    await resolvePendingAuthorization(tx, row, status, now, scope);
+    return findAuthorization(tx, id, scope);
   });
 
 export type TransitionOutcome =
@@ -521,15 +529,26 @@ export type TransitionOutcome =
   | { kind: "req_id_mismatch" }
   | { kind: "req_id_in_use" };
 
+const alreadyConsumed = (
+  row: AuthorizationRow,
+  reqId: string | null,
+): TransitionOutcome =>
+  reqId !== null && row.reqId === reqId
+    ? { kind: "ok", row }
+    : { kind: "conflict", row };
+
 export const consumeAuthorization = async (
-  orgId: string,
+  owner: AuthorizationOwner,
   id: string,
   reqId: string | null,
   now: Date = new Date(),
 ): Promise<TransitionOutcome> => {
-  const current = await refreshAuthorization(orgId, id, now);
+  const current = await refreshAuthorization(owner, id, now);
   if (!current) {
     return { kind: "not_found" };
+  }
+  if (current.status === "CONSUMED") {
+    return alreadyConsumed(current, reqId);
   }
   if (current.status !== "RESERVED") {
     return { kind: "conflict", row: current };
@@ -538,9 +557,10 @@ export const consumeAuthorization = async (
     return { kind: "req_id_mismatch" };
   }
 
-  return runInTransaction(async (tx) => {
-    if (reqId && !current.reqId && (await reqIdInUse(tx, orgId, reqId))) {
-      return { kind: "req_id_in_use" as const };
+  const scope = ownedBy(owner);
+  return runInTransaction(async (tx): Promise<TransitionOutcome> => {
+    if (reqId && !current.reqId && (await reqIdInUse(tx, owner.orgId, reqId))) {
+      return { kind: "req_id_in_use" };
     }
     const finalReqId = reqId ?? current.reqId;
     const payment = finalReqId
@@ -556,49 +576,56 @@ export const consumeAuthorization = async (
         reqId: finalReqId,
         ...(payment ? { paymentId: payment.id } : {}),
       },
-      { organizationId: orgId, expiresAt: { gt: now } },
+      { ...scope, expiresAt: { gt: now } },
     );
-    const row = await findAuthorization(tx, orgId, id);
+    const row = await findAuthorization(tx, id, scope);
     if (!row) {
-      return { kind: "not_found" as const };
+      return { kind: "not_found" };
     }
-    return count > 0
-      ? { kind: "ok" as const, row }
-      : { kind: "conflict" as const, row };
+    if (count > 0) {
+      return { kind: "ok", row };
+    }
+    return row.status === "CONSUMED"
+      ? alreadyConsumed(row, reqId)
+      : { kind: "conflict", row };
   });
 };
 
 export const releaseAuthorization = async (
-  orgId: string,
+  owner: AuthorizationOwner,
   id: string,
   now: Date = new Date(),
 ): Promise<TransitionOutcome> => {
-  const current = await refreshAuthorization(orgId, id, now);
+  const current = await refreshAuthorization(owner, id, now);
   if (!current) {
     return { kind: "not_found" };
+  }
+  if (current.status === "RELEASED") {
+    return { kind: "ok", row: current };
   }
   if (current.status !== "RESERVED" && current.status !== "PENDING_APPROVAL") {
     return { kind: "conflict", row: current };
   }
 
-  return runInTransaction(async (tx) => {
+  const scope = ownedBy(owner);
+  return runInTransaction(async (tx): Promise<TransitionOutcome> => {
     const { count } = await transitionAuthorization(
       tx,
       id,
       ["RESERVED", "PENDING_APPROVAL"],
       { status: "RELEASED" },
-      { organizationId: orgId },
+      scope,
     );
     if (count > 0 && current.approvalRequestId) {
       await cancelPendingApproval(tx, current.approvalRequestId);
     }
-    const row = await findAuthorization(tx, orgId, id);
+    const row = await findAuthorization(tx, id, scope);
     if (!row) {
-      return { kind: "not_found" as const };
+      return { kind: "not_found" };
     }
-    return count > 0
-      ? { kind: "ok" as const, row }
-      : { kind: "conflict" as const, row };
+    return count > 0 || row.status === "RELEASED"
+      ? { kind: "ok", row }
+      : { kind: "conflict", row };
   });
 };
 
