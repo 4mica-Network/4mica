@@ -1,11 +1,13 @@
 import { createHmac, randomUUID } from "node:crypto";
 import {
+  OutboundAbortedError,
   OutboundTimeoutError,
   postToPublicUrl,
   UnsafeDestinationError,
 } from "@utils/safe-outbound";
 
 export const DELIVERY_TIMEOUT_MS = 10_000;
+export const MAX_IN_FLIGHT_PER_ORGANIZATION = 2;
 export const SIGNATURE_HEADER = "x-4mica-signature";
 export const DELIVERY_HEADER = "x-4mica-delivery";
 
@@ -63,13 +65,33 @@ export interface DeliveryResult {
   statusCode: number | null;
   error: string | null;
   deliveryId: string;
+  deferred?: boolean;
 }
+
+const inFlight = new Map<string, number>();
+
+const acquireSlot = (organizationId: string): (() => void) | null => {
+  const count = inFlight.get(organizationId) ?? 0;
+  if (count >= MAX_IN_FLIGHT_PER_ORGANIZATION) {
+    return null;
+  }
+  inFlight.set(organizationId, count + 1);
+  return () => {
+    const remaining = (inFlight.get(organizationId) ?? 1) - 1;
+    if (remaining > 0) {
+      inFlight.set(organizationId, remaining);
+    } else {
+      inFlight.delete(organizationId);
+    }
+  };
+};
 
 export const deliver = async (
   target: DeliveryTarget,
   secret: string,
   events: ReturnType<typeof toAuditEvent>[],
   now: () => Date = () => new Date(),
+  signal?: AbortSignal,
 ): Promise<DeliveryResult> => {
   const deliveryId = randomUUID();
   const fail = (error: string, statusCode: number | null = null) => ({
@@ -85,9 +107,20 @@ export const deliver = async (
   });
   const timestamp = Math.floor(now().getTime() / 1000);
 
+  const release = acquireSlot(target.organizationId);
+  if (!release) {
+    return {
+      ...fail(
+        "Another delivery for this organization is in progress; try again shortly.",
+      ),
+      deferred: true,
+    };
+  }
+
   try {
     const { status } = await postToPublicUrl(target.url, {
       timeoutMs: DELIVERY_TIMEOUT_MS,
+      signal,
       headers: {
         "content-type": "application/json",
         "user-agent": "4mica-audit-stream/1",
@@ -111,10 +144,20 @@ export const deliver = async (
     if (error instanceof UnsafeDestinationError) {
       return fail(error.message);
     }
+    if (error instanceof OutboundAbortedError) {
+      return { ...fail(error.message), deferred: true };
+    }
+    if (error instanceof OutboundTimeoutError) {
+      return fail(
+        error.phase === "dns"
+          ? `The endpoint's DNS did not resolve within ${DELIVERY_TIMEOUT_MS / 1000}s.`
+          : `The endpoint did not answer within ${DELIVERY_TIMEOUT_MS / 1000}s.`,
+      );
+    }
     return fail(
-      error instanceof OutboundTimeoutError
-        ? `The endpoint did not answer within ${DELIVERY_TIMEOUT_MS / 1000}s.`
-        : `The endpoint could not be reached: ${error instanceof Error ? error.message : String(error)}`,
+      `The endpoint could not be reached: ${error instanceof Error ? error.message : String(error)}`,
     );
+  } finally {
+    release();
   }
 };

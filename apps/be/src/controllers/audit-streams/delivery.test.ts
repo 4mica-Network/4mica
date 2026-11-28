@@ -1,7 +1,13 @@
 import { createHmac } from "node:crypto";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { connectAddress } from "@/test-support/https-request";
-import { deliver, signature, streamSecret, toAuditEvent } from "./delivery";
+import {
+  deliver,
+  MAX_IN_FLIGHT_PER_ORGANIZATION,
+  signature,
+  streamSecret,
+  toAuditEvent,
+} from "./delivery";
 
 const { lookup } = vi.hoisted(() => ({ lookup: vi.fn() }));
 const https = await vi.hoisted(async () =>
@@ -185,5 +191,65 @@ describe("audit stream delivery", () => {
       ok: false,
       statusCode: null,
     });
+  });
+
+  it("caps concurrent deliveries per organization and defers the rest", async () => {
+    https.state.status = null;
+    const stalled = Array.from({ length: MAX_IN_FLIGHT_PER_ORGANIZATION }, () =>
+      deliver(STREAM, "s", [event]),
+    );
+    await vi.waitFor(() =>
+      expect(https.request).toHaveBeenCalledTimes(
+        MAX_IN_FLIGHT_PER_ORGANIZATION,
+      ),
+    );
+
+    expect(await deliver(STREAM, "s", [event])).toMatchObject({
+      ok: false,
+      deferred: true,
+    });
+    expect(https.request).toHaveBeenCalledTimes(MAX_IN_FLIGHT_PER_ORGANIZATION);
+
+    https.state.status = 204;
+    expect(
+      await deliver(
+        { ...STREAM, organizationId: "019fce62-0000-7000-8000-0000000000b2" },
+        "s",
+        [event],
+      ),
+    ).toMatchObject({ ok: true });
+
+    const caller = new AbortController();
+    caller.abort();
+    expect(
+      await deliver(STREAM, "s", [event], () => NOW, caller.signal),
+    ).toMatchObject({ ok: false, deferred: true });
+
+    for (const { value } of https.request.mock.results.slice(
+      0,
+      MAX_IN_FLIGHT_PER_ORGANIZATION,
+    )) {
+      value.destroy(new Error("ECONNRESET"));
+    }
+    await Promise.all(stalled);
+
+    expect(await deliver(STREAM, "s", [event])).toMatchObject({ ok: true });
+  });
+
+  it("names DNS when the deadline expires during resolution", async () => {
+    vi.useFakeTimers();
+    try {
+      lookup.mockImplementation(() => new Promise(() => undefined));
+      const pending = deliver(STREAM, "s", [event]);
+      await vi.advanceTimersByTimeAsync(10_000);
+
+      expect(await pending).toMatchObject({
+        ok: false,
+        error: "The endpoint's DNS did not resolve within 10s.",
+      });
+      expect(https.request).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

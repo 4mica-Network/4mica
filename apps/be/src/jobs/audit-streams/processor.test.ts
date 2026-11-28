@@ -171,6 +171,29 @@ describe("audit stream delivery job", () => {
     expect(summary.failed).toBe(1);
   });
 
+  it("leaves a deferred delivery for the next run without counting a failure", async () => {
+    send.mockResolvedValue({
+      ok: false,
+      statusCode: null,
+      error: "Another delivery for this organization is in progress.",
+      deliveryId: "d",
+      deferred: true,
+    });
+    const signal = new AbortController().signal;
+
+    const summary = await runAuditStreams({
+      logger,
+      signingKey: KEY,
+      now: () => NOW,
+      send,
+      signal,
+    });
+
+    expect(send.mock.calls[0][4]).toBe(signal);
+    expect(db.auditStream.updateMany).not.toHaveBeenCalled();
+    expect(summary).toMatchObject({ delivered: 0, failed: 0 });
+  });
+
   it("pauses after 20 consecutive failures and records it", async () => {
     send.mockResolvedValue({
       ok: false,

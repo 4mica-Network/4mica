@@ -9,6 +9,7 @@ const logger = createScopedLogger("audit-streams");
 let queue: Queue | undefined;
 let worker: Worker | undefined;
 let stopping = false;
+let cancel = new AbortController();
 
 export const startAuditStreams = async (): Promise<boolean> => {
   const url = config.onboarding.valkeyUrl;
@@ -23,9 +24,16 @@ export const startAuditStreams = async (): Promise<boolean> => {
   }
 
   stopping = false;
+  cancel = new AbortController();
+  const { signal } = cancel;
   queue = createQueue(url);
   worker = createWorker(url, () =>
-    runAuditStreams({ logger, signingKey, shouldStop: () => stopping }),
+    runAuditStreams({
+      logger,
+      signingKey,
+      signal,
+      shouldStop: () => stopping,
+    }),
   );
 
   worker.on("error", (error) => {
@@ -44,6 +52,7 @@ export const startAuditStreams = async (): Promise<boolean> => {
 
 export const stopAuditStreams = async (): Promise<void> => {
   stopping = true;
+  cancel.abort();
 
   await worker?.close();
   await queue?.close();

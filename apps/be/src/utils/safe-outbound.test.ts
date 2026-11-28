@@ -1,6 +1,7 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { connectAddress } from "@/test-support/https-request";
 import {
+  OutboundAbortedError,
   OutboundTimeoutError,
   postToPublicUrl,
   UnsafeDestinationError,
@@ -139,6 +140,105 @@ describe("postToPublicUrl", () => {
     expect(https.requests[0]?.options).toMatchObject({
       port: "8443",
       path: "/in?x=1",
+    });
+  });
+
+  describe("one absolute deadline", () => {
+    const never = () => new Promise<never>(() => undefined);
+    const later = (ms: number) =>
+      new Promise((resolve) => setTimeout(() => resolve([PUBLIC]), ms));
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("abandons a DNS lookup that never answers", async () => {
+      lookup.mockImplementation(never);
+
+      const pending = postToPublicUrl("https://dns-stall.example.com/", POST);
+      const settled = expect(pending).rejects.toMatchObject({
+        name: "TimeoutError",
+        phase: "dns",
+      });
+      await vi.advanceTimersByTimeAsync(POST.timeoutMs);
+      await settled;
+      expect(https.request).not.toHaveBeenCalled();
+    });
+
+    it("never connects when DNS answers only after the deadline", async () => {
+      lookup.mockImplementation(() => later(POST.timeoutMs * 3));
+
+      const pending = postToPublicUrl("https://dns-slow.example.com/", POST);
+      const settled =
+        expect(pending).rejects.toBeInstanceOf(OutboundTimeoutError);
+      await vi.advanceTimersByTimeAsync(POST.timeoutMs);
+      await settled;
+      await vi.advanceTimersByTimeAsync(POST.timeoutMs * 3);
+      expect(https.request).not.toHaveBeenCalled();
+    });
+
+    it("counts DNS time against the connect, TLS and header budget", async () => {
+      lookup.mockImplementation(() => later(POST.timeoutMs * 0.75));
+      https.state.status = null;
+      let failure: unknown = null;
+
+      postToPublicUrl("https://connect-stall.example.com/", POST).catch(
+        (error: unknown) => {
+          failure = error;
+        },
+      );
+      await vi.advanceTimersByTimeAsync(POST.timeoutMs);
+
+      expect(https.request).toHaveBeenCalledOnce();
+      expect(failure).toBeInstanceOf(OutboundTimeoutError);
+      expect(failure).toMatchObject({ phase: "request" });
+    });
+
+    it("stops resolving as soon as the caller cancels", async () => {
+      lookup.mockImplementation(never);
+      const caller = new AbortController();
+
+      const pending = postToPublicUrl("https://dns-stall.example.com/", {
+        ...POST,
+        signal: caller.signal,
+      });
+      caller.abort();
+
+      await expect(pending).rejects.toBeInstanceOf(OutboundAbortedError);
+      expect(https.request).not.toHaveBeenCalled();
+    });
+
+    it("destroys an in-flight request when the caller cancels", async () => {
+      https.state.status = null;
+      const caller = new AbortController();
+
+      const pending = postToPublicUrl("https://connect-stall.example.com/", {
+        ...POST,
+        signal: caller.signal,
+      });
+      await vi.advanceTimersByTimeAsync(0);
+      expect(https.request).toHaveBeenCalledOnce();
+      caller.abort();
+
+      await expect(pending).rejects.toBeInstanceOf(OutboundAbortedError);
+    });
+
+    it("does nothing for a caller that has already cancelled", async () => {
+      const caller = new AbortController();
+      caller.abort();
+
+      await expect(
+        postToPublicUrl("https://hook.example.com/", {
+          ...POST,
+          signal: caller.signal,
+        }),
+      ).rejects.toBeInstanceOf(OutboundAbortedError);
+      expect(lookup).not.toHaveBeenCalled();
+      expect(https.request).not.toHaveBeenCalled();
     });
   });
 

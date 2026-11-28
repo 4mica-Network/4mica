@@ -30,10 +30,13 @@ export interface StreamDeps {
   signingKey: string | undefined;
   now?: () => Date;
   shouldStop?: () => boolean;
+  signal?: AbortSignal;
   send?: (
     target: DeliveryTarget,
     secret: string,
     events: ReturnType<typeof toAuditEvent>[],
+    now?: () => Date,
+    signal?: AbortSignal,
   ) => Promise<DeliveryResult>;
 }
 
@@ -64,7 +67,19 @@ const drain = async (
       break;
     }
 
-    const result = await send(stream, secret, rows.map(toAuditEvent));
+    const result = await send(
+      stream,
+      secret,
+      rows.map(toAuditEvent),
+      now,
+      deps.signal,
+    );
+    if (result.deferred) {
+      deps.logger.info("audit streams: delivery deferred to the next run", {
+        streamId: stream.id,
+      });
+      return { delivered, failed: false };
+    }
     if (!result.ok) {
       const failures = stream.consecutiveFailures + 1;
       const pause = failures >= PAUSE_AFTER_FAILURES;
