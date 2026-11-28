@@ -845,7 +845,7 @@ export const resolveCustomerHandler: RouteHandler = async (request, reply) => {
   const approved =
     result.needsApproval &&
     approvalRequestId != null &&
-    (await consumeSellerApproval(orgId, approvalRequestId, {
+    (await consumeSellerApproval(key, approvalRequestId, {
       payerAddress,
       network,
       amount,

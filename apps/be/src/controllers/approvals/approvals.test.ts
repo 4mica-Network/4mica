@@ -1,4 +1,5 @@
 import type { OrgRole, ProjectRole } from "@4mica/db";
+import { networksForEnvironment } from "@4mica/rules";
 import { clearUserCache } from "@auth/user-store";
 import { approvalRoutes } from "@routes/approvals";
 import { getAddress } from "viem";
@@ -952,6 +953,59 @@ describe("approval routes", () => {
         organizationId: ORG_ID,
         projectId: PROJECT_ID,
         kind: "SELLER_PAYMENT",
+        OR: networksForEnvironment("SANDBOX").map((network) => ({
+          payload: { path: ["network"], equals: network },
+        })),
+      });
+    });
+
+    it("hides a production request from a sandbox key of the same project", async () => {
+      db.apiKey.findUnique.mockResolvedValue(keyRecord());
+      db.approvalRequest.findFirst.mockImplementation(
+        async ({ where }: { where: { OR: unknown[] } }) =>
+          JSON.stringify(where.OR).includes('"BASE"')
+            ? { id: APPROVAL_ID, status: "APPROVED" }
+            : null,
+      );
+
+      const res = await call(
+        "GET",
+        `/v1/approvals/${APPROVAL_ID}`,
+        undefined,
+        KEY_AUTH,
+      );
+
+      expect(res.statusCode).toBe(404);
+      expect(db.approvalRequest.findMany.mock.calls[0][0].where).toMatchObject({
+        projectId: PROJECT_ID,
+        kind: "SELLER_PAYMENT",
+      });
+      expect(db.approvalRequest.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("records the creating key's prefix, service account and environment", async () => {
+      db.apiKey.findUnique.mockResolvedValue(
+        keyRecord({
+          prefix: "4mica_sk_test_ab12",
+          serviceAccountId: "019fce62-6666-7000-8000-000000000000",
+          serviceAccount: { suspendedAt: null, deletedAt: null },
+        }),
+      );
+      db.governanceSettings.findUnique.mockResolvedValue(null);
+      db.approvalRequest.create.mockResolvedValue({
+        id: APPROVAL_ID,
+        status: "PENDING",
+        expiresAt: FUTURE,
+        decidedAt: null,
+      });
+
+      const res = await call("POST", "/v1/approvals", body, KEY_AUTH);
+
+      expect(res.statusCode).toBe(201);
+      expect(db.auditLog.create.mock.calls[0][0].data.metadata).toMatchObject({
+        environment: "SANDBOX",
+        apiKeyPrefix: "4mica_sk_test_ab12",
+        serviceAccountId: "019fce62-6666-7000-8000-000000000000",
       });
     });
   });

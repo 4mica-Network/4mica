@@ -95,6 +95,7 @@ export const findApiKeyByHash = (hashedKey: string) =>
     where: { hashedKey },
     select: {
       id: true,
+      prefix: true,
       organizationId: true,
       listingId: true,
       agentId: true,

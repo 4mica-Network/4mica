@@ -232,6 +232,9 @@ export const createSellerApprovalHandler: RouteHandler = async (
         kind: "SELLER_PAYMENT",
         network: input.network,
         amount: input.amount,
+        environment: key.environment,
+        apiKeyPrefix: key.prefix,
+        serviceAccountId: key.serviceAccountId,
       },
     }),
   );
@@ -249,7 +252,7 @@ export const getSellerApprovalHandler: RouteHandler = async (
   }
 
   const { id } = request.params as { id: string };
-  const row = await findSellerApproval(key.orgId, key.projectId, id);
+  const row = await findSellerApproval(key, id);
   return row ? reply.send(row) : notFound(reply, "approval request");
 };
 

@@ -1,11 +1,13 @@
 import {
   type ApprovalStatus,
   type ApprovalVote,
+  type EnvironmentKind,
   type OrgRole,
   type PaymentNetwork,
   type Prisma,
   prisma,
 } from "@4mica/db";
+import { networksForEnvironment } from "@4mica/rules";
 import { can, type RoleSubject } from "@auth/permissions";
 import {
   lockVisibility,
@@ -368,17 +370,25 @@ export const createSellerApproval = async (
   });
 };
 
-export const findSellerApproval = async (
-  orgId: string,
-  projectId: string,
-  id: string,
-) => {
-  const where = {
+export interface SellerKey {
+  orgId: string;
+  projectId: string;
+  environment: EnvironmentKind;
+}
+
+const sellerWhere = (key: SellerKey, id: string) =>
+  ({
     id,
-    organizationId: orgId,
-    projectId,
-    kind: "SELLER_PAYMENT" as const,
-  };
+    organizationId: key.orgId,
+    projectId: key.projectId,
+    kind: "SELLER_PAYMENT",
+    OR: networksForEnvironment(key.environment).map((network) => ({
+      payload: { path: ["network"], equals: network },
+    })),
+  }) satisfies Prisma.ApprovalRequestWhereInput;
+
+export const findSellerApproval = async (key: SellerKey, id: string) => {
+  const where = sellerWhere(key, id);
   await expireStaleApprovals(where);
   return prisma.approvalRequest.findFirst({
     where,
@@ -392,15 +402,13 @@ const payloadField = (payload: Prisma.JsonValue, field: string) =>
     : undefined;
 
 export const consumeSellerApproval = async (
-  orgId: string,
+  key: SellerKey,
   id: string,
   match: SellerPaymentMatch,
 ): Promise<boolean> => {
   const row = await prisma.approvalRequest.findFirst({
     where: {
-      id,
-      organizationId: orgId,
-      kind: "SELLER_PAYMENT",
+      ...sellerWhere(key, id),
       status: "APPROVED",
       executedAt: null,
       expiresAt: { gt: new Date() },
@@ -428,7 +436,7 @@ export const consumeSellerApproval = async (
 
   const { count } = await prisma.approvalRequest.updateMany({
     where: {
-      id: row.id,
+      ...sellerWhere(key, row.id),
       status: "APPROVED",
       executedAt: null,
       expiresAt: { gt: new Date() },

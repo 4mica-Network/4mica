@@ -7,6 +7,7 @@ import { findApiKeyByHash, touchApiKey } from "./repository";
 
 export interface ApiKeyContext {
   id: string;
+  prefix: string;
   orgId: string;
   projectId: string;
   environmentId: string;
@@ -138,6 +139,7 @@ export const authenticateApiKey = async (
 
   request.apiKey = {
     id: record.id,
+    prefix: record.prefix,
     orgId: record.organizationId,
     projectId: record.projectId,
     environmentId: record.environmentId,

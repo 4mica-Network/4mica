@@ -2373,6 +2373,53 @@ describe("customer routes", () => {
       await instance.close();
     });
 
+    it("keeps the approval flag for a request of another environment or project", async () => {
+      customerPaymentIdentity.findFirst.mockResolvedValue(
+        claims({ approvalThreshold: decimal("100") }),
+      );
+      const production = {
+        id: APPROVAL_ID,
+        projectId: PROJECT_ID,
+        payload: { payerAddress: PAYER, network: "BASE", amount: "150" },
+      };
+      approvalRequest.findFirst.mockImplementation(
+        async ({
+          where,
+        }: {
+          where: {
+            projectId?: string;
+            OR?: { payload: { equals: string } }[];
+          };
+        }) =>
+          where.projectId === production.projectId &&
+          (where.OR ?? []).some(
+            (entry) => entry.payload.equals === production.payload.network,
+          )
+            ? production
+            : null,
+      );
+
+      const instance = await app();
+      const response = await instance.inject(
+        resolve({
+          network: "BASE",
+          amount: "150",
+          approvalRequestId: APPROVAL_ID,
+        }),
+      );
+
+      expect(response.json().needsApproval).toBe(true);
+      expect(approvalRequest.findFirst.mock.calls[0][0].where).toMatchObject({
+        id: APPROVAL_ID,
+        organizationId: ORG_ID,
+        projectId: PROJECT_ID,
+        kind: "SELLER_PAYMENT",
+      });
+      expect(approvalRequest.updateMany).not.toHaveBeenCalled();
+
+      await instance.close();
+    });
+
     it("keeps the approval flag when the approved request is for a different amount", async () => {
       customerPaymentIdentity.findFirst.mockResolvedValue(
         claims({ approvalThreshold: decimal("100") }),
