@@ -1,12 +1,25 @@
 import { createHmac } from "node:crypto";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { connectAddress } from "@/test-support/https-request";
 import { deliver, signature, streamSecret, toAuditEvent } from "./delivery";
 
 const { lookup } = vi.hoisted(() => ({ lookup: vi.fn() }));
+const https = await vi.hoisted(async () =>
+  (await import("@/test-support/https-request")).fakeHttps(),
+);
 
 vi.mock("node:dns/promises", async (importOriginal) => {
   const actual = await importOriginal<typeof import("node:dns/promises")>();
   return { ...actual, lookup, default: { ...actual, lookup } };
+});
+
+vi.mock("node:https", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:https")>();
+  return {
+    ...actual,
+    request: https.request,
+    default: { ...actual, request: https.request },
+  };
 });
 
 const KEY = "k".repeat(32);
@@ -31,19 +44,12 @@ const event = toAuditEvent({
   createdAt: NOW,
 });
 
-const fetchMock = vi.fn();
-
 describe("audit stream delivery", () => {
   beforeEach(() => {
-    fetchMock.mockReset();
-    vi.stubGlobal("fetch", fetchMock);
+    https.reset();
+    https.state.status = 204;
     lookup.mockReset();
     lookup.mockResolvedValue([{ address: "93.184.216.34", family: 4 }]);
-    fetchMock.mockResolvedValue(new Response(null, { status: 204 }));
-  });
-
-  afterEach(() => {
-    vi.unstubAllGlobals();
   });
 
   it("derives a stable secret per stream and version", () => {
@@ -61,11 +67,14 @@ describe("audit stream delivery", () => {
     const result = await deliver(STREAM, secret, [event], () => NOW);
 
     expect(result).toMatchObject({ ok: true, statusCode: 204, error: null });
-    const [url, init] = fetchMock.mock.calls[0] as [URL, RequestInit];
-    expect(url.href).toBe(STREAM.url);
-    expect(init.redirect).toBe("manual");
-    const headers = init.headers as Record<string, string>;
-    const body = init.body as string;
+    const [sent] = https.requests;
+    expect(sent?.options).toMatchObject({
+      hostname: "siem.example.com",
+      path: "/ingest",
+      method: "POST",
+    });
+    const headers = sent?.headers as Record<string, string>;
+    const body = sent?.body as string;
     expect(JSON.parse(body)).toEqual({
       stream: { id: STREAM.id, organizationId: STREAM.organizationId },
       events: [event],
@@ -96,7 +105,7 @@ describe("audit stream delivery", () => {
 
     expect(result.ok).toBe(false);
     expect(result.error).toContain("public address");
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(https.request).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -111,7 +120,36 @@ describe("audit stream delivery", () => {
     ]);
 
     expect((await deliver(STREAM, "s", [event])).ok).toBe(false);
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(https.request).not.toHaveBeenCalled();
+  });
+
+  it("connects to the validated address even when DNS rebinds afterwards", async () => {
+    lookup
+      .mockResolvedValueOnce([{ address: "93.184.216.34", family: 4 }])
+      .mockResolvedValue([{ address: "169.254.169.254", family: 4 }]);
+
+    expect((await deliver(STREAM, "s", [event])).ok).toBe(true);
+
+    const pinned = https.requests[0]?.options.lookup;
+    if (!pinned) {
+      throw new Error("the connection was not pinned");
+    }
+    expect(await connectAddress(pinned, "siem.example.com", true)).toEqual([
+      { address: "93.184.216.34", family: 4 },
+    ]);
+    expect(lookup).toHaveBeenCalledOnce();
+  });
+
+  it("refuses a URL carrying credentials", async () => {
+    const result = await deliver(
+      { ...STREAM, url: "https://user:pass@siem.example.com/ingest" },
+      "s",
+      [event],
+    );
+
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain("credentials");
+    expect(https.request).not.toHaveBeenCalled();
   });
 
   it("refuses plain http", async () => {
@@ -122,32 +160,27 @@ describe("audit stream delivery", () => {
     );
 
     expect(result.ok).toBe(false);
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(https.request).not.toHaveBeenCalled();
   });
 
   it("does not follow redirects", async () => {
-    fetchMock.mockResolvedValue(
-      new Response(null, {
-        status: 302,
-        headers: { location: "http://169.254.169.254/" },
-      }),
-    );
+    https.state.status = 302;
 
     const result = await deliver(STREAM, "s", [event]);
 
     expect(result).toMatchObject({ ok: false, statusCode: 302 });
     expect(result.error).toContain("redirect");
-    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(https.request).toHaveBeenCalledOnce();
   });
 
   it("reports a non-2xx answer and a network error as failures", async () => {
-    fetchMock.mockResolvedValueOnce(new Response("no", { status: 500 }));
+    https.state.status = 500;
     expect(await deliver(STREAM, "s", [event])).toMatchObject({
       ok: false,
       statusCode: 500,
     });
 
-    fetchMock.mockRejectedValueOnce(new TypeError("fetch failed"));
+    https.state.error = new Error("ECONNREFUSED");
     expect(await deliver(STREAM, "s", [event])).toMatchObject({
       ok: false,
       statusCode: null,

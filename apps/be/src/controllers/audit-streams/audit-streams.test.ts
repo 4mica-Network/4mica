@@ -26,6 +26,18 @@ const { authenticateRequest, db, lookup, signing, claims } = vi.hoisted(() => ({
     $transaction: vi.fn(),
   },
 }));
+const https = await vi.hoisted(async () =>
+  (await import("@/test-support/https-request")).fakeHttps(),
+);
+
+vi.mock("node:https", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:https")>();
+  return {
+    ...actual,
+    request: https.request,
+    default: { ...actual, request: https.request },
+  };
+});
 
 vi.mock("@clerk/backend", () => ({
   createClerkClient: vi.fn(() => ({
@@ -74,8 +86,6 @@ const actAs = (role: string) =>
     customRole: null,
     organization: { id: ORG_ID, personal: false },
   });
-
-const fetchMock = vi.fn();
 
 const call = async (method: string, url: string, payload?: unknown) => {
   const app = await initApp([{ plugin: auditStreamRoutes }]);
@@ -143,9 +153,7 @@ describe("audit stream routes", () => {
     db.auditStream.updateMany.mockResolvedValue({ count: 1 });
     db.auditLog.findFirst.mockResolvedValue({ id: "latest-audit-id" });
     lookup.mockResolvedValue([{ address: "93.184.216.34", family: 4 }]);
-    fetchMock.mockReset();
-    fetchMock.mockResolvedValue(new Response(null, { status: 200 }));
-    vi.stubGlobal("fetch", fetchMock);
+    https.reset();
     actAs("OWNER");
   });
 
@@ -239,6 +247,8 @@ describe("audit stream routes", () => {
     "http://siem.example.com/ingest",
     "https://169.254.169.254/latest",
     "https://localhost/ingest",
+    "https://user:pass@siem.example.com/ingest",
+    "https://token@siem.example.com/ingest",
   ])("refuses %s", async (url) => {
     const res = await call("POST", "/me/organization/audit-streams", {
       name: "SIEM",
@@ -292,26 +302,21 @@ describe("audit stream routes", () => {
 
     expect(res.statusCode).toBe(200);
     expect(res.json()).toMatchObject({ delivered: true, statusCode: 200 });
-    expect(fetchMock).toHaveBeenCalledOnce();
-    const init = fetchMock.mock.calls[0][1] as RequestInit;
-    const body = JSON.parse(init.body as string);
+    expect(https.request).toHaveBeenCalledOnce();
+    const [sent] = https.requests;
+    const body = JSON.parse(sent?.body as string);
     expect(body.events).toHaveLength(1);
     expect(body.events[0]).toMatchObject({
       action: "audit_stream.test",
       targetId: STREAM_ID,
     });
-    expect(
-      (init.headers as Record<string, string>)["x-4mica-signature"],
-    ).toMatch(/^t=\d+,v1=[0-9a-f]{64}$/);
+    expect(sent?.headers["x-4mica-signature"]).toMatch(
+      /^t=\d+,v1=[0-9a-f]{64}$/,
+    );
   });
 
   it("reports a redirect on test as not delivered", async () => {
-    fetchMock.mockResolvedValue(
-      new Response(null, {
-        status: 301,
-        headers: { location: "https://elsewhere.example.com" },
-      }),
-    );
+    https.state.status = 301;
 
     const res = await call(
       "POST",
@@ -372,6 +377,18 @@ describe("audit stream routes", () => {
       { status: "ACTIVE" },
     );
     expect(active.statusCode).toBe(400);
+  });
+
+  it("refuses to change the URL to one carrying credentials", async () => {
+    const res = await call(
+      "PATCH",
+      `/me/organization/audit-streams/${STREAM_ID}`,
+      { url: "https://user:pass@siem.example.com/ingest" },
+    );
+
+    expect(res.statusCode).toBe(400);
+    expect(res.json().issues[0]).toMatchObject({ path: "url" });
+    expect(db.auditStream.updateMany).not.toHaveBeenCalled();
   });
 
   it("answers 404 for another organization's stream", async () => {

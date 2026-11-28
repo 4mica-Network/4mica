@@ -1,5 +1,9 @@
 import { createHmac, randomUUID } from "node:crypto";
-import { resolvesPublicly } from "@utils/public-host";
+import {
+  OutboundTimeoutError,
+  postToPublicUrl,
+  UnsafeDestinationError,
+} from "@utils/safe-outbound";
 
 export const DELIVERY_TIMEOUT_MS = 10_000;
 export const SIGNATURE_HEADER = "x-4mica-signature";
@@ -75,19 +79,6 @@ export const deliver = async (
     deliveryId,
   });
 
-  let url: URL;
-  try {
-    url = new URL(target.url);
-  } catch {
-    return fail("The stream URL is not valid.");
-  }
-  if (url.protocol !== "https:") {
-    return fail("The stream URL must use https.");
-  }
-  if (!(await resolvesPublicly(url.hostname))) {
-    return fail("The stream URL does not resolve to a public address.");
-  }
-
   const body = JSON.stringify({
     stream: { id: target.id, organizationId: target.organizationId },
     events,
@@ -95,10 +86,8 @@ export const deliver = async (
   const timestamp = Math.floor(now().getTime() / 1000);
 
   try {
-    const response = await fetch(url, {
-      method: "POST",
-      redirect: "manual",
-      signal: AbortSignal.timeout(DELIVERY_TIMEOUT_MS),
+    const { status } = await postToPublicUrl(target.url, {
+      timeoutMs: DELIVERY_TIMEOUT_MS,
       headers: {
         "content-type": "application/json",
         "user-agent": "4mica-audit-stream/1",
@@ -107,24 +96,23 @@ export const deliver = async (
       },
       body,
     });
-    await response.body?.cancel().catch(() => undefined);
 
-    if (response.status >= 200 && response.status < 300) {
-      return { ok: true, statusCode: response.status, error: null, deliveryId };
+    if (status >= 200 && status < 300) {
+      return { ok: true, statusCode: status, error: null, deliveryId };
     }
-    if (
-      response.type === "opaqueredirect" ||
-      (response.status >= 300 && response.status < 400)
-    ) {
+    if (status >= 300 && status < 400) {
       return fail(
         "The endpoint redirected; redirects are not followed.",
-        response.status || null,
+        status,
       );
     }
-    return fail(`The endpoint answered ${response.status}.`, response.status);
+    return fail(`The endpoint answered ${status}.`, status || null);
   } catch (error) {
+    if (error instanceof UnsafeDestinationError) {
+      return fail(error.message);
+    }
     return fail(
-      error instanceof Error && error.name === "TimeoutError"
+      error instanceof OutboundTimeoutError
         ? `The endpoint did not answer within ${DELIVERY_TIMEOUT_MS / 1000}s.`
         : `The endpoint could not be reached: ${error instanceof Error ? error.message : String(error)}`,
     );

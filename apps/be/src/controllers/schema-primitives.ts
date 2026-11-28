@@ -71,6 +71,10 @@ export const publicHttpsUrl = (max: number) =>
       (value) => isPublicHostname(new URL(value).hostname),
       "must point to a public host, not a private or local address",
     ),
+    v.check((value) => {
+      const { username, password } = new URL(value);
+      return username === "" && password === "";
+    }, "must not contain credentials"),
   );
 
 export const email = (max: number) =>
