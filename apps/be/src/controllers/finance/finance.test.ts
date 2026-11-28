@@ -58,6 +58,9 @@ vi.mock("@4mica/db", async () => {
       apiListing,
       user: { findUnique: vi.fn(), upsert, update: vi.fn() },
       $queryRaw: queryRaw,
+      $transaction: vi.fn(async (run: (tx: unknown) => unknown) =>
+        run({ auditLog: tenancy.auditLog }),
+      ),
     },
     disconnect: vi.fn(async () => {}),
   };
@@ -796,6 +799,19 @@ describe("finance routes", () => {
           new Date("2026-12-01T00:00:00.000Z"),
         ]),
       );
+    });
+
+    it("withholds the CSV when its audit entry cannot be saved", async () => {
+      queryRaw.mockResolvedValue([storedPayment()]);
+      tenancy.auditLog.create.mockRejectedValue(new Error("audit down"));
+
+      const res = await get(
+        "/me/finance/export/payments.csv?from=2026-11-01&to=2026-11-30&direction=sent",
+        { "x-environment": "production" },
+      );
+
+      expect(res.statusCode).toBe(500);
+      expect(res.body).not.toContain(MY_WALLET);
     });
 
     it("records the export with its filters", async () => {

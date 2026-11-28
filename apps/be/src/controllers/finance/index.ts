@@ -1,10 +1,10 @@
 import type { Permission } from "@auth/permissions";
 import { accessibleProjectIds, requestedEnvironment } from "@auth/project";
 import {
-  audit,
   invalidBody,
   notFound,
   parseBody,
+  recordAudit,
   requireTenant,
 } from "@controllers/shared";
 import { CSV_ROW_LIMIT, sendCsv } from "@utils/csv";
@@ -150,7 +150,7 @@ export const exportPaymentsHandler: RouteHandler = async (request, reply) => {
     CSV_ROW_LIMIT,
   );
 
-  await audit(request, tenant, {
+  await recordAudit(request, tenant, {
     action: "report.exported",
     targetType: "report",
     targetId: "payments",
@@ -206,7 +206,7 @@ export const exportUsageHandler: RouteHandler = async (request, reply) => {
       item.count,
     ]);
 
-  await audit(request, tenant, {
+  await recordAudit(request, tenant, {
     action: "report.exported",
     targetType: "report",
     targetId: "usage",

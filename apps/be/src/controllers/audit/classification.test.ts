@@ -23,8 +23,6 @@ const { audit, recordAudit, withAudit, withProjectAudit } = await import(
 
 const SRC = join(import.meta.dirname, "..", "..");
 
-const PENDING_ELSEWHERE = ["controllers/finance/index.ts:report.exported"];
-
 const sources = (dir: string): string[] =>
   readdirSync(dir).flatMap((name) => {
     const path = join(dir, name);
@@ -87,7 +85,7 @@ describe("audit classification", () => {
       .map(({ file, action }) => `${file}:${action}`);
 
     expect(bestEffort.length).toBeGreaterThan(0);
-    expect([...new Set(offending)].sort()).toEqual(PENDING_ELSEWHERE);
+    expect([...new Set(offending)].sort()).toEqual([]);
   });
 
   it("names only classified actions on the best-effort path", () => {
