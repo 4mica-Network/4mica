@@ -38,6 +38,8 @@ const authorizationProperties = {
   approvalRequestId: nullStr,
   expiresAt: date,
   amount: str,
+  authorizedAmount: nullStr,
+  settledAmount: nullStr,
   network: { type: "string", enum: networks },
   assetAddress: nullStr,
 } as const;

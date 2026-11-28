@@ -11,7 +11,7 @@ import {
   requireTenant,
 } from "@controllers/shared";
 import { appLogger } from "@logger/index";
-import { amountText } from "@utils/amount";
+import { amountText, optionalAmountText } from "@utils/amount";
 import type { FastifyReply, RouteHandler } from "fastify";
 import {
   authorizeSpend,
@@ -41,6 +41,8 @@ export const toAuthorization = (row: AuthorizationRow) => ({
   approvalRequestId: row.approvalRequestId,
   expiresAt: row.expiresAt.toISOString(),
   amount: amountText(row.amount),
+  authorizedAmount: optionalAmountText(row.authorizedAmount),
+  settledAmount: optionalAmountText(row.settledAmount),
   network: row.network,
   assetAddress: row.assetAddress,
 });

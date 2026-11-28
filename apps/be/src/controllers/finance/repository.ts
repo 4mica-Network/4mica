@@ -7,7 +7,7 @@ import {
 } from "@4mica/db";
 import { networksForEnvironment } from "@4mica/rules";
 import { walletAddressesFor } from "@controllers/payments/repository";
-import { amountText } from "@utils/amount";
+import { amountText, optionalAmountText } from "@utils/amount";
 import { type ProjectAccess, projectIn, projectInOrNone } from "@utils/scope";
 import type {
   DateRange,
@@ -361,6 +361,8 @@ const AUTHORIZATION_SELECT = {
   approvalRequestId: true,
   expiresAt: true,
   amount: true,
+  authorizedAmount: true,
+  settledAmount: true,
   network: true,
   assetAddress: true,
   payerAddress: true,
@@ -378,8 +380,14 @@ type RawAuthorization = Prisma.SpendAuthorizationGetPayload<{
 
 export type AuthorizationRow = Omit<
   RawAuthorization,
-  "amount" | "expiresAt" | "createdAt"
-> & { amount: string; expiresAt: string; createdAt: string };
+  "amount" | "authorizedAmount" | "settledAmount" | "expiresAt" | "createdAt"
+> & {
+  amount: string;
+  authorizedAmount: string | null;
+  settledAmount: string | null;
+  expiresAt: string;
+  createdAt: string;
+};
 
 const toAuthorizationRow = (
   row: RawAuthorization,
@@ -392,6 +400,8 @@ const toAuthorizationRow = (
       ? "EXPIRED"
       : row.status,
   amount: amountText(row.amount),
+  authorizedAmount: optionalAmountText(row.authorizedAmount),
+  settledAmount: optionalAmountText(row.settledAmount),
   expiresAt: row.expiresAt.toISOString(),
   createdAt: row.createdAt.toISOString(),
 });

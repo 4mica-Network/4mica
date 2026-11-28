@@ -103,6 +103,8 @@ const authorizationSchema = {
     approvalRequestId: nullStr,
     expiresAt: dateTime,
     amount: str,
+    authorizedAmount: nullStr,
+    settledAmount: nullStr,
     network: str,
     assetAddress: nullStr,
     payerAddress: str,

@@ -240,6 +240,7 @@ const decideSpend = async (
       payerAddress: input.payerAddress,
       recipientAddress: input.recipientAddress,
       amount: input.amount,
+      authorizedAmount: input.amount,
       reqId: input.reqId,
     };
     const alerts: AlertInput[] = [];
@@ -712,7 +713,8 @@ const mismatchOf = (
   return candidate.network === payment.network &&
     candidate.assetAddress === payment.assetAddress &&
     candidate.payerAddress === payment.payerAddress &&
-    toUnits(candidate.amount) >= toUnits(payment.amount) &&
+    toUnits(candidate.authorizedAmount ?? candidate.amount) >=
+      toUnits(payment.amount) &&
     (candidate.paymentId === null || candidate.paymentId === payment.id)
     ? null
     : "exceeds_authorization";
@@ -750,16 +752,18 @@ const reconcileForOrg = async (
     const alerts: AlertInput[] = [];
 
     if (candidate && reason === null) {
-      await tx.spendAuthorization.update({
-        where: { id: candidate.id },
-        data: {
-          status: "CONSUMED",
-          paymentId: payment.id,
-          amount: payment.amount,
-          consumedAt: candidate.consumedAt ?? now,
-        },
-        select: { id: true },
-      });
+      if (candidate.paymentId === null) {
+        await tx.spendAuthorization.updateMany({
+          where: { id: candidate.id, paymentId: null },
+          data: {
+            status: "CONSUMED",
+            paymentId: payment.id,
+            amount: payment.amount,
+            settledAmount: payment.amount,
+            consumedAt: candidate.consumedAt ?? now,
+          },
+        });
+      }
     } else if (reason !== null && (await hasEnforcingPolicy(tx, orgId))) {
       alerts.push({
         orgId,

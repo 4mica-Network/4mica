@@ -316,6 +316,8 @@ describe("POST /v1/spend/authorize", () => {
       approvalRequestId: null,
       expiresAt: "2026-11-27T12:10:00.000Z",
       amount: "10",
+      authorizedAmount: "10",
+      settledAmount: null,
       network: "BASE_SEPOLIA",
       assetAddress: USDC,
     });
@@ -1180,6 +1182,81 @@ describe("reconcileReportedPayment", () => {
     expect(
       (await post("/v1/spend/authorize", body({ amount: "96" }))).json().status,
     ).toBe("RESERVED");
+  });
+
+  it("keeps the authorized amount when a smaller payment settles it", async () => {
+    h.db.spendAuthorization.seed(
+      authRow({ reqId: "0xfeed", amount: "90", authorizedAmount: "90" }),
+    );
+    await reconcileReportedPayment(reported({ amount: "4" }), email(), NOW);
+    expect(h.db.spendAuthorization.rows[0]).toMatchObject({
+      status: "CONSUMED",
+      amount: "4",
+      authorizedAmount: "90",
+      settledAmount: "4",
+    });
+    const id = h.db.spendAuthorization.rows[0]?.id;
+    expect((await get(`/v1/spend/authorizations/${id}`)).json()).toMatchObject({
+      amount: "4",
+      authorizedAmount: "90",
+      settledAmount: "4",
+    });
+  });
+
+  it("settles once however often the same payment is reported", async () => {
+    h.db.spendingPolicy.seed(orgPolicy());
+    h.db.spendAuthorization.seed(
+      authRow({ reqId: "0xfeed", amount: "10", authorizedAmount: "10" }),
+    );
+    await reconcileReportedPayment(reported({ amount: "6" }), email(), NOW);
+    const update = vi.spyOn(h.db.spendAuthorization, "updateMany");
+    try {
+      await reconcileReportedPayment(reported({ amount: "6" }), email(), NOW);
+      expect(update).not.toHaveBeenCalled();
+    } finally {
+      update.mockRestore();
+    }
+    expect(h.db.spendAuthorization.rows[0]).toMatchObject({
+      amount: "6",
+      authorizedAmount: "10",
+      settledAmount: "6",
+    });
+    expect(h.db.financialAlert.rows).toEqual([]);
+  });
+
+  it("never re-settles a settled authorization with a second payment", async () => {
+    h.db.spendingPolicy.seed(orgPolicy());
+    h.db.spendAuthorization.seed(
+      authRow({ reqId: "0xfeed", amount: "10", authorizedAmount: "10" }),
+    );
+    await reconcileReportedPayment(reported({ amount: "4" }), email(), NOW);
+    await reconcileReportedPayment(
+      reported({ id: "019fce62-5555-7000-8000-000000000002", amount: "4" }),
+      email(),
+      NOW,
+    );
+    expect(h.db.spendAuthorization.rows[0]).toMatchObject({
+      amount: "4",
+      authorizedAmount: "10",
+      settledAmount: "4",
+      paymentId: "019fce62-5555-7000-8000-000000000001",
+    });
+    expect(h.db.financialAlert.rows).toHaveLength(1);
+    expect(h.db.financialAlert.rows[0]?.dedupeKey).toBe(
+      "unauthorized:019fce62-5555-7000-8000-000000000002",
+    );
+  });
+
+  it("checks a payment against the granted amount, not the amount left committed", async () => {
+    h.db.spendAuthorization.seed(
+      authRow({ reqId: "0xfeed", amount: "2", authorizedAmount: "10" }),
+    );
+    await reconcileReportedPayment(reported({ amount: "8" }), email(), NOW);
+    expect(h.db.spendAuthorization.rows[0]).toMatchObject({
+      status: "CONSUMED",
+      settledAmount: "8",
+      authorizedAmount: "10",
+    });
   });
 
   it("treats a payment larger than its authorization as unauthorized", async () => {

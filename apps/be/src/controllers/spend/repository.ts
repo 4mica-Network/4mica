@@ -309,6 +309,8 @@ export const AUTHORIZATION_SELECT = {
   payerAddress: true,
   recipientAddress: true,
   amount: true,
+  authorizedAmount: true,
+  settledAmount: true,
   reqId: true,
   status: true,
   deniedReason: true,

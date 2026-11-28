@@ -33,6 +33,16 @@ A wallet linked to an organization is evidence of control (SIWE), not custody. A
 
 An authorization is bound to the payer, recipient, network, asset and amount it was granted for, and to the project, environment and API key (or service account) that requested it. Reconciliation only consumes it for a reported payment with the same `reqId`, payer, recipient, network and asset and an amount no larger than the authorized amount; the authorization is then cut down to the paid amount so the remainder is released. A mismatch never consumes it and raises an `UNAUTHORIZED_SPEND` alert.
 
+## Authorized, settled and committed amounts
+
+An authorization carries three amounts:
+
+- `authorizedAmount` is what was granted. It is written once, when the authorization is created, and a trigger refuses any later change.
+- `settledAmount` is what the reported payment that consumed it actually paid. It is written once, when reconciliation links the payment, and is null until then.
+- `amount` is what currently counts against budgets: the authorized amount until a payment settles it, then the settled amount. Partial settlement therefore releases the remainder without losing what was granted.
+
+Rows created before migration `20261202121000_preserve_spend_authorized_amount` were backfilled without inventing history: `authorizedAmount` is the stored `amount` only where reconciliation never cut it (no linked payment, not consumed, or a linked payment whose amount differs from it), otherwise the amount recorded in the payment's approval request, otherwise null. `settledAmount` is backfilled only where the linked payment's amount equals the stored amount.
+
 ## Payment identity and `reqId` uniqueness
 
 A payment is identified by its organization, network, asset (or the native currency) and `reqId`. At most one authorization per identity may be RESERVED, PENDING_APPROVAL or CONSUMED; DENIED, RELEASED and EXPIRED ones give the `reqId` back, so a payer may retry under the same `reqId` after a release. The rule is a partial unique index on `spend_authorizations` (`spend_authorizations_live_req_id_key`), and authorizing and consuming both take the same per-organization, network and asset advisory lock before checking it, so a lost race is answered with 409 `req_id_in_use` rather than a database error. The same `reqId` on another network or asset is a different payment.

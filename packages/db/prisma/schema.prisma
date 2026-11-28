@@ -454,6 +454,8 @@ model SpendAuthorization {
   payerAddress      String                   @map("payer_address") @db.VarChar(42)
   recipientAddress  String                   @map("recipient_address") @db.VarChar(42)
   amount            Decimal                  @db.Decimal(38, 18)
+  authorizedAmount  Decimal?                 @map("authorized_amount") @db.Decimal(38, 18)
+  settledAmount     Decimal?                 @map("settled_amount") @db.Decimal(38, 18)
   reqId             String?                  @map("req_id") @db.VarChar(66)
   reqIdConflict     String?                  @map("req_id_conflict") @db.VarChar(64)
   status            SpendAuthorizationStatus
