@@ -49,6 +49,15 @@
     payment carries the first one's request id, and core issues one
     guarantee per request id, so the seller can redeem one of them and
     `total` counts it once.
+  - `FourMica.connect(governance=GovernanceOptions(api_key=...))` checks each
+    payment against the organization's spending policies before signing,
+    with the TypeScript SDK's semantics: `SpendAuthorizationError` when it
+    is denied or no approval comes in time, a release only when the payment
+    certainly did not happen (signing failed, or the seller answered 402),
+    and a consume under the signed request id for every other outcome.
+    Consume and release retry 5xx, 429 and network errors up to three times
+    and never raise after a payment; `governance_for(response)` and
+    `on_accounting_error` (a `SpendAccountingError`) report the accounting.
   - After a redirect, `fetch` pays the request that was answered 402, not
     the one it started with, and only on the origin it was asked for. The
     paid retry follows no redirect, so the payment is never forwarded.
@@ -65,7 +74,9 @@
   field, or with an unknown role or a deadline that is not a time, raises
   `InvalidParamsError` rather than being filled in.
 - `fourmica_sdk.app`, for sellers: `AppClient(api_key)` with `resource()`,
-  `resolve_customer()` and `report_payment()`; `parse_settlement(context)`
+  `resolve_customer()` and `report_payment()`, and for payers
+  `authorize_spend()`, `get_spend_authorization()`,
+  `consume_spend_authorization()` and `release_spend_authorization()`; `parse_settlement(context)`
   reads an x402 after-settle hook into what `report_payment` takes, and
   `payment_from_header()` reads an `X-PAYMENT` header. `AppListing` and
   `AppAgent` carry `assetDecimals` for pricing a route in base units.

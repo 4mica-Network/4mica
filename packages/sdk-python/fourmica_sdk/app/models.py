@@ -154,3 +154,30 @@ class ReportedPayment(TypedDict):
 class AppIssue(TypedDict):
     path: str
     message: str
+
+
+SpendAuthorizationStatus = Literal[
+    "RESERVED", "PENDING_APPROVAL", "DENIED", "CONSUMED", "RELEASED", "EXPIRED"
+]
+SpendDeniedReason = Literal[
+    "frozen",
+    "recipient_not_allowed",
+    "per_payment_limit",
+    "daily_limit",
+    "monthly_limit",
+    "limit_changed",
+    "approval_rejected",
+    "approval_expired",
+]
+
+
+class SpendAuthorization(TypedDict):
+    id: str
+    status: SpendAuthorizationStatus
+    deniedReason: SpendDeniedReason | None
+    policyId: str | None
+    approvalRequestId: str | None
+    expiresAt: str
+    amount: str
+    network: AppNetwork
+    assetAddress: str | None

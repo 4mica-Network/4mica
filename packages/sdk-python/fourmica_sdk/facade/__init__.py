@@ -16,13 +16,17 @@ from ..networks import DEFAULT_NETWORK, NETWORKS, resolve_network
 from ..signing import EvmSigner
 from .deposit import deposit as _deposit
 from .fetch import FetchContext, SpendLimiter, paying_fetch
+from .governance import SpendGovernor
 from .models import (
     DEFAULT_DEPOSIT_TIMEOUT_SECS,
+    AccountingStatus,
     AssetRef,
     Balance,
     Balances,
     DepositResult,
     Gas,
+    GovernanceOptions,
+    GovernanceOutcome,
     PaymentRecord,
     PendingWithdrawal,
     Position,
@@ -44,11 +48,14 @@ from .withdraw import (
 )
 
 __all__ = [
+    "AccountingStatus",
     "AssetRef",
     "Balance",
     "Balances",
     "DepositResult",
     "FourMica",
+    "GovernanceOptions",
+    "GovernanceOutcome",
     "PaymentProtocol",
     "PaymentRecord",
     "PaymentTerms",
@@ -134,6 +141,7 @@ class FourMica:
         http: httpx.AsyncClient,
         *,
         owns_http: bool,
+        governor: SpendGovernor | None = None,
     ) -> None:
         self._cfg = cfg
         self._home = home
@@ -141,6 +149,7 @@ class FourMica:
         self._limiter = limiter
         self._http = http
         self._owns_http = owns_http
+        self._governor = governor
         self._sessions: dict[str, NetworkSession] = {home.caip2: home}
         self._payments: WeakKeyDictionary[httpx.Response, PaymentRecord] = (
             WeakKeyDictionary()
@@ -159,12 +168,14 @@ class FourMica:
         rpc_url: str | None = None,
         facilitator_url: str | None = None,
         spend: SpendLimits | None = None,
+        governance: GovernanceOptions | None = None,
         protocols: str | Sequence[str] = ("x402",),
         http_client: httpx.AsyncClient | None = None,
     ) -> FourMica:
         """With neither *private_key* nor *signer*, all configuration comes from
         ``FOURMICA_*`` in *env*; with one, the environment is not read. *rpc_url*
-        names a self-hosted core. *http_client* stays the caller's to close."""
+        names a self-hosted core. *http_client* stays the caller's to close.
+        With *governance*, :meth:`fetch` asks the 4Mica API before it signs."""
         if private_key and signer is not None:
             raise ConfigError("pass private_key or signer, not both")
         chosen = []
@@ -177,15 +188,19 @@ class FourMica:
         limiter = SpendLimiter(spend)
         cfg = _home_config(private_key, signer, env, network, rpc_url, facilitator_url)
         home = await _connect_session(cfg)
+        http = (
+            httpx.AsyncClient(timeout=_FETCH_TIMEOUT)
+            if http_client is None
+            else http_client
+        )
         return cls(
             cfg,
             home,
             chosen,
             limiter,
-            httpx.AsyncClient(timeout=_FETCH_TIMEOUT)
-            if http_client is None
-            else http_client,
+            http,
             owns_http=http_client is None,
+            governor=None if governance is None else SpendGovernor(governance, http),
         )
 
     @property
@@ -329,6 +344,7 @@ class FourMica:
                 session_for=open_sessions.get,
                 limiter=self._limiter,
                 record=self._payments.__setitem__,
+                governor=self._governor,
             ),
             method,
             url,
@@ -338,6 +354,11 @@ class FourMica:
     def payment_for(self, response: httpx.Response) -> PaymentRecord | None:
         """What :meth:`fetch` paid for *response*, or ``None`` if nothing."""
         return self._payments.get(response)
+
+    def governance_for(self, response: httpx.Response) -> GovernanceOutcome | None:
+        """How the spend authorization behind *response* was accounted for, or
+        ``None`` without governance or when nothing was paid."""
+        return None if self._governor is None else self._governor.outcome(response)
 
     async def aclose(self) -> None:
         if self._closing is None:

@@ -6,7 +6,9 @@ from datetime import datetime
 from typing import Literal
 
 from ..amounts import Token
+from ..app.client import DEFAULT_APP_BASE_URL
 from ..client.model import Route, TokenRoute
+from ..errors import SpendAccountingError
 
 AssetRef = Token
 
@@ -30,6 +32,30 @@ class SpendLimits:
     process only."""
     pay_to: str | Sequence[str] | None = None
     """When set, the only payees the session pays."""
+
+
+AccountingStatus = Literal["recorded", "pending", "failed"]
+
+
+@dataclass(frozen=True)
+class GovernanceOptions:
+    """Asks the 4Mica API before each payment is signed, with a key holding
+    the ``SPEND_AUTHORIZE`` scope, and consumes or releases what it granted."""
+
+    api_key: str
+    base_url: str = DEFAULT_APP_BASE_URL
+    agent_id: str | None = None
+    approval_timeout_secs: float = 300.0
+    poll_interval_secs: float = 2.0
+    on_accounting_error: Callable[[SpendAccountingError], None] | None = None
+
+
+@dataclass(frozen=True)
+class GovernanceOutcome:
+    authorization_id: str
+    accounting: AccountingStatus
+    """``"recorded"``, ``"failed"``, or ``"pending"`` when cancelled while
+    retrying."""
 
 
 @dataclass(frozen=True)

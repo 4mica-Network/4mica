@@ -3,13 +3,15 @@ from __future__ import annotations
 import base64
 import json
 import secrets
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
 import httpx
 
+from ..app.payment import payment_from_header
 from ..client import Client
-from ..errors import X402Error
+from ..errors import InvalidParamsError, X402Error
 from ..models import CheckpointRequiredDetails, parse_refusal_details
 from ..networks import resolve_network
 from ..utils import parse_address, parse_u256
@@ -54,6 +56,10 @@ class PaymentProtocol(Protocol):
 
     def settled(self, response: httpx.Response) -> bool | None:
         """``None`` when the response does not say."""
+        ...
+
+    def req_id(self, headers: Mapping[str, str]) -> str | None:
+        """The request id of the payment in the headers ``pay`` returned."""
         ...
 
     async def recover(
@@ -191,6 +197,15 @@ class X402Protocol:
     def settled(self, response: httpx.Response) -> bool | None:
         answer = _payment_response(response)
         return None if answer is None else answer.get("success") is True
+
+    def req_id(self, headers: Mapping[str, str]) -> str | None:
+        header = headers.get("PAYMENT-SIGNATURE") or headers.get("X-PAYMENT")
+        if not header:
+            return None
+        try:
+            return payment_from_header(header).req_id
+        except (X402Error, InvalidParamsError):
+            return None
 
     async def recover(
         self, refused: httpx.Response, terms: PaymentTerms, client: Client

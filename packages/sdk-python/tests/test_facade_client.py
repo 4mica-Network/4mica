@@ -19,8 +19,9 @@ from stubs import (
     ok,
 )
 
+import fourmica_sdk.app.client as app_client_module
 import fourmica_sdk.client.ctx as ctx_module
-from fourmica_sdk import FourMica
+from fourmica_sdk import FourMica, GovernanceOptions, GovernanceOutcome
 from fourmica_sdk.client.facilitator import Facilitator
 from fourmica_sdk.client.model import Route, TokenRoute
 from fourmica_sdk.errors import InsufficientBalanceError
@@ -251,3 +252,61 @@ async def test_pays_a_402_with_a_payment_signed_by_the_wallet(stack):
         payload.signing_digest(domain), signature=signed.signature
     )
     assert recovered == TEST_ADDRESS
+
+
+async def test_asks_the_api_before_paying_when_governed(stack, monkeypatch):
+    monkeypatch.setattr(app_client_module, "to_app_network", lambda _: "BASE_SEPOLIA")
+    api_calls = []
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        if request.url.host == "app.example":
+            api_calls.append(request.url.path)
+            return httpx.Response(200, json={"id": "auth_1", "status": "RESERVED"})
+        if request.headers.get("PAYMENT-SIGNATURE"):
+            return httpx.Response(200, text="data")
+        required = {
+            "x402Version": 2,
+            "resource": {"url": URL},
+            "accepts": [
+                {
+                    "scheme": "4mica-credit",
+                    "network": CAIP2,
+                    "asset": TOKEN_ADDRESS,
+                    "amount": "10000",
+                    "payTo": SELLER,
+                }
+            ],
+        }
+        encoded = base64.b64encode(json.dumps(required).encode()).decode()
+        return httpx.Response(402, headers={"PAYMENT-REQUIRED": encoded})
+
+    async with (
+        httpx.AsyncClient(transport=httpx.MockTransport(handle)) as http,
+        await FourMica.connect(
+            env={
+                "FOURMICA_WALLET_PRIVATE_KEY": TEST_PRIVATE_KEY,
+                "FOURMICA_RPC_URL": "https://core.example/",
+                "FOURMICA_BEARER_TOKEN": "test-token",
+            },
+            http_client=http,
+            governance=GovernanceOptions(
+                api_key="4mica_sk_test", base_url="https://app.example"
+            ),
+        ) as client,
+    ):
+        response = await client.fetch(URL)
+        assert response.text == "data"
+        assert client.governance_for(response) == GovernanceOutcome(
+            "auth_1", "recorded"
+        )
+        assert client.governance_for(httpx.Response(200)) is None
+
+    assert api_calls == [
+        "/v1/spend/authorize",
+        "/v1/spend/authorizations/auth_1/consume",
+    ]
+
+
+async def test_reports_no_governance_outcome_without_governance(stack):
+    async with await connect(stack) as client:
+        assert client.governance_for(httpx.Response(200)) is None
