@@ -951,6 +951,7 @@ describe("reconcileReportedPayment", () => {
     id: "019fce62-5555-7000-8000-000000000001",
     reqId: "0xfeed",
     payerAddress: PAYER,
+    recipientAddress: RECIPIENT,
     network: "BASE_SEPOLIA" as const,
     assetAddress: USDC,
     amount: "10",
@@ -983,6 +984,48 @@ describe("reconcileReportedPayment", () => {
       dedupeKey: "unauthorized:019fce62-5555-7000-8000-000000000001",
     });
     expect(h.sendFinancialAlert).toHaveBeenCalledTimes(1);
+  });
+
+  it("never consumes an authorization for a payment to a different recipient", async () => {
+    h.db.spendingPolicy.seed(orgPolicy());
+    const [row] = h.db.spendAuthorization.seed(authRow({ reqId: "0xfeed" }));
+    const elsewhere = "0x9999999999999999999999999999999999999999";
+    await reconcileReportedPayment(
+      reported({ recipientAddress: elsewhere }),
+      email(),
+      NOW,
+    );
+    await flush();
+    expect(h.db.spendAuthorization.rows[0]).toMatchObject({
+      status: "RESERVED",
+      paymentId: null,
+      consumedAt: null,
+    });
+    expect(h.db.financialAlert.rows).toHaveLength(1);
+    expect(h.db.financialAlert.rows[0]).toMatchObject({
+      kind: "UNAUTHORIZED_SPEND",
+      dedupeKey: "unauthorized:019fce62-5555-7000-8000-000000000001",
+    });
+    expect(h.db.financialAlert.rows[0]?.detail).toMatchObject({
+      reason: "recipient_mismatch",
+      recipientAddress: elsewhere,
+      authorizationId: row?.id,
+    });
+    expect(h.sendFinancialAlert).toHaveBeenCalledTimes(1);
+  });
+
+  it("consumes only the paid part of a larger authorization and frees the rest", async () => {
+    h.db.spendingPolicy.seed(orgPolicy({ dailyLimit: "100" }));
+    h.db.spendAuthorization.seed(authRow({ reqId: "0xfeed", amount: "90" }));
+    await reconcileReportedPayment(reported({ amount: "4" }), email(), NOW);
+    expect(h.db.spendAuthorization.rows[0]).toMatchObject({
+      status: "CONSUMED",
+      amount: "4",
+      paymentId: "019fce62-5555-7000-8000-000000000001",
+    });
+    expect(
+      (await post("/v1/spend/authorize", body({ amount: "96" }))).json().status,
+    ).toBe("RESERVED");
   });
 
   it("treats a payment larger than its authorization as unauthorized", async () => {

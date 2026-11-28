@@ -843,6 +843,7 @@ describe("payment routes", () => {
       expect(reconcileReportedPayment.mock.calls[0][0]).toMatchObject({
         id: PAYMENT_ID,
         network: "BASE_SEPOLIA",
+        recipientAddress: validReport().recipientAddress.toLowerCase(),
       });
 
       await instance.close();

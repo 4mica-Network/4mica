@@ -633,11 +633,44 @@ export interface ReportedPayment {
   id: string;
   reqId: string;
   payerAddress: string;
+  recipientAddress: string;
   network: PaymentNetwork;
   assetAddress: string | null;
   amount: string;
   status: string;
 }
+
+type Mismatch =
+  | "not_authorized"
+  | "recipient_mismatch"
+  | "exceeds_authorization";
+
+const mismatchOf = (
+  candidate: AuthorizationRow | null,
+  payment: ReportedPayment,
+): Mismatch | null => {
+  if (candidate === null) {
+    return "not_authorized";
+  }
+  if (candidate.recipientAddress !== payment.recipientAddress) {
+    return "recipient_mismatch";
+  }
+  return candidate.network === payment.network &&
+    candidate.assetAddress === payment.assetAddress &&
+    candidate.payerAddress === payment.payerAddress &&
+    toUnits(candidate.amount) >= toUnits(payment.amount) &&
+    (candidate.paymentId === null || candidate.paymentId === payment.id)
+    ? null
+    : "exceeds_authorization";
+};
+
+const MISMATCH_LINES: Record<Mismatch, string> = {
+  not_authorized:
+    "No spend authorization was requested for it. It still counts toward your limits.",
+  recipient_mismatch:
+    "It paid a different recipient than its authorization named.",
+  exceeds_authorization: "The payment does not match its authorization.",
+};
 
 const RECONCILABLE = ["RESERVED", "EXPIRED", "RELEASED", "CONSUMED"] as const;
 
@@ -649,7 +682,6 @@ const reconcileForOrg = async (
   runInTransaction(async (tx) => {
     await lockSpend(tx, orgId, payment.network, payment.assetAddress);
 
-    const amount = toUnits(payment.amount);
     const candidate = await tx.spendAuthorization.findFirst({
       where: {
         organizationId: orgId,
@@ -660,28 +692,21 @@ const reconcileForOrg = async (
       select: AUTHORIZATION_SELECT,
     });
 
-    const covers =
-      candidate !== null &&
-      candidate.network === payment.network &&
-      candidate.assetAddress === payment.assetAddress &&
-      candidate.payerAddress === payment.payerAddress &&
-      toUnits(candidate.amount) >= amount &&
-      (candidate.paymentId === null || candidate.paymentId === payment.id);
-
+    const reason = mismatchOf(candidate, payment);
     const alerts: AlertInput[] = [];
 
-    if (candidate && covers) {
+    if (candidate && reason === null) {
       await tx.spendAuthorization.update({
         where: { id: candidate.id },
         data: {
           status: "CONSUMED",
           paymentId: payment.id,
+          amount: payment.amount,
           consumedAt: candidate.consumedAt ?? now,
         },
         select: { id: true },
       });
-    } else if (await hasEnforcingPolicy(tx, orgId)) {
-      const reason = candidate ? "exceeds_authorization" : "not_authorized";
+    } else if (reason !== null && (await hasEnforcingPolicy(tx, orgId))) {
       alerts.push({
         orgId,
         projectId: candidate?.projectId ?? null,
@@ -696,12 +721,11 @@ const reconcileForOrg = async (
           network: payment.network,
           assetAddress: payment.assetAddress,
           payerAddress: payment.payerAddress,
+          recipientAddress: payment.recipientAddress,
           authorizationId: candidate?.id ?? null,
           lines: [
-            `${shortAddress(payment.payerAddress)} paid ${money(payment.amount, payment.network, payment.assetAddress)} on ${networkLabel(payment.network)}.`,
-            reason === "exceeds_authorization"
-              ? "The payment does not match its authorization."
-              : "No spend authorization was requested for it. It still counts toward your limits.",
+            `${shortAddress(payment.payerAddress)} paid ${money(payment.amount, payment.network, payment.assetAddress)} to ${shortAddress(payment.recipientAddress)} on ${networkLabel(payment.network)}.`,
+            MISMATCH_LINES[reason],
           ],
         },
       });
