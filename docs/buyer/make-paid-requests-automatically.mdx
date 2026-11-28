@@ -106,6 +106,35 @@ Before signing, `client.fetch` asks `POST /v1/spend/authorize` for the payment's
 
 `agentId` attributes payments to one agent when the key is not already an agent's key.
 
+### Accounting after the payment
+
+Consuming or releasing the authorization is bookkeeping that happens after the seller has answered, so its failure never turns a payment into an error: `client.fetch` still returns the seller's response, unchanged. A network error, a 5xx or a 429 from the 4mica API is retried up to three attempts in all, with jittered backoff; any other 4xx is not retried. Both calls are idempotent, so a retry never counts a payment twice.
+
+`governanceOutcome(response)` tells you how the bookkeeping went for a response that carried a governed payment, and returns `undefined` otherwise:
+
+- `accounting: "recorded"`: the authorization was consumed, or released after a 402.
+- `accounting: "pending"`: a transient failure was being retried when the request's `signal` aborted, so the outcome is not known yet. A consume is reconciled by `reqId` once the seller reports the payment; a release lapses when the reservation expires.
+- `accounting: "failed"`: the API refused the call, or every attempt failed.
+
+To alert on it, pass `onAccountingError`. It receives a `SpendAccountingError` with the `transition` (`"consume"` or `"release"`), `authorizationId`, `reqId`, `accounting` and the underlying `cause`, for every outcome other than `"recorded"`, including when the paid request itself threw:
+
+```ts
+import { FourMica, governanceOutcome } from "@4mica/sdk";
+
+await using client = await FourMica.connect({
+  privateKey: process.env.PRIVATE_KEY,
+  governance: {
+    apiKey: process.env.FOURMICA_API_KEY!,
+    onAccountingError: (err) => console.warn(err.authorizationId, err.message),
+  },
+});
+
+const res = await client.fetch("https://api.example.com/report");
+console.log(governanceOutcome(res)); // { authorizationId: "…", accounting: "recorded" }
+```
+
+Do not pay again because accounting failed: the payment went through, and the spend is reconciled from the seller's report.
+
 **This is a cooperative check, not hard enforcement.** 4mica's dashboard is not in the payment path: payments are signed locally, so anyone holding the wallet key can sign without asking, or leave `governance` out. Such a payment is still detected afterwards when the seller reports it: it raises an unauthorized-spend alert and counts toward your limits. Without `governance`, `client.fetch` behaves exactly as before.
 
 `client.paymentFor(response)` returns what was paid for a response: `protocol`, `network`, `asset`, `amount` (a decimal string), `amountRaw` and `payTo`. It returns `undefined` when the request needed no payment, or when the seller failed the request without taking one.

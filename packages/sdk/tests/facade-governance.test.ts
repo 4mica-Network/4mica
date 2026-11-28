@@ -1,7 +1,11 @@
-import { describe, expect, it, vi } from "vitest";
-import { SpendAuthorizationError, SpendLimitError } from "@/errors";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  type SpendAccountingError,
+  SpendAuthorizationError,
+  SpendLimitError,
+} from "@/errors";
 import { type FetchContext, payingFetch, SpendLimiter } from "@/facade/fetch";
-import { SpendGovernor } from "@/facade/governance";
+import { governanceOutcome, SpendGovernor } from "@/facade/governance";
 import type { PaymentRecord } from "@/facade/models";
 import { x402Protocol } from "@/facade/protocols/x402";
 import { base64ToUtf8, utf8ToBase64 } from "@/x402/base64";
@@ -52,7 +56,12 @@ const authorization = (overrides: Record<string, unknown> = {}) => ({
 });
 
 function api(
-  answers: { authorize?: () => Response; poll?: () => Response } = {},
+  answers: {
+    authorize?: () => Response;
+    poll?: () => Response;
+    consume?: () => Response;
+    release?: () => Response;
+  } = {},
 ) {
   const calls: { method: string; path: string; body: unknown }[] = [];
   const fetchFn = vi.fn(
@@ -71,9 +80,11 @@ function api(
         return answers.poll?.() ?? json(authorization());
       }
       if (path.endsWith("/consume")) {
-        return json(authorization({ status: "CONSUMED" }));
+        return (
+          answers.consume?.() ?? json(authorization({ status: "CONSUMED" }))
+        );
       }
-      return json(authorization({ status: "RELEASED" }));
+      return answers.release?.() ?? json(authorization({ status: "RELEASED" }));
     },
   );
   return { calls, fetchFn: fetchFn as unknown as typeof fetch };
@@ -109,7 +120,11 @@ function context(
 
 const governor = (
   fetchFn: typeof fetch,
-  options: { approvalTimeoutMs?: number; agentId?: string } = {},
+  options: {
+    approvalTimeoutMs?: number;
+    agentId?: string;
+    onAccountingError?: (error: SpendAccountingError) => void;
+  } = {},
 ) =>
   new SpendGovernor(
     { apiKey: "4mica_sk_test", baseUrl: API, pollIntervalMs: 1, ...options },
@@ -420,20 +435,250 @@ describe("governed paying fetch", () => {
     );
     expect(backend.calls).toEqual([]);
   });
+});
 
-  it("ignores a failed consume once the seller has delivered", async () => {
+async function settle<T>(promise: Promise<T>): Promise<T> {
+  let done = false;
+  promise.then(
+    () => {
+      done = true;
+    },
+    () => {
+      done = true;
+    },
+  );
+  while (!done) {
+    await new Promise((resolve) => setImmediate(resolve));
+    await vi.advanceTimersByTimeAsync(1_000);
+  }
+  return promise;
+}
+
+const consumes = (calls: { method: string; path: string }[]) =>
+  paths(calls).filter((call) => call.endsWith("/consume"));
+
+describe("governance accounting", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  const fakeTimers = () =>
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+
+  it("reports the consume as recorded when it succeeds first time", async () => {
     const backend = api();
-    const failing = vi.fn(
-      async (input: RequestInfo | URL, init?: RequestInit) =>
-        String(input).endsWith("/consume")
-          ? json({ error: "conflict" }, 409)
-          : backend.fetchFn(input, init),
-    ) as unknown as typeof fetch;
-    const { ctx, records } = context(seller().fetchFn, governor(failing));
+    const onAccountingError = vi.fn();
+    const { ctx } = context(
+      seller().fetchFn,
+      governor(backend.fetchFn, { onAccountingError }),
+    );
 
     const res = await payingFetch(ctx, URL_);
 
-    expect(res.ok).toBe(true);
+    expect(governanceOutcome(res)).toEqual({
+      authorizationId: "auth_1",
+      accounting: "recorded",
+    });
+    expect(consumes(backend.calls)).toHaveLength(1);
+    expect(onAccountingError).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["a 503", () => json({ error: "unavailable" }, 503)],
+    ["a 429", () => json({ error: "rate_limited" }, 429)],
+    [
+      "a network error",
+      () => {
+        throw new TypeError("fetch failed");
+      },
+    ],
+  ])("retries the consume after %s and records it", async (_label, failure) => {
+    fakeTimers();
+    let attempts = 0;
+    const backend = api({
+      consume: () =>
+        ++attempts < 3
+          ? failure()
+          : json(authorization({ status: "CONSUMED" })),
+    });
+    const onAccountingError = vi.fn();
+    const { ctx, records } = context(
+      seller().fetchFn,
+      governor(backend.fetchFn, { onAccountingError }),
+    );
+
+    const res = await settle(payingFetch(ctx, URL_));
+
+    expect(attempts).toBe(3);
+    const bodies = backend.calls
+      .filter((call) => call.path.endsWith("/consume"))
+      .map((call) => call.body);
+    expect(new Set(bodies.map((body) => JSON.stringify(body))).size).toBe(1);
+    expect(governanceOutcome(res)?.accounting).toBe("recorded");
     expect(records).toHaveLength(1);
+    expect(onAccountingError).not.toHaveBeenCalled();
+  });
+
+  it("gives up after three transient failures and reports it", async () => {
+    fakeTimers();
+    const backend = api({
+      consume: () => json({ error: "unavailable" }, 503),
+    });
+    const onAccountingError = vi.fn();
+    const { ctx } = context(
+      seller().fetchFn,
+      governor(backend.fetchFn, { onAccountingError }),
+    );
+
+    const res = await settle(payingFetch(ctx, URL_));
+
+    expect(consumes(backend.calls)).toHaveLength(3);
+    expect(await res.text()).toBe("ok");
+    expect(governanceOutcome(res)?.accounting).toBe("failed");
+    expect(onAccountingError).toHaveBeenCalledTimes(1);
+    expect(onAccountingError.mock.calls[0][0]).toMatchObject({
+      name: "SpendAccountingError",
+      transition: "consume",
+      authorizationId: "auth_1",
+      accounting: "failed",
+      cause: { status: 503 },
+    });
+  });
+
+  it("returns the paid response even when the accounting callback throws", async () => {
+    const backend = api({
+      consume: () => json({ error: "conflict" }, 409),
+    });
+    const paidResponse = new Response("ok");
+    const { ctx } = context(
+      seller(() => paidResponse).fetchFn,
+      governor(backend.fetchFn, {
+        onAccountingError: () => {
+          throw new Error("callback bug");
+        },
+      }),
+    );
+
+    const res = await payingFetch(ctx, URL_);
+
+    expect(res).toBe(paidResponse);
+    expect(governanceOutcome(res)).toEqual({
+      authorizationId: "auth_1",
+      accounting: "failed",
+    });
+  });
+
+  it.each([
+    400, 404, 409,
+  ])("does not retry a %i, reports it, and still returns the paid response", async (status) => {
+    const backend = api({
+      consume: () => json({ error: "conflict" }, status),
+    });
+    const onAccountingError = vi.fn();
+    const paidResponse = new Response("ok");
+    const shop = seller(() => paidResponse);
+    const { ctx, records } = context(
+      shop.fetchFn,
+      governor(backend.fetchFn, { onAccountingError }),
+    );
+
+    const res = await payingFetch(ctx, URL_);
+
+    expect(res).toBe(paidResponse);
+    expect(await res.text()).toBe("ok");
+    expect(records).toHaveLength(1);
+    expect(consumes(backend.calls)).toHaveLength(1);
+    expect(governanceOutcome(res)).toEqual({
+      authorizationId: "auth_1",
+      accounting: "failed",
+    });
+    expect(onAccountingError).toHaveBeenCalledTimes(1);
+    const error = onAccountingError.mock.calls[0][0] as SpendAccountingError;
+    expect(error.accounting).toBe("failed");
+    const envelope = JSON.parse(
+      base64ToUtf8(shop.calls[1].headers.get("PAYMENT-SIGNATURE") ?? ""),
+    );
+    expect(error.reqId).toBe(envelope.payload.payload.req_id);
+  });
+
+  it("stops retrying once the request is aborted and reports the consume as pending", async () => {
+    fakeTimers();
+    const controller = new AbortController();
+    const backend = api({
+      consume: () => {
+        controller.abort();
+        return json({ error: "unavailable" }, 503);
+      },
+    });
+    const onAccountingError = vi.fn();
+    const { ctx } = context(
+      seller().fetchFn,
+      governor(backend.fetchFn, { onAccountingError }),
+    );
+
+    const res = await settle(
+      payingFetch(ctx, URL_, { signal: controller.signal }),
+    );
+
+    expect(await res.text()).toBe("ok");
+    expect(consumes(backend.calls)).toHaveLength(1);
+    expect(governanceOutcome(res)?.accounting).toBe("pending");
+    expect(onAccountingError).toHaveBeenCalledTimes(1);
+    expect(onAccountingError.mock.calls[0][0]).toMatchObject({
+      accounting: "pending",
+    });
+  });
+
+  it("reports a failed consume when the paid request itself throws", async () => {
+    const backend = api({
+      consume: () => json({ error: "forbidden" }, 403),
+    });
+    const onAccountingError = vi.fn();
+    const shop = seller(() => {
+      throw new TypeError("network down");
+    });
+    const { ctx } = context(
+      shop.fetchFn,
+      governor(backend.fetchFn, { onAccountingError }),
+    );
+
+    await expect(payingFetch(ctx, URL_)).rejects.toThrow("network down");
+    expect(onAccountingError).toHaveBeenCalledTimes(1);
+    expect(onAccountingError.mock.calls[0][0]).toMatchObject({
+      transition: "consume",
+      accounting: "failed",
+    });
+  });
+
+  it("reports a release that keeps failing after a 402", async () => {
+    fakeTimers();
+    const backend = api({
+      release: () => json({ error: "unavailable" }, 502),
+    });
+    const onAccountingError = vi.fn();
+    const { ctx } = context(
+      seller(() => v2Challenge()).fetchFn,
+      governor(backend.fetchFn, { onAccountingError }),
+    );
+
+    const res = await settle(payingFetch(ctx, URL_));
+
+    expect(res.status).toBe(402);
+    expect(
+      paths(backend.calls).filter((call) => call.endsWith("/release")),
+    ).toHaveLength(3);
+    expect(governanceOutcome(res)?.accounting).toBe("failed");
+    expect(onAccountingError.mock.calls[0][0]).toMatchObject({
+      transition: "release",
+      accounting: "failed",
+    });
+  });
+
+  it("records no outcome without governance", async () => {
+    const { ctx } = context(seller().fetchFn, undefined);
+
+    const res = await payingFetch(ctx, URL_);
+
+    expect(governanceOutcome(res)).toBeUndefined();
   });
 });

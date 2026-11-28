@@ -847,3 +847,29 @@ export class SpendAuthorizationError extends PaymentError {
     this.url = url;
   }
 }
+
+export class SpendAccountingError extends PaymentError {
+  readonly transition: "consume" | "release";
+  readonly authorizationId: string;
+  readonly reqId: string | null;
+  readonly accounting: "pending" | "failed";
+
+  constructor(
+    transition: "consume" | "release",
+    authorizationId: string,
+    accounting: "pending" | "failed",
+    cause: unknown,
+    reqId?: string,
+  ) {
+    super(
+      `could not ${transition} spend authorization ${authorizationId}` +
+        (accounting === "pending" ? " before the request was aborted" : "") +
+        `: ${cause instanceof Error ? cause.message : String(cause)}`,
+    );
+    this.transition = transition;
+    this.authorizationId = authorizationId;
+    this.reqId = reqId ?? null;
+    this.accounting = accounting;
+    this.cause = cause;
+  }
+}

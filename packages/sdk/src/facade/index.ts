@@ -34,6 +34,7 @@ import {
 } from "@/facade/withdraw";
 import { DEFAULT_NETWORK, NETWORKS, resolveNetwork } from "@/networks";
 
+export { governanceOutcome } from "@/facade/governance";
 export type * from "@/facade/models";
 export type { PaymentProtocol, PaymentTerms } from "@/facade/protocols/types";
 

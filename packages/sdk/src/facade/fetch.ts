@@ -1,8 +1,16 @@
 import { formatUnits, parseAmount, toBaseUnits } from "@/amounts";
 import type { SpendAuthorization } from "@/app/models";
 import { SpendAuthorizationError, SpendLimitError } from "@/errors";
-import type { SpendGovernor } from "@/facade/governance";
-import type { AssetRef, PaymentRecord, SpendLimits } from "@/facade/models";
+import {
+  recordGovernanceOutcome,
+  type SpendGovernor,
+} from "@/facade/governance";
+import type {
+  AccountingStatus,
+  AssetRef,
+  PaymentRecord,
+  SpendLimits,
+} from "@/facade/models";
 import type { PaymentProtocol, PaymentTerms } from "@/facade/protocols/types";
 import { assetRef, type NetworkSession } from "@/facade/session";
 
@@ -186,7 +194,7 @@ export async function payingFetch(
       authorization = granted;
     }
     const releaseAuthorization = () =>
-      authorization && ctx.governor?.release(authorization.id);
+      authorization && ctx.governor?.release(authorization.id, request.signal);
 
     const headers = new Headers(request.headers);
     let signed: Record<string, string>;
@@ -200,13 +208,21 @@ export async function payingFetch(
     for (const [name, value] of Object.entries(signed)) {
       headers.set(name, value);
     }
-    const conclude = async (outcome: PaymentOutcome) => {
+    const conclude = async (
+      outcome: PaymentOutcome,
+    ): Promise<AccountingStatus | undefined> => {
       if (outcome === "rejected") {
         ctx.limiter.release(reservation);
-        await releaseAuthorization();
-      } else if (authorization) {
-        await ctx.governor?.consume(authorization.id, protocol.reqId?.(signed));
+        return releaseAuthorization();
       }
+      return (
+        authorization &&
+        ctx.governor?.consume(
+          authorization.id,
+          protocol.reqId?.(signed),
+          request.signal,
+        )
+      );
     };
 
     let paid: Response;
@@ -217,7 +233,13 @@ export async function payingFetch(
       throw err;
     }
     const outcome = paymentOutcome(protocol, paid);
-    await conclude(outcome);
+    const accounting = await conclude(outcome);
+    if (authorization && accounting) {
+      recordGovernanceOutcome(paid, {
+        authorizationId: authorization.id,
+        accounting,
+      });
+    }
     if (outcome === "settled") {
       ctx.record(paid, {
         protocol: protocol.name,

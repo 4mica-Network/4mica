@@ -188,6 +188,12 @@ unknown, since the seller holds a payment it may still redeem; consume with the 
 case, so the spend is over-counted rather than under-counted. 4mica reconciles by `reqId` when the
 seller reports the payment.
 
+Both calls are idempotent: consuming again with the same `reqId`, or releasing again, answers 200.
+Retry a network error, a 5xx or a 429 with backoff; another 4xx will not succeed on retry. A failure
+here is bookkeeping, not a failed payment: never sign the payment again because of it.
+`FourMica.connect({ governance })` retries up to three attempts, reports what is left through
+`onAccountingError`, and exposes the result as `governanceOutcome(response)`.
+
 A reservation expires 10 minutes after it is granted. Release one you will not use, so it stops
 counting toward your limits.
 

@@ -1,6 +1,7 @@
 import type { Account } from "viem/accounts";
 import type { TokenLike } from "@/amounts";
 import type { Route, TokenRoute } from "@/client/model";
+import type { SpendAccountingError } from "@/errors";
 
 export type AssetRef = TokenLike;
 
@@ -25,6 +26,14 @@ export interface GovernanceOptions {
   agentId?: string;
   approvalTimeoutMs?: number;
   pollIntervalMs?: number;
+  onAccountingError?: (error: SpendAccountingError) => void;
+}
+
+export type AccountingStatus = "recorded" | "pending" | "failed";
+
+export interface GovernanceOutcome {
+  authorizationId: string;
+  accounting: AccountingStatus;
 }
 
 export interface FourMicaOptions {
