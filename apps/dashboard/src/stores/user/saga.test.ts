@@ -90,14 +90,41 @@ describe("completeOnboarding saga", () => {
 
     const dispatched = await record(completeOnboarding, action);
 
-    expect(upsertBusiness).toHaveBeenCalledWith({
-      legalName: "Analytical Engines Ltd",
-    });
+    expect(upsertBusiness).toHaveBeenCalledWith(
+      { legalName: "Analytical Engines Ltd" },
+      null,
+    );
     expect(updateAccount).toHaveBeenCalledWith({ completeOnboarding: true });
     expect(types(dispatched)).toEqual([
       actionTypes.UPDATE_BUSINESS_SUCCEEDED,
       actionTypes.UPDATE_USER_SUCCEEDED,
     ]);
+  });
+
+  it("writes the business to the workspace it was asked for", async () => {
+    upsertBusiness.mockResolvedValue({ legalName: "Analytical Engines Ltd" });
+    updateAccount.mockResolvedValue({ completeOnboarding: true });
+
+    await record(completeOnboarding, { ...action, organizationId: "personal" });
+
+    expect(upsertBusiness).toHaveBeenCalledWith(
+      { legalName: "Analytical Engines Ltd" },
+      "personal",
+    );
+  });
+
+  it("only flips the flag when there is no business to write", async () => {
+    updateAccount.mockResolvedValue({ completeOnboarding: true });
+
+    const dispatched = await record(completeOnboarding, {
+      ...action,
+      payload: null,
+      meta: { section: "onboarding.complete" },
+    });
+
+    expect(upsertBusiness).not.toHaveBeenCalled();
+    expect(updateAccount).toHaveBeenCalledWith({ completeOnboarding: true });
+    expect(types(dispatched)).toEqual([actionTypes.UPDATE_USER_SUCCEEDED]);
   });
 
   it("never marks the account onboarded when the business write fails", async () => {

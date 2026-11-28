@@ -10,8 +10,11 @@ vi.mock("@/components/Sidebar", () => ({
   ),
 }));
 vi.mock("@/components/Onboarding", () => ({ OnboardingGate: () => null }));
+vi.mock("@/components/OrganizationRail", () => ({
+  OrganizationRail: () => <nav data-testid="organization-rail" />,
+}));
 vi.mock("@/components/Project/EnvironmentToggle", () => ({
-  EnvironmentBar: () => null,
+  EnvironmentBar: () => <div data-testid="environment-bar">Sandbox</div>,
 }));
 
 const { AppShell } = await import("./index");
@@ -127,5 +130,47 @@ describe("AppShell", () => {
     expect(
       screen.queryByRole("button", { name: "Close sidebar" }),
     ).not.toBeInTheDocument();
+  });
+
+  it("runs the environment banner across the top, outside the content", () => {
+    setWidth(1440);
+    renderShell();
+    const banner = screen.getByTestId("environment-bar");
+
+    expect(screen.getByRole("main")).not.toContainElement(banner);
+    expect(banner.parentElement?.firstElementChild).toHaveTextContent(
+      "Skip to content",
+    );
+    const rail = screen.getByTestId("organization-rail");
+    expect(
+      banner.compareDocumentPosition(rail) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      banner.compareDocumentPosition(screen.getByTestId("sidebar")) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it("keeps the organization rail beside the sidebar on desktop, even collapsed", () => {
+    setWidth(1440);
+    renderShell();
+
+    expect(screen.getByTestId("organization-rail")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Collapse sidebar" }));
+    expect(screen.getByTestId("organization-rail")).toBeInTheDocument();
+  });
+
+  it("shows the rail only inside the open drawer on medium screens", () => {
+    setWidth(900);
+    renderShell();
+
+    expect(screen.queryByTestId("organization-rail")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Expand sidebar" }));
+    const rail = screen.getByTestId("organization-rail");
+    expect(rail.nextElementSibling).toBe(screen.getByTestId("sidebar"));
+
+    fireEvent.click(screen.getByRole("button", { name: "Close sidebar" }));
+    expect(screen.queryByTestId("organization-rail")).toBeNull();
   });
 });

@@ -202,6 +202,17 @@ describe("organization setup card", () => {
     expect(screen.queryByTestId("org-setup")).toBeNull();
   });
 
+  it.each([
+    "DEVELOPER",
+    "VIEWER",
+    "FINANCE",
+  ] as const)("stays hidden from a newly invited %s", (role) => {
+    renderCard(organization({ role, memberCount: 2 }));
+
+    expect(screen.queryByTestId("org-setup")).toBeNull();
+    expect(getInvitations).not.toHaveBeenCalled();
+  });
+
   it("disappears once every step is done", () => {
     renderCard(organization({ memberCount: 2 }), [
       project(),

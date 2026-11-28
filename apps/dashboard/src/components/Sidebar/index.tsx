@@ -1,6 +1,5 @@
-import { Avatar, cn, Dropdown, Tooltip } from "@4mica/ui";
+import { cn, Dropdown, Tooltip } from "@4mica/ui";
 import { useCopyToClipboard } from "@4mica/ui/hooks";
-import { useClerk, useUser } from "@clerk/clerk-react";
 import { fetchFinanceBadges } from "@stores/financeBadge/actions";
 import { selectFinanceBadges } from "@stores/financeBadge/selector";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
@@ -16,23 +15,15 @@ import {
   Check,
   ChevronDown,
   Copy,
+  DoorOpen,
   Eye,
-  LogOut,
   type LucideIcon,
-  UserCog,
+  Settings,
+  UserPlus,
 } from "lucide-react";
-import {
-  lazy,
-  type ReactNode,
-  Suspense,
-  useEffect,
-  useId,
-  useRef,
-  useState,
-} from "react";
+import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
-import { OrganizationSwitcher } from "@/components/Organization/OrganizationSwitcher";
 import { EnvironmentToggle } from "@/components/Project/EnvironmentToggle";
 import { ProjectSwitcher } from "@/components/Project/ProjectSwitcher";
 import { SidebarBanners } from "@/components/SidebarBanners";
@@ -40,6 +31,8 @@ import { showsProjects, useWorkspaceMode } from "@/hooks/useWorkspaceMode";
 import { links } from "@/lib/links";
 import {
   FOOTER_ITEMS,
+  firstSettingsPath,
+  INVITE_TEAM_PATH,
   NAV_SECTIONS,
   type NavItem,
   type NavSection,
@@ -47,14 +40,7 @@ import {
   SETTINGS_SECTIONS,
 } from "@/nav";
 import { preloadPage } from "@/routes";
-
-const CreateOrganizationModal = lazy(() =>
-  import("@/components/Organization/CreateOrganizationModal").then(
-    (module) => ({
-      default: module.CreateOrganizationModal,
-    }),
-  ),
-);
+import { OrganizationAvatar, UserAvatar, useDisplayName } from "./identity";
 
 const EXPANDED_WIDTH = 256;
 export const COLLAPSED_WIDTH = 60;
@@ -95,43 +81,6 @@ function Label({
     >
       {children}
     </span>
-  );
-}
-
-const firstNonBlank = (
-  ...values: (string | null | undefined)[]
-): string | undefined => values.find((value) => value?.trim())?.trim();
-
-function useDisplayName(): string {
-  const { t } = useTranslation();
-  const { user } = useUser();
-  const currentUser = useAppSelector(selectUser);
-
-  return (
-    firstNonBlank(
-      currentUser?.name,
-      user?.fullName,
-      currentUser?.email,
-      user?.primaryEmailAddress?.emailAddress,
-    ) ?? t("sidebar.newUser")
-  );
-}
-
-function AvatarCircle() {
-  const { t } = useTranslation();
-  const { user } = useUser();
-  const imageUrl = user?.imageUrl;
-  const [failedUrl, setFailedUrl] = useState<string | null>(null);
-
-  return (
-    <Avatar
-      src={imageUrl && imageUrl !== failedUrl ? imageUrl : null}
-      onError={() => setFailedUrl(imageUrl ?? null)}
-      name={t("monogram")}
-      alt=""
-      size="xs"
-      className="border-0 bg-overlay/15 text-ink-strong"
-    />
   );
 }
 
@@ -299,17 +248,71 @@ function ActionRow({
   );
 }
 
-function AvatarMenu({ collapsed }: { collapsed: boolean }) {
-  const { t } = useTranslation();
-  const { signOut } = useClerk();
-  const [open, setOpen] = useState(false);
-  const [creating, setCreating] = useState(false);
-  const anchorRef = useRef<HTMLButtonElement>(null);
-  const menuId = useId();
+const MENU_ITEM =
+  "flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-ink-body text-sm outline-none hover:bg-overlay/10 focus-visible:bg-overlay/10 focus-visible:ring-1 focus-visible:ring-overlay/60 focus-visible:ring-inset";
 
+function useWorkspaceIdentity() {
+  const { t } = useTranslation();
   const displayName = useDisplayName();
   const organization = useAppSelector(selectActiveOrganization);
-  const { hasTeamOrganizations } = useWorkspaceMode();
+  const team = organization && !organization.personal ? organization : null;
+  return {
+    organization,
+    team,
+    title: team ? team.name : t("sidebar.personal"),
+    subtitle: team ? t(`organization.role.${team.role}`) : displayName,
+    avatar: team ? <OrganizationAvatar organization={team} /> : <UserAvatar />,
+  };
+}
+
+function WorkspaceIdentity({
+  collapsed,
+  trailing,
+}: {
+  collapsed: boolean;
+  trailing?: ReactNode;
+}) {
+  const { title, subtitle, avatar } = useWorkspaceIdentity();
+  return (
+    <>
+      <span className="mr-1 grid h-11 w-9 shrink-0 place-items-center">
+        {avatar}
+      </span>
+      <span
+        className={cn(
+          "flex min-w-0 flex-1 items-center gap-1 pr-2 transition-opacity duration-200",
+          collapsed ? "opacity-0" : "opacity-100",
+        )}
+      >
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span
+            className="min-w-0 truncate font-medium text-ink-strong text-sm"
+            data-testid="active-organization"
+          >
+            {title}
+          </span>
+          <span className="min-w-0 truncate text-2xs text-ink-subtle">
+            {subtitle}
+          </span>
+        </span>
+        {trailing}
+      </span>
+    </>
+  );
+}
+
+function WorkspaceMenu({ collapsed }: { collapsed: boolean }) {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+  const anchorRef = useRef<HTMLButtonElement>(null);
+  const menuId = useId();
+  const { organization, team, title } = useWorkspaceIdentity();
+  const mode = useWorkspaceMode();
+  const settingsPath = firstSettingsPath(mode, (permission: Permission) =>
+    allows(organization, permission),
+  );
+  const canInvite = Boolean(team) && allows(team, PERMISSION.MEMBERS_MANAGE);
+  const close = () => setOpen(false);
 
   return (
     <>
@@ -319,43 +322,26 @@ function AvatarMenu({ collapsed }: { collapsed: boolean }) {
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
-        aria-label={collapsed ? displayName : undefined}
+        aria-label={t("sidebar.workspaceMenu", { name: title })}
         onClick={() => setOpen((v) => !v)}
+        data-testid="workspace-menu"
         className={cn(
           "flex h-11 w-full items-center overflow-hidden rounded-lg text-left transition-[background-color,padding] duration-200 hover:bg-overlay/5",
           collapsed ? "pl-0" : "pl-1.5",
         )}
       >
-        <span className="mr-1 grid h-11 w-9 shrink-0 place-items-center">
-          <AvatarCircle />
-        </span>
-        <span
-          className={cn(
-            "flex min-w-0 flex-1 items-center gap-1 pr-2 transition-opacity duration-200",
-            collapsed ? "opacity-0" : "opacity-100",
-          )}
-        >
-          <span className="flex min-w-0 flex-1 flex-col">
-            <span className="min-w-0 truncate font-medium text-ink-strong text-sm">
-              {displayName}
-            </span>
-            {organization && (
-              <span
-                className="min-w-0 truncate text-2xs text-ink-subtle"
-                data-testid="active-organization"
-              >
-                {organization.name}
-              </span>
-            )}
-          </span>
-          <m.span
-            animate={{ rotate: open ? 180 : 0 }}
-            transition={{ duration: 0.18 }}
-            className="shrink-0 text-ink-subtle"
-          >
-            <ChevronDown aria-hidden="true" className="h-4 w-4" />
-          </m.span>
-        </span>
+        <WorkspaceIdentity
+          collapsed={collapsed}
+          trailing={
+            <m.span
+              animate={{ rotate: open ? 180 : 0 }}
+              transition={{ duration: 0.18 }}
+              className="shrink-0 text-ink-subtle"
+            >
+              <ChevronDown aria-hidden="true" className="h-4 w-4" />
+            </m.span>
+          }
+        />
       </button>
 
       <Dropdown
@@ -363,67 +349,64 @@ function AvatarMenu({ collapsed }: { collapsed: boolean }) {
         anchorRef={anchorRef}
         placement="bottom"
         matchAnchorWidth={!collapsed}
-        onClickOutside={() => setOpen(false)}
+        onClickOutside={close}
+        onDismiss={close}
         autoFocus
         className="min-w-50 bg-surface-deep p-1"
       >
-        <div id={menuId} role="menu" aria-label={displayName}>
-          <OrganizationSwitcher
-            showOrganizations={hasTeamOrganizations}
-            onDone={() => setOpen(false)}
-            onCreate={() => setCreating(true)}
-          />
+        <div id={menuId} role="menu" aria-label={title}>
           <NavLink
-            to="/settings/profile"
+            to={settingsPath}
             role="menuitem"
-            onClick={() => setOpen(false)}
-            className="flex items-center gap-2 rounded-md px-2.5 py-2 text-ink-body text-sm outline-none hover:bg-overlay/10 focus-visible:bg-overlay/10 focus-visible:ring-1 focus-visible:ring-overlay/60 focus-visible:ring-inset"
+            onClick={close}
+            className={MENU_ITEM}
+            data-testid="workspace-settings"
           >
-            <UserCog aria-hidden="true" className="h-4 w-4" />
-            {t("sidebar.preferences")}
+            <Settings aria-hidden="true" className="h-4 w-4" />
+            {team
+              ? t("sidebar.organizationSettings")
+              : t("sidebar.workspaceSettings")}
           </NavLink>
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() => {
-              setOpen(false);
-              void signOut({ redirectUrl: "/sign-in" });
-            }}
-            className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-ink-body text-sm outline-none hover:bg-overlay/10 focus-visible:bg-overlay/10 focus-visible:ring-1 focus-visible:ring-overlay/60 focus-visible:ring-inset"
-          >
-            <LogOut aria-hidden="true" className="h-4 w-4" />
-            {t("sidebar.signOut")}
-          </button>
+          {canInvite && (
+            <NavLink
+              to={INVITE_TEAM_PATH}
+              role="menuitem"
+              onClick={close}
+              className={MENU_ITEM}
+              data-testid="workspace-invite"
+            >
+              <UserPlus aria-hidden="true" className="h-4 w-4" />
+              {t("sidebar.invitePeople")}
+            </NavLink>
+          )}
+          {team && (
+            <NavLink
+              to="/settings/general"
+              role="menuitem"
+              onClick={close}
+              className={MENU_ITEM}
+              data-testid="workspace-leave"
+            >
+              <DoorOpen aria-hidden="true" className="h-4 w-4" />
+              {t("sidebar.leaveOrganization")}
+            </NavLink>
+          )}
         </div>
       </Dropdown>
-
-      {creating && (
-        <Suspense fallback={null}>
-          <CreateOrganizationModal isOpen onClose={() => setCreating(false)} />
-        </Suspense>
-      )}
     </>
   );
 }
 
-function StaticBrand({ collapsed }: { collapsed: boolean }) {
-  const displayName = useDisplayName();
+function SettingsWorkspace({ collapsed }: { collapsed: boolean }) {
   return (
     <div
       className={cn(
         "flex h-11 w-full items-center overflow-hidden rounded-lg transition-[padding] duration-200",
         collapsed ? "pl-0" : "pl-1.5",
       )}
+      data-testid="settings-workspace"
     >
-      <span className="mr-1 grid h-11 w-9 shrink-0 place-items-center">
-        <AvatarCircle />
-      </span>
-      <Label
-        collapsed={collapsed}
-        className="pr-2 font-medium text-ink-strong text-sm"
-      >
-        {displayName}
-      </Label>
+      <WorkspaceIdentity collapsed={collapsed} />
     </div>
   );
 }
@@ -483,7 +466,7 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
       animate={{ width: collapsed ? COLLAPSED_WIDTH : EXPANDED_WIDTH }}
       transition={WIDTH_TRANSITION}
       onAnimationComplete={() => setSettled(!collapsed)}
-      className="flex h-dvh shrink-0 flex-col overflow-hidden border-overlay/10 border-r bg-surface-deep"
+      className="flex h-full shrink-0 flex-col overflow-hidden border-overlay/10 border-r bg-surface-deep"
     >
       <div className="flex flex-col gap-0.5 p-3">
         {inSettings ? (
@@ -496,10 +479,10 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
                 collapsed={collapsed}
               />
             </div>
-            <StaticBrand collapsed={collapsed} />
+            <SettingsWorkspace collapsed={collapsed} />
           </>
         ) : (
-          <AvatarMenu collapsed={collapsed} />
+          <WorkspaceMenu collapsed={collapsed} />
         )}
         <div className="mt-1 flex flex-col gap-1.5">
           {showProjects && <ProjectSwitcher collapsed={collapsed} />}

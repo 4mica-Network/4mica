@@ -318,5 +318,7 @@
   "projects.access.chosenTag": "Solo personas elegidas",
   "projects.access.roles": "Roles del proyecto",
   "projects.members.chosenTitle": "Personas con acceso",
-  "projects.members.chosenDescription": "Elige quién puede trabajar en este proyecto y con qué rol. Los propietarios y administradores siempre tienen acceso."
+  "projects.members.chosenDescription": "Elige quién puede trabajar en este proyecto y con qué rol. Los propietarios y administradores siempre tienen acceso.",
+  "invitation.mismatch.sentTo": "Esta invitación se envió a {{email}}. Para aceptarla, inicia sesión con esa cuenta de Google.",
+  "invitation.mismatch.switchAccount": "Cerrar sesión y usar otra cuenta"
 }

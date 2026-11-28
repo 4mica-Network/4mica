@@ -4,6 +4,7 @@ import {
   selectNeedsOnboarding,
 } from "@stores/user/selector";
 import { lazy, Suspense } from "react";
+import { useWorkspaceMode } from "@/hooks/useWorkspaceMode";
 import { translated } from "@/i18n/manifest";
 
 const Wizard = lazy(
@@ -23,6 +24,7 @@ const IntegrationChecklist = lazy(
 export function OnboardingGate() {
   const needsOnboarding = useAppSelector(selectNeedsOnboarding);
   const hasCompleted = useAppSelector(selectHasCompletedOnboarding);
+  const { personal, canManageOrg } = useWorkspaceMode();
 
   if (needsOnboarding) {
     return (
@@ -32,7 +34,7 @@ export function OnboardingGate() {
     );
   }
 
-  if (hasCompleted) {
+  if (hasCompleted && (personal || canManageOrg)) {
     return (
       <Suspense fallback={null}>
         <IntegrationChecklist />

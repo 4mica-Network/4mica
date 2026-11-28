@@ -1,4 +1,5 @@
 import { Avatar, Button, Card } from "@4mica/ui";
+import { useClerk } from "@clerk/clerk-react";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import {
   acceptInvitation,
@@ -12,7 +13,7 @@ import {
 } from "@stores/organization/selector";
 import { formatDate } from "@utils/format";
 import { CircleX, MailX, SearchX, TriangleAlert } from "lucide-react";
-import { type ReactNode, useEffect } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { PageSpinner } from "@/components/PageSpinner";
@@ -48,11 +49,13 @@ function Message({
   title,
   body,
   testId,
+  action,
 }: {
   icon: ReactNode;
   title: string;
   body: string;
   testId: string;
+  action?: ReactNode;
 }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -65,6 +68,7 @@ function Message({
         <h1 className="font-semibold text-ink-strong text-lg">{title}</h1>
         <p className="mt-1 text-ink-muted text-sm">{body}</p>
       </div>
+      {action}
       <Button
         type="button"
         intent="outline"
@@ -74,6 +78,30 @@ function Message({
         {t("invitation.home")}
       </Button>
     </Frame>
+  );
+}
+
+function SwitchAccount({ token }: { token: string }) {
+  const { t } = useTranslation();
+  const { signOut } = useClerk();
+  const [leaving, setLeaving] = useState(false);
+  return (
+    <Button
+      type="button"
+      intent="invert"
+      size="sm"
+      className="btn-no-lift"
+      loading={leaving}
+      onClick={() => {
+        setLeaving(true);
+        void signOut({
+          redirectUrl: `/invitations/${encodeURIComponent(token)}`,
+        });
+      }}
+      data-testid="invitation-switch-account"
+    >
+      {t("invitation.mismatch.switchAccount")}
+    </Button>
   );
 }
 
@@ -123,6 +151,23 @@ export function InvitationPage() {
 
   if (invitation.status === "failed") {
     const failure = FAILURES[invitation.errorCode ?? ""];
+    if (invitation.errorCode === "invitation_email_mismatch" && failure) {
+      return (
+        <Message
+          icon={failure.icon}
+          title={t("invitation.mismatch.title")}
+          body={
+            invitation.preview
+              ? t("invitation.mismatch.sentTo", {
+                  email: invitation.preview.email,
+                })
+              : t("invitation.mismatch.body")
+          }
+          testId="invitation-invitation_email_mismatch"
+          action={<SwitchAccount token={token} />}
+        />
+      );
+    }
     return failure ? (
       <Message
         icon={failure.icon}

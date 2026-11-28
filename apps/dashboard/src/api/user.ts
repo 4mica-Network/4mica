@@ -71,9 +71,13 @@ export const getBusiness = () =>
     method: HttpMethod.GET,
   });
 
-export const upsertBusiness = (data: Partial<Business>) =>
+export const upsertBusiness = (
+  data: Partial<Business>,
+  organizationId: string | null = null,
+) =>
   httpClient.request<Business, Partial<Business>>({
     url: "/me/business",
     method: HttpMethod.PUT,
     data,
+    ...(organizationId ? { headers: { "X-Org-Id": organizationId } } : {}),
   });

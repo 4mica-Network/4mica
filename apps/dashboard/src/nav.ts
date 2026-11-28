@@ -145,6 +145,8 @@ export const NAV_SECTIONS: NavSection[] = [
   },
 ];
 
+export const INVITE_TEAM_PATH = "/settings/team?invite=1";
+
 export const FOOTER_ITEMS: NavItem[] = [
   { to: "/settings", labelKey: "nav.settings", icon: Settings },
   { to: "/help", labelKey: "nav.help", icon: CircleHelp },
@@ -207,6 +209,37 @@ export const SECURITY_COMPLIANCE: NavItem = {
   ],
 };
 
+const PROFILE: NavItem = {
+  to: "/settings/profile",
+  labelKey: "nav.profile",
+  icon: BadgeCheck,
+};
+const NOTIFICATIONS: NavItem = {
+  to: "/settings/notifications",
+  labelKey: "nav.notifications",
+  icon: Bell,
+};
+const BUSINESS: NavItem = {
+  to: "/settings/business",
+  labelKey: "nav.business",
+  icon: Building2,
+};
+const PLANS: NavItem = {
+  to: "/settings/plans",
+  labelKey: "nav.plans",
+  icon: CreditCard,
+};
+const COMPLIANCE: NavItem = {
+  to: "/settings/compliance",
+  labelKey: "nav.compliance",
+  icon: ShieldCheck,
+};
+const DEVELOPER: NavItem = {
+  to: "/settings/developer",
+  labelKey: "nav.developer",
+  icon: Code,
+};
+
 export const SETTINGS_SECTIONS: NavSection[] = [
   {
     titleKey: "nav.section.organization",
@@ -220,40 +253,40 @@ export const SETTINGS_SECTIONS: NavSection[] = [
         icon: FolderKanban,
         visibleIn: projectManagers,
       },
-    ],
-  },
-  {
-    titleKey: "nav.section.workspace",
-    items: [
-      { to: "/settings/profile", labelKey: "nav.profile", icon: BadgeCheck },
-      {
-        to: "/settings/general",
-        labelKey: "nav.account",
-        icon: SlidersHorizontal,
-        visibleIn: "personal",
-      },
-      { to: "/settings/business", labelKey: "nav.business", icon: Building2 },
-      {
-        to: "/settings/notifications",
-        labelKey: "nav.notifications",
-        icon: Bell,
-      },
-      { to: "/settings/plans", labelKey: "nav.plans", icon: CreditCard },
-      {
-        to: "/settings/compliance",
-        labelKey: "nav.compliance",
-        icon: ShieldCheck,
-      },
-      { to: "/settings/developer", labelKey: "nav.developer", icon: Code },
+      BUSINESS,
+      PLANS,
+      COMPLIANCE,
+      DEVELOPER,
       {
         to: "/settings/service-accounts",
         labelKey: "nav.serviceAccounts",
         icon: KeySquare,
-        visibleIn: "team",
       },
     ],
   },
-  { items: [SECURITY_COMPLIANCE] },
+  { visibleIn: "team", items: [SECURITY_COMPLIANCE] },
+  {
+    titleKey: "nav.section.yourAccount",
+    visibleIn: "team",
+    items: [PROFILE, NOTIFICATIONS],
+  },
+  {
+    titleKey: "nav.section.workspace",
+    visibleIn: "personal",
+    items: [
+      PROFILE,
+      {
+        to: "/settings/general",
+        labelKey: "nav.account",
+        icon: SlidersHorizontal,
+      },
+      BUSINESS,
+      NOTIFICATIONS,
+      PLANS,
+      COMPLIANCE,
+      DEVELOPER,
+    ],
+  },
 ];
 
 export const navItems = (sections: NavSection[]): NavItem[] =>
@@ -322,3 +355,25 @@ export const isPathVisible = (path: string, mode: WorkspaceMode): boolean => {
     chains.some((chain) => chain.every((rule) => isVisible(rule, mode)))
   );
 };
+
+const settingsPaths = (
+  mode: WorkspaceMode,
+  permitted: (permission: Permission) => boolean,
+): string[] =>
+  navItems(resolveNav(SETTINGS_SECTIONS, mode, permitted))
+    .map((item) => item.to)
+    .filter((to, index, all) => all.indexOf(to) === index);
+
+export const firstSettingsPath = (
+  mode: WorkspaceMode,
+  permitted: (permission: Permission) => boolean,
+): string => settingsPaths(mode, permitted)[0] ?? "/settings/profile";
+
+export const settingsPathFor = (
+  pathname: string,
+  mode: WorkspaceMode,
+  permitted: (permission: Permission) => boolean,
+): string =>
+  settingsPaths(mode, permitted).includes(pathname)
+    ? pathname
+    : firstSettingsPath(mode, permitted);

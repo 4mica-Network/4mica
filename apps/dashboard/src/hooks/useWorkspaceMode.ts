@@ -5,8 +5,13 @@ import {
   selectActiveOrganization,
   selectOrganizations,
 } from "@stores/organization/selector";
-import { ORGANIZATION_ROLE, PERMISSION } from "@stores/organization/type";
+import {
+  ORGANIZATION_ROLE,
+  type OrganizationSummary,
+  PERMISSION,
+} from "@stores/organization/type";
 import { selectProjects } from "@stores/project/selector";
+import type { ProjectSummary } from "@stores/project/type";
 import { shallowEqual } from "react-redux";
 
 export interface WorkspaceMode {
@@ -22,9 +27,11 @@ const ORG_MANAGERS = new Set<string>([
   ORGANIZATION_ROLE.ADMIN,
 ]);
 
-export const selectWorkspaceMode = (state: RootState): WorkspaceMode => {
-  const organization = selectActiveOrganization(state);
-  const projects = selectProjects(state);
+export const workspaceModeFor = (
+  organization: OrganizationSummary | null,
+  projects: ProjectSummary[],
+  organizations: OrganizationSummary[],
+): WorkspaceMode => {
   const personal = Boolean(organization?.personal);
   return {
     personal,
@@ -34,11 +41,16 @@ export const selectWorkspaceMode = (state: RootState): WorkspaceMode => {
       !personal &&
       (allows(organization, PERMISSION.PROJECTS_CREATE) ||
         projects.some((project) => project.role === "ADMIN")),
-    hasTeamOrganizations: selectOrganizations(state).some(
-      (item) => !item.personal,
-    ),
+    hasTeamOrganizations: organizations.some((item) => !item.personal),
   };
 };
+
+export const selectWorkspaceMode = (state: RootState): WorkspaceMode =>
+  workspaceModeFor(
+    selectActiveOrganization(state),
+    selectProjects(state),
+    selectOrganizations(state),
+  );
 
 export const showsProjects = (mode: WorkspaceMode): boolean =>
   !mode.personal && mode.projectCount > 1;

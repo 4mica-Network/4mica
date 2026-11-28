@@ -317,5 +317,7 @@
   "projects.access.chosenTag": "Chosen people only",
   "projects.access.roles": "Project roles",
   "projects.members.chosenTitle": "People with access",
-  "projects.members.chosenDescription": "Pick who can work in this project and their role. Owners and admins always have access."
+  "projects.members.chosenDescription": "Pick who can work in this project and their role. Owners and admins always have access.",
+  "invitation.mismatch.sentTo": "This invitation was sent to {{email}}. To accept it, sign in with that Google account.",
+  "invitation.mismatch.switchAccount": "Sign out and use another account"
 }

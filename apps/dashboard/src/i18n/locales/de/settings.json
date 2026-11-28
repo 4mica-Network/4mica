@@ -317,5 +317,7 @@
   "projects.access.chosenTag": "Nur ausgewählte Personen",
   "projects.access.roles": "Projektrollen",
   "projects.members.chosenTitle": "Personen mit Zugriff",
-  "projects.members.chosenDescription": "Wählen Sie aus, wer in diesem Projekt arbeiten darf und mit welcher Rolle. Inhaber und Admins haben immer Zugriff."
+  "projects.members.chosenDescription": "Wählen Sie aus, wer in diesem Projekt arbeiten darf und mit welcher Rolle. Inhaber und Admins haben immer Zugriff.",
+  "invitation.mismatch.sentTo": "Diese Einladung wurde an {{email}} gesendet. Melde dich mit diesem Google-Konto an, um sie anzunehmen.",
+  "invitation.mismatch.switchAccount": "Abmelden und ein anderes Konto verwenden"
 }

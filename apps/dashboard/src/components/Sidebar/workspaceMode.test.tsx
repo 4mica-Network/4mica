@@ -23,6 +23,7 @@ vi.mock("@clerk/clerk-react", () => ({
 const { Sidebar } = await import("./index");
 const { WorkspaceGuard } = await import("@/components/WorkspaceGuard");
 const { SettingsLayout } = await import("@/components/SettingsLayout");
+const { SettingsIndex } = await import("@/components/WorkspaceGuard");
 
 const ALL: Permission[] = [
   "org.update",
@@ -118,8 +119,8 @@ const renderSidebar = (
     </Provider>,
   );
 
-const openMenu = () =>
-  fireEvent.click(screen.getByRole("button", { name: /Ada Lovelace/ }));
+const openMenu = (name: RegExp) =>
+  fireEvent.click(screen.getByRole("button", { name }));
 
 const navLabels = () =>
   within(screen.getByRole("navigation"))
@@ -142,21 +143,24 @@ describe("sidebar in a personal workspace", () => {
     expect(screen.getByTestId("environment-toggle")).toBeInTheDocument();
   });
 
-  it("offers only Create organization when there is no team", () => {
-    renderSidebar(storeFor([organization()], "personal"));
-    openMenu();
+  it("names the personal workspace in the header", () => {
+    renderSidebar(storeFor([organization(), ACME], "personal"));
 
-    const switcher = screen.getByTestId("organization-switcher");
-    expect(within(switcher).queryAllByRole("menuitemradio")).toHaveLength(0);
-    expect(within(switcher).getByTestId("organization-create")).toBeDefined();
-    expect(within(switcher).queryByText("Organizations")).toBeNull();
+    expect(screen.getByTestId("active-organization")).toHaveTextContent(
+      "Personal",
+    );
+    expect(screen.getByText("Ada Lovelace")).toBeInTheDocument();
   });
 
-  it("lists organizations once the user belongs to a team", () => {
+  it("offers only the personal settings in the header menu", () => {
     renderSidebar(storeFor([organization(), ACME], "personal"));
-    openMenu();
+    openMenu(/Personal menu/);
 
-    expect(screen.getAllByRole("menuitemradio")).toHaveLength(2);
+    const items = screen.getAllByRole("menuitem");
+    expect(items.map((item) => item.textContent)).toEqual(["Settings"]);
+    expect(items[0]).toHaveAttribute("href", "/settings/profile");
+    expect(screen.queryByTestId("organization-switcher")).toBeNull();
+    expect(screen.queryByText("Create organization")).toBeNull();
   });
 
   it("hides team and enterprise settings", () => {
@@ -201,22 +205,63 @@ describe("sidebar in an organization", () => {
     expect(screen.getByTestId("project-switcher")).toBeInTheDocument();
   });
 
+  it("names the organization in the header and offers its settings", () => {
+    renderSidebar(storeFor([organization(), ACME], "acme"));
+
+    expect(screen.getByTestId("active-organization")).toHaveTextContent("Acme");
+    openMenu(/Acme menu/);
+
+    expect(
+      screen.getByRole("menuitem", { name: "Organization settings" }),
+    ).toHaveAttribute("href", "/settings/general");
+    expect(
+      screen.getByRole("menuitem", { name: "Invite people" }),
+    ).toHaveAttribute("href", "/settings/team?invite=1");
+    expect(
+      screen.getByRole("menuitem", { name: "Leave organization" }),
+    ).toHaveAttribute("href", "/settings/general");
+  });
+
+  it("does not offer invitations without members.manage", () => {
+    const viewer = {
+      ...ACME,
+      role: "VIEWER" as const,
+      permissions: ["finance.read" as const],
+    };
+    renderSidebar(storeFor([organization(), viewer], "acme"));
+    openMenu(/Acme menu/);
+
+    expect(
+      screen.queryByRole("menuitem", { name: "Invite people" }),
+    ).toBeNull();
+    expect(
+      screen.getByRole("menuitem", { name: "Organization settings" }),
+    ).toHaveAttribute("href", "/settings/general");
+  });
+
+  it("shows which workspace the settings belong to", () => {
+    renderSidebar(storeFor([organization(), ACME], "acme"), "/settings/team");
+
+    expect(screen.getByTestId("settings-workspace")).toHaveTextContent("Acme");
+  });
+
   it("groups settings and folds security into one entry", () => {
     renderSidebar(storeFor([organization(), ACME], "acme"), "/settings/team");
 
     expect(screen.getByText("Organization")).toBeInTheDocument();
+    expect(screen.getByText("Your account")).toBeInTheDocument();
     expect(navLabels()).toEqual([
       "General",
       "Team",
       "Projects",
-      "Profile",
       "Business",
-      "Notifications",
       "Plans",
       "Compliance",
       "Developer",
       "Service accounts",
       "Security & compliance",
+      "Profile",
+      "Notifications",
     ]);
     expect(
       screen.getByRole("link", { name: "Security & compliance" }),
@@ -245,7 +290,8 @@ const renderRoute = (store: ReturnType<typeof storeFor>, path: string) =>
         <Routes>
           <Route path="/" element={<Where label="overview" />} />
           <Route path="settings" element={<SettingsLayout />}>
-            {["team", "audit-log", "general"].map((page) => (
+            <Route index element={<SettingsIndex />} />
+            {["team", "audit-log", "general", "profile"].map((page) => (
               <Route
                 key={page}
                 path={page}
@@ -271,14 +317,29 @@ const renderRoute = (store: ReturnType<typeof storeFor>, path: string) =>
   );
 
 describe("deep links", () => {
+  it("sends a personal workspace from a team page to the overview", () => {
+    renderRoute(storeFor([organization()], "personal"), "/finance/approvals");
+
+    expect(screen.getByTestId("where")).toHaveTextContent("overview");
+  });
+
   it.each([
     "/settings/team",
     "/settings/audit-log",
-    "/finance/approvals",
-  ])("sends a personal workspace from %s to the overview", (path) => {
+  ])("sends a personal workspace from %s to its first settings page", (path) => {
     renderRoute(storeFor([organization()], "personal"), path);
 
-    expect(screen.getByTestId("where")).toHaveTextContent("overview");
+    expect(screen.getByTestId("where")).toHaveTextContent("profile");
+  });
+
+  it("sends a developer from a manager-only settings page to General", () => {
+    const developer = { ...ACME, role: "DEVELOPER" as const };
+    renderRoute(
+      storeFor([organization(), developer], "acme"),
+      "/settings/audit-log",
+    );
+
+    expect(screen.getByTestId("where")).toHaveTextContent("general");
   });
 
   it("keeps the personal settings reachable", () => {
@@ -305,5 +366,48 @@ describe("deep links", () => {
     );
     expect(within(tabs).getAllByRole("link")).toHaveLength(8);
     expect(screen.getByTestId("where")).toHaveTextContent("audit-log");
+  });
+});
+
+describe("opening settings", () => {
+  it("lands on the organization's General page in a team, not the profile", () => {
+    renderRoute(storeFor([organization(), ACME], "acme"), "/settings");
+
+    expect(screen.getByTestId("where")).toHaveTextContent("general");
+  });
+
+  it("lands on the profile in a personal workspace", () => {
+    renderRoute(storeFor([organization(), ACME], "personal"), "/settings");
+
+    expect(screen.getByTestId("where")).toHaveTextContent("profile");
+  });
+
+  it("opens org General from the sidebar header in a team", () => {
+    render(
+      <Provider store={storeFor([organization(), ACME], "acme")}>
+        <MemoryRouter initialEntries={["/payments"]}>
+          <Routes>
+            <Route path="payments" element={<Sidebar collapsed={false} />} />
+            <Route path="settings" element={<SettingsLayout />}>
+              <Route index element={<SettingsIndex />} />
+              {["general", "profile"].map((page) => (
+                <Route
+                  key={page}
+                  path={page}
+                  element={<Where label={page} />}
+                />
+              ))}
+            </Route>
+          </Routes>
+        </MemoryRouter>
+      </Provider>,
+    );
+
+    openMenu(/Acme menu/);
+    fireEvent.click(
+      screen.getByRole("menuitem", { name: "Organization settings" }),
+    );
+
+    expect(screen.getByTestId("where")).toHaveTextContent("general");
   });
 });

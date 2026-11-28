@@ -15,9 +15,8 @@ import { type FormEvent, useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { FieldRow, TextInput } from "@/components/form";
+import { INVITE_TEAM_PATH } from "@/nav";
 import { handleProblemKey, suggestHandle } from "./handle";
-
-export const INVITE_TEAM_PATH = "/settings/team?invite=1";
 
 export function CreateOrganizationModal({
   isOpen,

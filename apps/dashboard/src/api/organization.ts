@@ -58,6 +58,20 @@ export const getInvitation = (token: string) =>
     method: HttpMethod.GET,
   });
 
+export interface PublicInvitationPreview {
+  organization: { name: string; avatarUrl: string | null };
+  invitedBy: { name: string } | null;
+  emailHint: string;
+  expiresAt: string;
+}
+
+export const getPublicInvitationPreview = (token: string) =>
+  httpClient.request<PublicInvitationPreview>({
+    url: `/v1/invitations/${encodeURIComponent(token)}/preview`,
+    method: HttpMethod.GET,
+    skipAuth: true,
+  });
+
 export const acceptInvitation = (token: string) =>
   httpClient.request<{ organization: OrganizationSummary }>({
     url: `/me/invitations/${encodeURIComponent(token)}/accept`,

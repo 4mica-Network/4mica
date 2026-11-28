@@ -284,7 +284,19 @@ export default function userReducer(
       return { ...state, usernameCheck: { value: "", status: "idle" } };
 
     case actionTypes.COMPLETE_ONBOARDING_REQUESTED: {
-      const patch = action.payload as Partial<Business>;
+      const patch = action.payload as Partial<Business> | null;
+      if (!patch) {
+        return {
+          ...state,
+          savingSections: setSaving(
+            state.savingSections,
+            action.meta?.section,
+            true,
+          ),
+          error: null,
+          validationIssues: {},
+        };
+      }
       return {
         ...state,
         business: state.business

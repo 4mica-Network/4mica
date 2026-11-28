@@ -1,5 +1,9 @@
-import { Button } from "@4mica/ui";
+import { Avatar, Button } from "@4mica/ui";
 import { safeRedirectPath } from "@4mica/url";
+import {
+  getPublicInvitationPreview,
+  type PublicInvitationPreview,
+} from "@api/organization";
 import { useAuth, useSignIn } from "@clerk/clerk-react";
 import { isClerkAPIResponseError } from "@clerk/clerk-react/errors";
 import { useTitle } from "ahooks";
@@ -33,6 +37,67 @@ function GoogleIcon() {
   );
 }
 
+const INVITATION_PATH =
+  /^\/invitations\/(4mica_inv_[A-Za-z0-9_-]+)\/?(?:[?#].*)?$/;
+
+const invitationTokenOf = (path: string): string | null =>
+  INVITATION_PATH.exec(path)?.[1] ?? null;
+
+function useInvitationContext(
+  token: string | null,
+): PublicInvitationPreview | null {
+  const [preview, setPreview] = useState<PublicInvitationPreview | null>(null);
+
+  useEffect(() => {
+    setPreview(null);
+    if (!token) {
+      return;
+    }
+    let active = true;
+    getPublicInvitationPreview(token)
+      .then((result) => {
+        if (active) {
+          setPreview(result);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [token]);
+
+  return preview;
+}
+
+function InvitationContext({ preview }: { preview: PublicInvitationPreview }) {
+  const { t } = useTranslation();
+  const values = {
+    inviter: preview.invitedBy?.name ?? "",
+    organization: preview.organization.name,
+    email: preview.emailHint,
+  };
+  return (
+    <div
+      role="status"
+      className="mb-6 flex w-full items-center gap-3 rounded-lg border border-overlay/10 bg-overlay/5 p-3 text-left"
+      data-testid="sign-in-invitation"
+    >
+      <Avatar
+        src={preview.organization.avatarUrl}
+        name={preview.organization.name}
+        alt=""
+        size="sm"
+        className="rounded-lg border-0 bg-overlay/15"
+      />
+      <p className="text-ink-body text-sm">
+        {preview.invitedBy
+          ? t("auth.signIn.invitation", values)
+          : t("auth.signIn.invitationNoInviter", values)}
+      </p>
+    </div>
+  );
+}
+
 export function SignInPage() {
   const { t } = useTranslation();
   useTitle(t("auth.signIn.title"));
@@ -55,6 +120,9 @@ export function SignInPage() {
   const reason = params.get("reason");
   const ssoDomain = reason === "sso_required" ? params.get("domain") : null;
   const [email, setEmail] = useState("");
+  const invitation = useInvitationContext(
+    isSignedIn ? null : invitationTokenOf(redirectUrlComplete),
+  );
 
   const signInWith = async (
     options:
@@ -151,6 +219,8 @@ export function SignInPage() {
                 </Button>
               </form>
             )}
+
+            {invitation && <InvitationContext preview={invitation} />}
 
             <Button
               type="button"

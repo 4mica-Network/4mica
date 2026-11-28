@@ -2,11 +2,13 @@ import type { Permission } from "@stores/organization/type";
 import { describe, expect, it } from "vitest";
 import type { WorkspaceMode } from "@/hooks/useWorkspaceMode";
 import {
+  firstSettingsPath,
   isPathVisible,
   NAV_SECTIONS,
   type NavSection,
   resolveNav,
   SETTINGS_SECTIONS,
+  settingsPathFor,
 } from "./nav";
 
 const PERSONAL: WorkspaceMode = {
@@ -108,27 +110,29 @@ describe("navigation in an organization", () => {
     ]);
   });
 
-  it("groups settings into organization, workspace and one security entry", () => {
+  it("lists the organization first and the caller's own pages last", () => {
     const sections = resolveNav(SETTINGS_SECTIONS, OWNER, everything);
 
     expect(sections.map((section) => section.titleKey)).toEqual([
       "nav.section.organization",
-      "nav.section.workspace",
       undefined,
+      "nav.section.yourAccount",
     ]);
     expect(sections[0]?.items.map((item) => item.labelKey)).toEqual([
       "nav.account",
       "nav.team",
       "nav.projects",
-    ]);
-    expect(sections[1]?.items.map((item) => item.labelKey)).toContain(
+      "nav.business",
+      "nav.plans",
+      "nav.compliance",
+      "nav.developer",
       "nav.serviceAccounts",
-    );
-    expect(sections[2]?.items.map((item) => item.labelKey)).toEqual([
+    ]);
+    expect(sections[1]?.items.map((item) => item.labelKey)).toEqual([
       "nav.securityCompliance",
     ]);
     expect(
-      sections[2]?.items[0]?.children?.map((item) => item.labelKey),
+      sections[1]?.items[0]?.children?.map((item) => item.labelKey),
     ).toEqual([
       "nav.securityPolicies",
       "nav.domainsSso",
@@ -138,6 +142,10 @@ describe("navigation in an organization", () => {
       "nav.auditStreams",
       "nav.complianceReport",
       "nav.governance",
+    ]);
+    expect(sections[2]?.items.map((item) => item.labelKey)).toEqual([
+      "nav.profile",
+      "nav.notifications",
     ]);
   });
 
@@ -174,5 +182,47 @@ describe("navigation in an organization", () => {
     expect(keys).toContain("nav.team");
     expect(isPathVisible("/settings/audit-log", DEVELOPER)).toBe(false);
     expect(isPathVisible("/settings/team", DEVELOPER)).toBe(true);
+  });
+});
+
+describe("settings landing page", () => {
+  it("opens the organization's General page in a team", () => {
+    expect(firstSettingsPath(OWNER, everything)).toBe("/settings/general");
+    expect(firstSettingsPath(DEVELOPER, () => false)).toBe("/settings/general");
+  });
+
+  it("opens the profile in a personal workspace", () => {
+    expect(firstSettingsPath(PERSONAL, everything)).toBe("/settings/profile");
+  });
+
+  it("keeps a page that exists in the next workspace", () => {
+    expect(settingsPathFor("/settings/profile", OWNER, everything)).toBe(
+      "/settings/profile",
+    );
+    expect(settingsPathFor("/settings/developer", PERSONAL, everything)).toBe(
+      "/settings/developer",
+    );
+    expect(settingsPathFor("/settings/audit-log", OWNER, everything)).toBe(
+      "/settings/audit-log",
+    );
+  });
+
+  it("falls back to the next workspace's first page", () => {
+    expect(settingsPathFor("/settings/team", PERSONAL, everything)).toBe(
+      "/settings/profile",
+    );
+    expect(settingsPathFor("/settings/audit-log", DEVELOPER, everything)).toBe(
+      "/settings/general",
+    );
+    expect(
+      settingsPathFor(
+        "/settings/audit-log",
+        OWNER,
+        (permission) => permission !== "audit.read",
+      ),
+    ).toBe("/settings/general");
+    expect(settingsPathFor("/settings", OWNER, everything)).toBe(
+      "/settings/general",
+    );
   });
 });

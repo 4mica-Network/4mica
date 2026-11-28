@@ -6,7 +6,7 @@ import { PageBoundary } from "@/components/ErrorBoundary/PageBoundary";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { PageSpinner } from "@/components/PageSpinner";
 import { SettingsLayout } from "@/components/SettingsLayout";
-import { WorkspaceGuard } from "@/components/WorkspaceGuard";
+import { SettingsIndex, WorkspaceGuard } from "@/components/WorkspaceGuard";
 import { useAppLanguage } from "@/hooks/useAppLanguage";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { SignInPage } from "@/pages/sign-in";
@@ -63,10 +63,7 @@ export function App() {
             />
 
             <Route path="settings" element={<SettingsLayout />}>
-              <Route
-                index
-                element={<Navigate to={SETTINGS_PAGES[0].path} replace />}
-              />
+              <Route index element={<SettingsIndex />} />
               {SETTINGS_PAGES.map(({ path, component: Component }) => (
                 <Route
                   key={path}

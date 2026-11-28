@@ -152,12 +152,14 @@ export const resetUsernameCheck = () => ({
 });
 
 export const completeOnboarding = (
-  payload: Partial<Business>,
+  payload: Partial<Business> | null,
   section = "onboarding.business",
+  organizationId: string | null = null,
 ) => ({
   type: actionTypes.COMPLETE_ONBOARDING_REQUESTED,
   payload,
   meta: { section },
+  organizationId,
 });
 
 export const clearValidationIssues = () => ({
