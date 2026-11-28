@@ -7,6 +7,7 @@ import {
 } from "@4mica/db";
 import type { ApiKeyContext } from "@auth/api-key";
 import { optionalAmountText } from "@utils/amount";
+import { type ProjectAccess, projectIn } from "@utils/scope";
 import { toUnits } from "@utils/units";
 import type {
   EnginePolicy,
@@ -382,6 +383,7 @@ export const findReportedPayment = (
 
 export interface ListAuthorizationsFilter {
   environment: "SANDBOX" | "PRODUCTION";
+  projects: ProjectAccess;
   status?: SpendAuthorizationStatus;
   projectId?: string;
   agentId?: string;
@@ -401,7 +403,10 @@ export const listAuthorizations = async (
       organizationId: orgId,
       environment: filter.environment,
       ...(filter.status ? { status: filter.status } : {}),
-      ...(filter.projectId ? { projectId: filter.projectId } : {}),
+      AND: [
+        projectIn(filter.projects),
+        filter.projectId ? { projectId: filter.projectId } : {},
+      ],
       ...(filter.agentId ? { agentId: filter.agentId } : {}),
       ...(filter.apiKeyId ? { apiKeyId: filter.apiKeyId } : {}),
       ...(filter.from || filter.to

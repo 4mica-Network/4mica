@@ -5,6 +5,7 @@ import {
   prisma,
 } from "@4mica/db";
 import { can, ROLE_PERMISSIONS } from "@auth/permissions";
+import { type ProjectAccess, projectInOrNone } from "@utils/scope";
 
 type Db = Pick<Prisma.TransactionClient, "financialAlert">;
 
@@ -143,10 +144,15 @@ export interface ListAlertsFilter {
   limit: number;
 }
 
-export const listAlerts = async (orgId: string, filter: ListAlertsFilter) => {
+export const listAlerts = async (
+  orgId: string,
+  filter: ListAlertsFilter,
+  projects: ProjectAccess,
+) => {
   const rows = await prisma.financialAlert.findMany({
     where: {
       organizationId: orgId,
+      ...projectInOrNone(projects),
       ...(filter.acknowledged === undefined
         ? {}
         : { acknowledgedAt: filter.acknowledged ? { not: null } : null }),

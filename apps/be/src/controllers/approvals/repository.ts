@@ -9,6 +9,7 @@ import {
 import { can, type RoleSubject } from "@auth/permissions";
 import { onApprovalResolved } from "@controllers/spend/approval-hook";
 import { payloadHash } from "@utils/canonical";
+import { type ProjectAccess, projectInOrNone } from "@utils/scope";
 import {
   type CreateSellerApprovalInput,
   DEFAULT_APPROVAL_TTL_HOURS,
@@ -154,12 +155,14 @@ export const expireStaleApprovals = async (
 export const listApprovals = async (
   orgId: string,
   { status, kind, cursor, limit }: ListApprovalsQuery,
+  projects: ProjectAccess,
 ) => {
   await expireStaleApprovals(orgId);
 
   const rows = await prisma.approvalRequest.findMany({
     where: {
       organizationId: orgId,
+      ...projectInOrNone(projects),
       ...(status ? { status } : {}),
       ...(kind ? { kind } : {}),
       ...(cursor ? { id: { lt: cursor } } : {}),
@@ -176,10 +179,14 @@ export const listApprovals = async (
   };
 };
 
-export const findApproval = async (orgId: string, id: string) => {
+export const findApproval = async (
+  orgId: string,
+  id: string,
+  projects: ProjectAccess,
+) => {
   await expireStaleApprovals(orgId, id);
   return prisma.approvalRequest.findFirst({
-    where: { id, organizationId: orgId },
+    where: { id, organizationId: orgId, ...projectInOrNone(projects) },
     select: APPROVAL_SELECT,
   });
 };

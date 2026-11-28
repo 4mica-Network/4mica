@@ -8,6 +8,7 @@ import {
 import { networksForEnvironment } from "@4mica/rules";
 import { walletAddressesFor } from "@controllers/payments/repository";
 import { amountText } from "@utils/amount";
+import { type ProjectAccess, projectIn, projectInOrNone } from "@utils/scope";
 import type {
   DateRange,
   ExportDirection,
@@ -18,6 +19,7 @@ import type {
 export interface FinanceScope {
   orgId: string;
   environment: EnvironmentKind;
+  projects: ProjectAccess;
 }
 
 export const RECONCILIATION_LIMIT = 500;
@@ -95,6 +97,7 @@ const authorizationCounts = async (
     organizationId: scope.orgId,
     environment: scope.environment,
     createdAt: inRange(range),
+    ...projectIn(scope.projects),
   };
 
   const [all, lapsed] = await Promise.all([
@@ -153,8 +156,12 @@ export const financeSummary = async (
   const [sent, received, authorizations] = await Promise.all([
     addresses.length === 0
       ? Promise.resolve([])
-      : assetTotals({ ...base, payerAddress: { in: addresses } }),
-    assetTotals({ ...base, organizationId: scope.orgId }),
+      : sentTotals(scope, range, addresses),
+    assetTotals({
+      ...base,
+      organizationId: scope.orgId,
+      ...projectInOrNone(scope.projects),
+    }),
     authorizationCounts(scope, range, now),
   ]);
 
@@ -203,6 +210,57 @@ const authorizationMatch = (orgId: string): Prisma.Sql =>
   Prisma.sql`a.organization_id = ${orgId}
      AND (a.payment_id = p.id OR a.req_id = p.req_id)`;
 
+const receivedVisible = (scope: FinanceScope): Prisma.Sql =>
+  scope.projects === null
+    ? Prisma.sql`TRUE`
+    : scope.projects.length === 0
+      ? Prisma.sql`p.project_id IS NULL`
+      : Prisma.sql`(p.project_id IS NULL OR p.project_id IN (${Prisma.join(scope.projects)}))`;
+
+const sentVisible = (scope: FinanceScope): Prisma.Sql =>
+  scope.projects === null
+    ? Prisma.sql`TRUE`
+    : Prisma.sql`NOT EXISTS (
+        SELECT 1 FROM spend_authorizations a
+         WHERE ${authorizationMatch(scope.orgId)}
+           AND ${
+             scope.projects.length === 0
+               ? Prisma.sql`TRUE`
+               : Prisma.sql`a.project_id NOT IN (${Prisma.join(scope.projects)})`
+})`;
+
+interface TotalRow {
+  network: string;
+  asset_address: string | null;
+  amount: Prisma.Decimal | null;
+  count: bigint | number;
+}
+
+const sentTotals = async (
+  scope: FinanceScope,
+  range: DateRange,
+  addresses: string[],
+): Promise<AssetTotal[]> => {
+  const rows = await prisma.$queryRaw<TotalRow[]>`
+    SELECT p.network::text AS network,
+           p.asset_address,
+           SUM(p.amount) AS amount,
+           COUNT(*) AS count
+      FROM payments p
+     WHERE p.payer_address IN (${Prisma.join(addresses)})
+       AND ${paymentWindow(scope, range)}
+       AND ${sentVisible(scope)}
+     GROUP BY 1, 2
+     ORDER BY 1 ASC, 2 ASC
+  `;
+  return rows.map((row) => ({
+    network: row.network,
+    assetAddress: row.asset_address,
+    amount: amountText(row.amount ?? 0),
+    count: Number(row.count),
+  }));
+};
+
 const labelsFor = async (
   orgId: string,
   groupBy: UsageGroup,
@@ -247,6 +305,7 @@ export const financeUsage = async (
         FROM payments p
        WHERE p.organization_id = ${scope.orgId}
          AND ${paymentWindow(scope, range)}
+         AND ${receivedVisible(scope)}
        GROUP BY 1, 2, 3
        ORDER BY 4 DESC, 1 ASC
     `;
@@ -273,6 +332,7 @@ export const financeUsage = async (
         ) a ON TRUE
        WHERE p.payer_address IN (${Prisma.join(addresses)})
          AND ${paymentWindow(scope, range)}
+         AND ${sentVisible(scope)}
        GROUP BY 1, 2, 3
        ORDER BY 4 DESC, 1 ASC
     `;
@@ -379,6 +439,7 @@ export const financeReconciliation = async (
       environment: scope.environment,
       createdAt: inRange(range),
       paymentId: null,
+      ...projectIn(scope.projects),
       OR: [
         { status: "CONSUMED" },
         { status: "RESERVED", expiresAt: { lt: now } },
@@ -400,7 +461,8 @@ export const financeReconciliation = async (
   }
 
   const sent = Prisma.sql`p.payer_address IN (${Prisma.join(addresses)})
-     AND ${paymentWindow(scope, range)}`;
+     AND ${paymentWindow(scope, range)}
+     AND ${sentVisible(scope)}`;
   const match = authorizationMatch(scope.orgId);
 
   const [authorized, counted, unauthorized] = await Promise.all([
@@ -448,26 +510,26 @@ export const financeReconciliation = async (
   };
 };
 
-const EXPORT_SELECT = {
-  id: true,
-  createdAt: true,
-  settledAt: true,
-  status: true,
-  network: true,
-  assetAddress: true,
-  amount: true,
-  payerAddress: true,
-  recipientAddress: true,
-  reqId: true,
-  txHash: true,
-  projectId: true,
-  agentId: true,
-  listingId: true,
-  apiKeyId: true,
-  description: true,
-  resource: true,
-  failureReason: true,
-} satisfies Prisma.PaymentSelect;
+interface ExportPaymentRow {
+  id: string;
+  created_at: Date;
+  settled_at: Date | null;
+  status: string;
+  network: string;
+  asset_address: string | null;
+  amount: Prisma.Decimal;
+  payer_address: string;
+  recipient_address: string;
+  req_id: string;
+  tx_hash: string | null;
+  project_id: string | null;
+  agent_id: string | null;
+  listing_id: string | null;
+  api_key_id: string | null;
+  description: string | null;
+  resource: string | null;
+  failure_reason: string | null;
+}
 
 export const PAYMENT_EXPORT_HEADER = [
   "id",
@@ -507,64 +569,72 @@ export const exportPayments = async (
       : await walletAddressesFor(scope.orgId, scope.environment);
   const mine = new Set(addresses);
 
-  const sent: Prisma.PaymentWhereInput = { payerAddress: { in: addresses } };
-  const received: Prisma.PaymentWhereInput = { organizationId: scope.orgId };
-
   if (direction === "sent" && addresses.length === 0) {
     return { rows: [], truncated: false };
   }
 
-  const where: Prisma.PaymentWhereInput = {
-    ...paymentBase(scope, range),
-    ...(direction === "sent"
+  const received = Prisma.sql`(p.organization_id = ${scope.orgId} AND ${receivedVisible(scope)})`;
+  const sent =
+    addresses.length === 0
+      ? null
+      : Prisma.sql`(p.payer_address IN (${Prisma.join(addresses)}) AND ${sentVisible(scope)})`;
+  const which =
+    direction === "sent" && sent
       ? sent
-      : direction === "received"
+      : direction === "received" || !sent
         ? received
-        : addresses.length === 0
-          ? received
-          : { OR: [sent, received] }),
-  };
+        : Prisma.sql`(${sent} OR ${received})`;
 
   const rows: ExportRow[] = [];
-  let cursor: string | undefined;
+  let cursor: { createdAt: Date; id: string } | null = null;
 
   while (rows.length <= limit) {
-    const page = await prisma.payment.findMany({
-      where,
-      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
-      take: Math.min(EXPORT_PAGE, limit + 1 - rows.length),
-      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
-      select: EXPORT_SELECT,
-    });
+    const take = Math.min(EXPORT_PAGE, limit + 1 - rows.length);
+    const page: ExportPaymentRow[] = await prisma.$queryRaw<ExportPaymentRow[]>`
+      SELECT p.id, p.created_at, p.settled_at, p.status::text AS status,
+             p.network::text AS network, p.asset_address, p.amount,
+             p.payer_address, p.recipient_address, p.req_id, p.tx_hash,
+             p.project_id, p.agent_id, p.listing_id, p.api_key_id,
+             p.description, p.resource, p.failure_reason
+        FROM payments p
+       WHERE p.network::text IN (${Prisma.join(networksOf(scope.environment))})
+         AND p.created_at >= ${range.from}
+         AND p.created_at <  ${range.to}
+         AND ${which}
+         ${cursor ? Prisma.sql`AND (p.created_at, p.id) > (${cursor.createdAt}, ${cursor.id})` : Prisma.empty}
+       ORDER BY p.created_at ASC, p.id ASC
+       LIMIT ${take}
+    `;
 
     for (const row of page) {
       rows.push([
         row.id,
-        row.createdAt.toISOString(),
-        row.settledAt?.toISOString() ?? null,
-        mine.has(row.payerAddress) ? "sent" : "received",
+        row.created_at.toISOString(),
+        row.settled_at?.toISOString() ?? null,
+        mine.has(row.payer_address) ? "sent" : "received",
         row.status,
         row.network,
-        row.assetAddress,
+        row.asset_address,
         amountText(row.amount),
-        row.payerAddress,
-        row.recipientAddress,
-        row.reqId,
-        row.txHash,
-        row.projectId,
-        row.agentId,
-        row.listingId,
-        row.apiKeyId,
+        row.payer_address,
+        row.recipient_address,
+        row.req_id,
+        row.tx_hash,
+        row.project_id,
+        row.agent_id,
+        row.listing_id,
+        row.api_key_id,
         row.description,
         row.resource,
-        row.failureReason,
+        row.failure_reason,
       ]);
     }
 
-    if (page.length < EXPORT_PAGE) {
+    const last = page.at(-1);
+    if (page.length < EXPORT_PAGE || !last) {
       break;
     }
-    cursor = page.at(-1)?.id;
+    cursor = { createdAt: last.created_at, id: last.id };
   }
 
   const truncated = rows.length > limit;

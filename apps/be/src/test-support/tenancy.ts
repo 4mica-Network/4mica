@@ -47,13 +47,16 @@ export const projectRow = ({
 export const tenancyMocks = () => ({
   membership: { findFirst: vi.fn(), create: vi.fn() },
   auditLog: { create: vi.fn() },
-  project: { findFirst: vi.fn() },
+  project: { findFirst: vi.fn(), findMany: vi.fn() },
 });
 
 export interface TenancyMocks {
   membership: { findFirst: ReturnType<typeof vi.fn> };
   auditLog: { create: ReturnType<typeof vi.fn> };
-  project?: { findFirst: ReturnType<typeof vi.fn> };
+  project?: {
+    findFirst: ReturnType<typeof vi.fn>;
+    findMany?: ReturnType<typeof vi.fn>;
+  };
 }
 
 export const actAs = (
@@ -91,6 +94,11 @@ export const actAs = (
         }
         return where.isDefault && row.isDefault ? row : null;
       },
+    );
+    mocks.project.findMany?.mockReset();
+    mocks.project.findMany?.mockImplementation(
+      async ({ where }: { where: { organizationId?: string } }) =>
+        where.organizationId === orgId ? [row] : [],
     );
   }
 };

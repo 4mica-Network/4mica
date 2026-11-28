@@ -1,5 +1,5 @@
 import type { Permission } from "@auth/permissions";
-import { requestedEnvironment } from "@auth/project";
+import { accessibleProjectIds, requestedEnvironment } from "@auth/project";
 import {
   audit,
   invalidBody,
@@ -41,7 +41,11 @@ const requireFinance = async (
     return null;
   }
 
-  return { ...tenant, environment };
+  return {
+    ...tenant,
+    environment,
+    projects: await accessibleProjectIds(tenant),
+  };
 };
 
 const parseRanged = <

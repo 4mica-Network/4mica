@@ -1077,6 +1077,127 @@ describe("reconcileReportedPayment", () => {
 });
 
 describe("GET /me/spend/authorizations", () => {
+  const RESTRICTED_ID = "019fce62-0000-7000-8000-0000000000d3";
+  const projects = (memberOf: string[] = []) => {
+    const rows = [PROJECT_ID, OTHER_PROJECT_ID, RESTRICTED_ID].map((id) => ({
+      id,
+      restricted: id !== PROJECT_ID,
+      members: memberOf.includes(id) ? [{ role: "VIEWER" }] : [],
+    }));
+    h.db.project.findMany.mockImplementation(
+      async ({ where }: { where: { organizationId: string } }) =>
+        where.organizationId === ORG_ID ? rows : [],
+    );
+    h.db.project.findFirst.mockImplementation(
+      async ({ where }: { where: { organizationId: string; id: string } }) =>
+        where.organizationId === ORG_ID
+          ? (rows.find((row) => row.id === where.id) ?? null)
+          : null,
+    );
+  };
+  const seedSpread = () =>
+    h.db.spendAuthorization.seed(
+      authRow({
+        projectId: OTHER_PROJECT_ID,
+        createdAt: new Date("2026-11-27T11:00:00Z"),
+      }),
+      authRow({
+        projectId: RESTRICTED_ID,
+        createdAt: new Date("2026-11-27T10:00:00Z"),
+      }),
+      authRow({ createdAt: new Date("2026-11-27T09:00:00Z") }),
+    );
+  const listed = async (query = "") => {
+    const res = await get(`/me/spend/authorizations${query}`, AUTH);
+    expect(res.statusCode).toBe(200);
+    return res.json() as {
+      items: { projectId: string }[];
+      nextCursor: string | null;
+    };
+  };
+
+  it("hides restricted projects the caller is not a member of, in the query itself", async () => {
+    actAs(h.db.tenancy, "FINANCE");
+    projects();
+    seedSpread();
+    const findMany = vi.spyOn(h.db.spendAuthorization, "findMany");
+
+    const page = await listed("?limit=1");
+    expect(page.items.map((item) => item.projectId)).toEqual([PROJECT_ID]);
+    expect(page.nextCursor).toBeNull();
+    expect(findMany.mock.calls[0]?.[0]?.where).toMatchObject({
+      AND: [{ projectId: { in: [PROJECT_ID] } }, {}],
+    });
+    expect(h.db.project.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { organizationId: ORG_ID },
+        select: expect.objectContaining({
+          members: { where: { userId: USER_ID }, select: { role: true } },
+        }),
+      }),
+    );
+    findMany.mockRestore();
+  });
+
+  it("shows a restricted project to its members, with and without a project filter", async () => {
+    actAs(h.db.tenancy, "VIEWER");
+    projects([OTHER_PROJECT_ID]);
+    seedSpread();
+
+    expect((await listed()).items.map((item) => item.projectId).sort()).toEqual(
+      [PROJECT_ID, OTHER_PROJECT_ID].sort(),
+    );
+    expect(
+      (await listed(`?projectId=${OTHER_PROJECT_ID}`)).items.map(
+        (item) => item.projectId,
+      ),
+    ).toEqual([OTHER_PROJECT_ID]);
+    expect(
+      (await get(`/me/spend/authorizations?projectId=${RESTRICTED_ID}`, AUTH))
+        .statusCode,
+    ).toBe(404);
+  });
+
+  it("applies a custom role's project access like effectiveProjectRole does", async () => {
+    actAs(h.db.tenancy, "ADMIN");
+    h.db.tenancy.membership.findFirst.mockResolvedValue({
+      role: "ADMIN",
+      suspendedAt: null,
+      customRole: {
+        id: "019fce62-0000-7000-8000-0000000000cc",
+        permissions: ["finance.read"],
+        projectRole: "VIEWER",
+        deletedAt: null,
+      },
+      organization: { id: ORG_ID, personal: true },
+    });
+    projects();
+    seedSpread();
+
+    expect((await listed()).items.map((item) => item.projectId)).toEqual([
+      PROJECT_ID,
+    ]);
+  });
+
+  it("shows every project to an owner without loading the project list", async () => {
+    actAs(h.db.tenancy, "OWNER");
+    projects();
+    seedSpread();
+
+    const page = await listed("?limit=2");
+    expect(page.items.map((item) => item.projectId)).toEqual([
+      OTHER_PROJECT_ID,
+      RESTRICTED_ID,
+    ]);
+    expect(page.nextCursor).not.toBeNull();
+    expect(
+      (await listed(`?projectId=${RESTRICTED_ID}`)).items.map(
+        (item) => item.projectId,
+      ),
+    ).toEqual([RESTRICTED_ID]);
+    expect(h.db.project.findMany).not.toHaveBeenCalled();
+  });
+
   it("lists the org's authorizations in the active environment", async () => {
     actAs(h.db.tenancy, "VIEWER");
     h.db.spendAuthorization.seed(

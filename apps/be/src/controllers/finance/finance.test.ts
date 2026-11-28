@@ -105,6 +105,12 @@ const AUTH = { authorization: "Bearer good" };
 
 const decimal = (value: string) => new Prisma.Decimal(value);
 
+let accessRows: { id: string; restricted: boolean; members: unknown[] }[] = [];
+let labelRows: { id: string; name: string }[] = [];
+
+const labelLookups = () =>
+  project.findMany.mock.calls.filter(([arg]) => arg.where.id !== undefined);
+
 const ROUTES = [
   "/me/finance/summary",
   "/me/finance/usage",
@@ -161,23 +167,23 @@ const storedAuthorization = (over: Record<string, unknown> = {}) => ({
 
 const storedPayment = (over: Record<string, unknown> = {}) => ({
   id: "pay_1",
-  createdAt: new Date("2026-11-20T00:00:00Z"),
-  settledAt: new Date("2026-11-20T00:00:05Z"),
+  created_at: new Date("2026-11-20T00:00:00Z"),
+  settled_at: new Date("2026-11-20T00:00:05Z"),
   status: "SETTLED",
   network: "BASE_SEPOLIA",
-  assetAddress: USDC,
+  asset_address: USDC,
   amount: decimal("1.5"),
-  payerAddress: MY_WALLET,
-  recipientAddress: OTHER_WALLET,
-  reqId: "0xabc",
-  txHash: null,
-  projectId: PROJECT_A,
-  agentId: null,
-  listingId: null,
-  apiKeyId: null,
+  payer_address: MY_WALLET,
+  recipient_address: OTHER_WALLET,
+  req_id: "0xabc",
+  tx_hash: null,
+  project_id: PROJECT_A,
+  agent_id: null,
+  listing_id: null,
+  api_key_id: null,
   description: "=cmd|' /C calc'!A0",
   resource: "https://api.example.com/a,b",
-  failureReason: null,
+  failure_reason: null,
   ...over,
 });
 
@@ -210,9 +216,15 @@ describe("finance routes", () => {
     payment.findMany.mockResolvedValue([]);
     spendAuthorization.groupBy.mockResolvedValue([]);
     spendAuthorization.findMany.mockResolvedValue([]);
-    for (const model of [project, agent, apiKey, apiListing]) {
+    for (const model of [agent, apiKey, apiListing]) {
       model.findMany.mockResolvedValue([]);
     }
+    accessRows = [];
+    labelRows = [];
+    project.findMany.mockImplementation(
+      async (arg: { select: { restricted?: boolean } }) =>
+        arg.select.restricted ? accessRows : labelRows,
+    );
     queryRaw.mockResolvedValue([]);
   });
 
@@ -343,25 +355,22 @@ describe("finance routes", () => {
 
   describe("summary", () => {
     it("totals sent and received payments per asset in the active environment", async () => {
-      payment.groupBy.mockImplementation(async ({ where }) =>
-        where.payerAddress
-          ? [
-              {
-                network: "BASE_SEPOLIA",
-                assetAddress: USDC,
-                _sum: { amount: decimal("12.5") },
-                _count: { _all: 3 },
-              },
-            ]
-          : [
-              {
-                network: "BASE_SEPOLIA",
-                assetAddress: null,
-                _sum: { amount: decimal("0.001") },
-                _count: { _all: 1 },
-              },
-            ],
-      );
+      queryRaw.mockResolvedValue([
+        {
+          network: "BASE_SEPOLIA",
+          asset_address: USDC,
+          amount: decimal("12.5"),
+          count: 3n,
+        },
+      ]);
+      payment.groupBy.mockResolvedValue([
+        {
+          network: "BASE_SEPOLIA",
+          assetAddress: null,
+          _sum: { amount: decimal("0.001") },
+          _count: { _all: 1 },
+        },
+      ]);
 
       const res = await get("/me/finance/summary");
 
@@ -389,15 +398,15 @@ describe("finance routes", () => {
         organizationId: ORG_ID,
         network: { in: SANDBOX_NETWORKS },
       });
-      const [sent, received] = payment.groupBy.mock.calls.map(
-        ([arg]) => arg.where,
+      const sent = rawCall();
+      expect(sent.sql).toContain("p.payer_address IN (?)");
+      expect(sent.sql).toContain("p.status <> 'FAILED'");
+      expect(sent.sql).not.toContain("p.organization_id");
+      expect(sent.values).toEqual(
+        expect.arrayContaining([MY_WALLET, ...SANDBOX_NETWORKS]),
       );
-      expect(sent).toMatchObject({
-        payerAddress: { in: [MY_WALLET] },
-        network: { in: SANDBOX_NETWORKS },
-        status: { not: "FAILED" },
-      });
-      expect(sent.organizationId).toBeUndefined();
+      expect(payment.groupBy).toHaveBeenCalledTimes(1);
+      const received = payment.groupBy.mock.calls[0][0].where;
       expect(received).toMatchObject({
         organizationId: ORG_ID,
         network: { in: SANDBOX_NETWORKS },
@@ -415,6 +424,8 @@ describe("finance routes", () => {
       for (const [arg] of payment.groupBy.mock.calls) {
         expect(arg.where.network).toEqual({ in: ["BASE"] });
       }
+      expect(rawCall().values).toEqual(expect.arrayContaining(["BASE"]));
+      expect(rawCall().values).not.toContain("BASE_SEPOLIA");
       for (const [arg] of spendAuthorization.groupBy.mock.calls) {
         expect(arg.where).toMatchObject({
           organizationId: ORG_ID,
@@ -575,7 +586,7 @@ describe("finance routes", () => {
           count: 1n,
         },
       ]);
-      project.findMany.mockResolvedValue([{ id: PROJECT_A, name: "Checkout" }]);
+      labelRows = [{ id: PROJECT_A, name: "Checkout" }];
 
       const res = await get("/me/finance/usage?groupBy=project&direction=sent");
 
@@ -592,7 +603,7 @@ describe("finance routes", () => {
       expect(query.values).toEqual(
         expect.arrayContaining([ORG_ID, MY_WALLET, ...SANDBOX_NETWORKS]),
       );
-      expect(project.findMany.mock.calls[0][0].where).toEqual({
+      expect(labelLookups()[0]?.[0].where).toEqual({
         id: { in: [PROJECT_A] },
         organizationId: ORG_ID,
       });
@@ -625,9 +636,10 @@ describe("finance routes", () => {
         key: OTHER_WALLET,
         label: OTHER_WALLET,
       });
-      for (const model of [project, agent, apiKey, apiListing]) {
+      for (const model of [agent, apiKey, apiListing]) {
         expect(model.findMany).not.toHaveBeenCalled();
       }
+      expect(labelLookups()).toEqual([]);
     });
 
     it("refuses listing grouping for sent payments", async () => {
@@ -734,15 +746,15 @@ describe("finance routes", () => {
 
   describe("payments export", () => {
     it("streams the environment's payments as an escaped CSV attachment", async () => {
-      payment.findMany.mockResolvedValue([
+      queryRaw.mockResolvedValue([
         storedPayment(),
         storedPayment({
           id: "pay_2",
-          payerAddress: OTHER_WALLET,
-          recipientAddress: MY_WALLET,
+          payer_address: OTHER_WALLET,
+          recipient_address: MY_WALLET,
           description: "+SUM(1)",
           resource: null,
-          settledAt: null,
+          settled_at: null,
           status: "PENDING",
         }),
       ]);
@@ -769,20 +781,25 @@ describe("finance routes", () => {
       expect(lines[2]).toContain(",'+SUM(1),,");
       expect(lines[3]).toBe("");
 
-      const { where, orderBy } = payment.findMany.mock.calls[0][0];
-      expect(where).toMatchObject({
-        network: { in: SANDBOX_NETWORKS },
-        createdAt: {
-          gte: new Date("2026-11-01T00:00:00.000Z"),
-          lt: new Date("2026-12-01T00:00:00.000Z"),
-        },
-        OR: [{ payerAddress: { in: [MY_WALLET] } }, { organizationId: ORG_ID }],
-      });
-      expect(orderBy).toEqual([{ createdAt: "asc" }, { id: "asc" }]);
+      const query = rawCall();
+      expect(query.sql).toContain("p.payer_address IN (?)");
+      expect(query.sql).toContain("p.organization_id = ?");
+      expect(query.sql).toContain(" OR ");
+      expect(query.sql).toContain("ORDER BY p.created_at ASC, p.id ASC");
+      expect(query.sql).not.toContain("FAILED");
+      expect(query.values).toEqual(
+        expect.arrayContaining([
+          ORG_ID,
+          MY_WALLET,
+          ...SANDBOX_NETWORKS,
+          new Date("2026-11-01T00:00:00.000Z"),
+          new Date("2026-12-01T00:00:00.000Z"),
+        ]),
+      );
     });
 
     it("records the export with its filters", async () => {
-      payment.findMany.mockResolvedValue([storedPayment()]);
+      queryRaw.mockResolvedValue([storedPayment()]);
 
       await get(
         "/me/finance/export/payments.csv?from=2026-11-01&to=2026-11-30&direction=sent",
@@ -809,42 +826,158 @@ describe("finance routes", () => {
           },
         }),
       ]);
-      expect(payment.findMany.mock.calls[0][0].where).toMatchObject({
-        network: { in: ["BASE"] },
-        payerAddress: { in: [MY_WALLET] },
-      });
+      const query = rawCall();
+      expect(query.sql).toContain("p.payer_address IN (?)");
+      expect(query.sql).not.toContain("p.organization_id = ?");
+      expect(query.values).toEqual(expect.arrayContaining(["BASE", MY_WALLET]));
     });
 
     it("exports received payments by the reporting organization only", async () => {
       await get("/me/finance/export/payments.csv?direction=received");
 
-      const { where } = payment.findMany.mock.calls[0][0];
-      expect(where.organizationId).toBe(ORG_ID);
-      expect(where.payerAddress).toBeUndefined();
-      expect(where.OR).toBeUndefined();
+      const query = rawCall();
+      expect(query.sql).toContain("p.organization_id = ?");
+      expect(query.sql).not.toContain("payer_address IN");
       expect(wallet.findMany).not.toHaveBeenCalled();
     });
 
     it("stops at 50,000 rows and says so", async () => {
-      payment.findMany.mockImplementation(async ({ take }) =>
-        Array.from({ length: take }, (_, index) =>
-          storedPayment({ id: `pay_${index}`, description: null }),
-        ),
-      );
+      queryRaw.mockImplementation(async (...args: unknown[]) => {
+        const take = args.at(-1) as number;
+        return Array.from({ length: take }, (_, index) =>
+          storedPayment({
+            id: `pay_${index}`,
+            description: null,
+            created_at: new Date(Date.UTC(2026, 10, 20, 0, 0, index % 60)),
+          }),
+        );
+      });
 
       const res = await get("/me/finance/export/payments.csv");
 
       expect(res.headers["x-truncated"]).toBe("true");
       expect(res.body.split("\r\n").filter(Boolean)).toHaveLength(50_001);
-      expect(payment.findMany).toHaveBeenCalledTimes(11);
-      expect(payment.findMany.mock.calls[1][0]).toMatchObject({
-        cursor: { id: "pay_4999" },
-        skip: 1,
-      });
+      expect(queryRaw).toHaveBeenCalledTimes(11);
+      expect(rawCall(0).sql).not.toContain("(p.created_at, p.id) >");
+      const second = rawCall(1);
+      expect(second.sql).toContain("(p.created_at, p.id) > (?, ?)");
+      expect(second.values).toEqual(expect.arrayContaining(["pay_4999"]));
       expect(exported()[0].metadata).toMatchObject({
         rows: 50_000,
         truncated: true,
       });
+    });
+  });
+
+  describe("restricted projects", () => {
+    const HIDDEN = "019fce62-0000-7000-8000-0000000000f9";
+    const sqlOf = (marker: string) =>
+      queryRaw.mock.calls
+        .map((_, index) => rawCall(index))
+        .find((query) => query.sql.includes(marker));
+    const restrict = () => {
+      accessRows = [
+        { id: PROJECT_A, restricted: false, members: [] },
+        { id: HIDDEN, restricted: true, members: [] },
+      ];
+    };
+
+    it("filters received payments by project and keeps unattributed ones", async () => {
+      restrict();
+      await get("/me/finance/usage?groupBy=agent&direction=received");
+      await get("/me/finance/summary");
+
+      const usage = rawCall(0);
+      expect(usage.sql).toContain(
+        "(p.project_id IS NULL OR p.project_id IN (?))",
+      );
+      expect(usage.values).toContain(PROJECT_A);
+      expect(usage.values).not.toContain(HIDDEN);
+
+      const received = payment.groupBy.mock.calls[0][0].where;
+      expect(received.AND).toEqual([
+        { OR: [{ projectId: null }, { projectId: { in: [PROJECT_A] } }] },
+      ]);
+    });
+
+    it("drops sent payments matched to an authorization of a hidden project", async () => {
+      restrict();
+      queryRaw.mockImplementation(async (strings: TemplateStringsArray) =>
+        strings.join("?").includes("AS matched") ? [{ matched: 0n }] : [],
+      );
+      await get("/me/finance/usage?groupBy=project&direction=sent");
+      await get("/me/finance/summary");
+      await get("/me/finance/reconciliation");
+
+      for (const marker of [
+        "LEFT JOIN LATERAL",
+        "GROUP BY 1, 2\n",
+        "AS matched",
+      ]) {
+        const query = sqlOf(marker);
+        expect(query?.sql, marker).toContain("a.project_id NOT IN (?)");
+        expect(query?.values, marker).toContain(PROJECT_A);
+        expect(query?.values, marker).not.toContain(HIDDEN);
+      }
+    });
+
+    it("counts and lists only visible authorizations", async () => {
+      restrict();
+      await get("/me/finance/summary");
+      await get("/me/finance/reconciliation");
+
+      for (const [arg] of spendAuthorization.groupBy.mock.calls) {
+        expect(arg.where.projectId).toEqual({ in: [PROJECT_A] });
+      }
+      expect(
+        spendAuthorization.findMany.mock.calls[0][0].where.projectId,
+      ).toEqual({ in: [PROJECT_A] });
+    });
+
+    it("applies the same filter to both CSV exports", async () => {
+      actAs(tenancy, "FINANCE");
+      restrict();
+      await get("/me/finance/export/payments.csv");
+      await get(
+        "/me/finance/export/usage.csv?groupBy=agent&direction=received",
+      );
+
+      const payments = sqlOf("p.failure_reason");
+      expect(payments?.sql).toContain(
+        "p.project_id IS NULL OR p.project_id IN (?)",
+      );
+      expect(payments?.sql).toContain("a.project_id NOT IN (?)");
+      expect(payments?.values).not.toContain(HIDDEN);
+      const usage = sqlOf("SELECT p.agent_id AS key");
+      expect(usage?.sql).toContain(
+        "p.project_id IS NULL OR p.project_id IN (?)",
+      );
+    });
+
+    it("leaves a caller with no visible project only unattributed rows", async () => {
+      accessRows = [{ id: HIDDEN, restricted: true, members: [] }];
+      await get("/me/finance/usage?groupBy=agent&direction=received");
+
+      expect(rawCall().sql).toContain("p.project_id IS NULL");
+      expect(rawCall().values).not.toContain(HIDDEN);
+    });
+
+    it.each([
+      "OWNER",
+      "ADMIN",
+    ] as const)("shows a plain %s every project", async (role) => {
+      actAs(tenancy, role);
+      restrict();
+      await get("/me/finance/usage?groupBy=agent&direction=received");
+      await get("/me/finance/usage?groupBy=project&direction=sent");
+
+      for (const index of [0, 1]) {
+        expect(rawCall(index).sql).not.toContain("project_id IN");
+        expect(rawCall(index).sql).not.toContain("project_id NOT IN");
+      }
+      expect(
+        project.findMany.mock.calls.filter(([arg]) => arg.select.restricted),
+      ).toEqual([]);
     });
   });
 

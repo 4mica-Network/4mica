@@ -8,6 +8,7 @@ import { AUDIT_DOWN, failAuditInTransaction } from "@/test-support/audit";
 import {
   actAs,
   ORG_ID,
+  OTHER_PROJECT_ID,
   PRODUCTION_ENV_ID,
   PROJECT_ID,
   SANDBOX_ENV_ID,
@@ -18,7 +19,7 @@ const { authenticateRequest, getUser, db, onApprovalResolved } = vi.hoisted(
     const db = {
       membership: { findFirst: vi.fn(), findMany: vi.fn(), create: vi.fn() },
       auditLog: { create: vi.fn() },
-      project: { findFirst: vi.fn() },
+      project: { findFirst: vi.fn(), findMany: vi.fn() },
       user: { findUnique: vi.fn(), upsert: vi.fn(), update: vi.fn() },
       business: { findUnique: vi.fn(), upsert: vi.fn() },
       apiKey: { findUnique: vi.fn(), update: vi.fn() },
@@ -270,6 +271,69 @@ describe("approval routes", () => {
         id: APPROVAL_ID,
         organizationId: ORG_ID,
       });
+    });
+
+    it("keeps approvals of restricted projects out of the list and the detail for non-members", async () => {
+      as("FINANCE");
+      db.project.findMany.mockResolvedValue([
+        { id: PROJECT_ID, restricted: false, members: [] },
+        { id: OTHER_PROJECT_ID, restricted: true, members: [] },
+      ]);
+      db.approvalRequest.findFirst.mockResolvedValue(null);
+      const visible = {
+        AND: [
+          { OR: [{ projectId: null }, { projectId: { in: [PROJECT_ID] } }] },
+        ],
+      };
+
+      expect((await call("GET", "/me/approvals?limit=5")).statusCode).toBe(200);
+      const listed = db.approvalRequest.findMany.mock.calls[1][0];
+      expect(listed.where).toEqual({ organizationId: ORG_ID, ...visible });
+      expect(listed.take).toBe(6);
+
+      expect(
+        (await call("GET", "/me/approvals?status=PENDING")).statusCode,
+      ).toBe(200);
+      expect(db.approvalRequest.findMany.mock.calls[3][0].where).toEqual({
+        organizationId: ORG_ID,
+        ...visible,
+        status: "PENDING",
+      });
+
+      expect(
+        (await call("GET", `/me/approvals/${APPROVAL_ID}`)).statusCode,
+      ).toBe(404);
+      expect(db.approvalRequest.findFirst.mock.calls[0][0].where).toEqual({
+        id: APPROVAL_ID,
+        organizationId: ORG_ID,
+        ...visible,
+      });
+      expect(db.project.findMany.mock.calls[0][0]).toMatchObject({
+        where: { organizationId: ORG_ID },
+        select: { members: { where: { userId: USER_ID } } },
+      });
+    });
+
+    it("lets a member of a restricted project see its approvals", async () => {
+      as("VIEWER");
+      db.project.findMany.mockResolvedValue([
+        { id: PROJECT_ID, restricted: false, members: [] },
+        {
+          id: OTHER_PROJECT_ID,
+          restricted: true,
+          members: [{ role: "VIEWER" }],
+        },
+      ]);
+      db.approvalRequest.findFirst.mockResolvedValue(
+        stored({ projectId: OTHER_PROJECT_ID }),
+      );
+
+      expect(
+        (await call("GET", `/me/approvals/${APPROVAL_ID}`)).statusCode,
+      ).toBe(200);
+      expect(
+        db.approvalRequest.findFirst.mock.calls[0][0].where.AND[0].OR[1],
+      ).toEqual({ projectId: { in: [PROJECT_ID, OTHER_PROJECT_ID] } });
     });
 
     it("never offers a viewer the decision", async () => {

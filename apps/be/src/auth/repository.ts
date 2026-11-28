@@ -288,3 +288,13 @@ export const findProjectForMember = (
       environments: { select: { id: true, kind: true } },
     },
   });
+
+export const findProjectsForMember = (orgId: string, userId: string) =>
+  prisma.project.findMany({
+    where: { organizationId: orgId },
+    select: {
+      id: true,
+      restricted: true,
+      members: { where: { userId }, select: { role: true } },
+    },
+  });

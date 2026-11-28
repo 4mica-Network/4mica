@@ -1,3 +1,4 @@
+import { accessibleProjectIds } from "@auth/project";
 import {
   invalidBody,
   notFound,
@@ -46,7 +47,11 @@ export const listAlertsHandler: RouteHandler = async (request, reply) => {
     return invalidBody(reply, parsed.issues);
   }
 
-  const page = await listAlerts(tenant.orgId, parsed.data);
+  const page = await listAlerts(
+    tenant.orgId,
+    parsed.data,
+    await accessibleProjectIds(tenant),
+  );
   const names = await acknowledgers(page.items);
   return reply.send({
     items: page.items.map((row) => toAlert(row, names)),

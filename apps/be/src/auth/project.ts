@@ -5,7 +5,7 @@ import {
   type ProjectPermission,
   projectPermissionsFor,
 } from "./permissions";
-import { findProjectForMember } from "./repository";
+import { findProjectForMember, findProjectsForMember } from "./repository";
 import type { Tenant } from "./tenant";
 
 export const PROJECT_HEADER = "x-project-id";
@@ -123,4 +123,26 @@ export const resolveProject = (
   const pending = lookups.get(request) ?? lookup(request, tenant);
   lookups.set(request, pending);
   return pending;
+};
+
+export const accessibleProjectIds = async (
+  tenant: Pick<Tenant, "orgId" | "userId" | "role" | "custom">,
+): Promise<string[] | null> => {
+  const customProjectRole = tenant.custom?.projectRole ?? null;
+  const roleIn = (restricted: boolean, projectRole: ProjectRole | null) =>
+    effectiveProjectRole({
+      orgRole: tenant.role,
+      customProjectRole,
+      projectRole,
+      restricted,
+    });
+  if (roleIn(true, null)) {
+    return null;
+  }
+  const projects = await findProjectsForMember(tenant.orgId, tenant.userId);
+  return projects
+    .filter((project) =>
+      roleIn(project.restricted, project.members[0]?.role ?? null),
+    )
+    .map((project) => project.id);
 };

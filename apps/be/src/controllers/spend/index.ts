@@ -1,7 +1,7 @@
 import { environmentForNetwork } from "@4mica/rules";
 import { requireApiKeyScope } from "@auth/api-key";
 import { effectiveProjectRole } from "@auth/permissions";
-import { requestedEnvironment } from "@auth/project";
+import { accessibleProjectIds, requestedEnvironment } from "@auth/project";
 import { notifyFinance } from "@controllers/finance-alerts/notify";
 import { projectVisibleTo } from "@controllers/payments/repository";
 import {
@@ -267,6 +267,7 @@ export const listAuthorizationsHandler: RouteHandler = async (
   const page = await listAuthorizations(tenant.orgId, {
     ...parsed.data,
     environment,
+    projects: await accessibleProjectIds(tenant),
   });
 
   return reply.send({

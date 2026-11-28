@@ -29,3 +29,13 @@ export const networkIssue = (scope: Pick<ResourceScope, "environment">) => ({
   path: "network",
   message: `is not available in ${scope.environment === "PRODUCTION" ? "production" : "sandbox"}`,
 });
+
+export type ProjectAccess = string[] | null;
+
+export const projectIn = (projects: ProjectAccess) =>
+  projects === null ? {} : { projectId: { in: projects } };
+
+export const projectInOrNone = (projects: ProjectAccess) =>
+  projects === null
+    ? {}
+    : { AND: [{ OR: [{ projectId: null }, { projectId: { in: projects } }] }] };

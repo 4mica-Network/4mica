@@ -11,7 +11,13 @@ import {
 } from "vitest";
 import { initApp } from "@/server";
 import type { SpendDb } from "@/test-support/spend-db";
-import { actAs, ORG_ID, OTHER_ORG_ID } from "@/test-support/tenancy";
+import {
+  actAs,
+  ORG_ID,
+  OTHER_ORG_ID,
+  OTHER_PROJECT_ID,
+  PROJECT_ID,
+} from "@/test-support/tenancy";
 import { notifyFinance } from "./notify";
 import { raiseAlerts } from "./repository";
 
@@ -250,6 +256,55 @@ describe("notifyFinance", () => {
 });
 
 describe("alert routes", () => {
+  it("hides alerts of restricted projects the caller cannot see, in the query and its pages", async () => {
+    h.db.project.findMany.mockResolvedValue([
+      { id: PROJECT_ID, restricted: false, members: [] },
+      { id: OTHER_PROJECT_ID, restricted: true, members: [] },
+    ]);
+    h.db.financialAlert.seed(
+      ...["a", "b", "c", "d"].map((title, index) => ({
+        id: `019fce62-0000-7000-8000-000000000b0${index}`,
+        organizationId: ORG_ID,
+        projectId: [null, PROJECT_ID, OTHER_PROJECT_ID, OTHER_PROJECT_ID][
+          index
+        ],
+        kind: "BUDGET_THRESHOLD",
+        title,
+        detail: {},
+      })),
+    );
+    const titles = async (query = "") => {
+      const res = await app.inject({
+        method: "GET",
+        url: `/me/finance/alerts${query}`,
+        headers: AUTH,
+      });
+      expect(res.statusCode).toBe(200);
+      return res.json() as {
+        items: { title: string }[];
+        nextCursor: string | null;
+      };
+    };
+
+    expect((await titles()).items.map((a) => a.title).sort()).toEqual([
+      "a",
+      "b",
+    ]);
+    const page = await titles("?limit=2");
+    expect(page.items).toHaveLength(2);
+    expect(page.nextCursor).toBeNull();
+
+    h.db.project.findMany.mockResolvedValue([
+      { id: PROJECT_ID, restricted: false, members: [] },
+      { id: OTHER_PROJECT_ID, restricted: true, members: [{ role: "VIEWER" }] },
+    ]);
+    expect((await titles()).items).toHaveLength(4);
+
+    actAs(h.db.tenancy, "OWNER");
+    expect((await titles()).items).toHaveLength(4);
+    expect(h.db.project.findMany).not.toHaveBeenCalled();
+  });
+
   it("lists the org's alerts newest first with filters", async () => {
     h.db.financialAlert.seed(
       {

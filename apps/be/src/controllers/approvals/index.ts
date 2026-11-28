@@ -1,5 +1,6 @@
 import { environmentForNetwork } from "@4mica/rules";
 import { requireApiKeyScope } from "@auth/api-key";
+import { accessibleProjectIds } from "@auth/project";
 import { requireRecentAuth } from "@auth/security";
 import {
   invalidBody,
@@ -75,7 +76,11 @@ export const listApprovalsHandler: RouteHandler = async (request, reply) => {
     return invalidBody(reply, parsed.issues);
   }
 
-  const { items, nextCursor } = await listApprovals(tenant.orgId, parsed.data);
+  const { items, nextCursor } = await listApprovals(
+    tenant.orgId,
+    parsed.data,
+    await accessibleProjectIds(tenant),
+  );
   return reply.send({
     items: items.map((row) => toApproval(row, tenant)),
     nextCursor,
@@ -89,7 +94,11 @@ export const getApprovalHandler: RouteHandler = async (request, reply) => {
   }
 
   const { id } = request.params as { id: string };
-  const row = await findApproval(tenant.orgId, id);
+  const row = await findApproval(
+    tenant.orgId,
+    id,
+    await accessibleProjectIds(tenant),
+  );
   return row
     ? reply.send(toApproval(row, tenant))
     : notFound(reply, "approval request");
