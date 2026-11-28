@@ -76,6 +76,27 @@ const clerkError = (
   errors: { code: string; message: string; meta?: object }[],
 ) => Object.assign(new Error("clerk"), { status, errors });
 
+const ssoSession = (
+  connectionId: string,
+  extra: Record<string, unknown> = {},
+) => {
+  const base = signedIn();
+  return {
+    ...base,
+    toAuth: () => {
+      const auth = base.toAuth();
+      return {
+        ...auth,
+        sessionClaims: {
+          ...auth.sessionClaims,
+          sso_connection_id: connectionId,
+          ...extra,
+        },
+      };
+    },
+  };
+};
+
 const app = () => initApp([{ plugin: ssoRoutes }, { plugin: domainRoutes }]);
 
 const verifiedDomain = () => fake.domain({ verifiedAt: new Date() });
@@ -344,11 +365,7 @@ describe("updating a connection", () => {
       active: true,
       enforced: true,
     });
-    getUser.mockResolvedValue(
-      clerkUser({
-        samlAccounts: [{ active: true, samlConnection: { id: "samlc_1" } }],
-      }),
-    );
+    authenticateRequest.mockResolvedValue(ssoSession("samlc_1"));
     saml.updateSamlConnection.mockResolvedValue(
       clerkConnection({ active: false }),
     );
@@ -365,7 +382,7 @@ describe("updating a connection", () => {
     expect(res.json().error).toBe("would_lock_out");
   });
 
-  it("enforces once the caller has signed in through the connection", async () => {
+  it("refuses to enforce from a password session even with a linked SAML account", async () => {
     const domain = verifiedDomain();
     const connection = fake.connection({ domainId: domain.id });
     getUser.mockResolvedValue(
@@ -373,6 +390,15 @@ describe("updating a connection", () => {
         samlAccounts: [{ active: true, samlConnection: { id: "samlc_1" } }],
       }),
     );
+    const res = await patch(connection.id, { enforced: true });
+    expect(res.statusCode).toBe(409);
+    expect(res.json().error).toBe("would_lock_out");
+  });
+
+  it("enforces once the caller's session was established through the connection", async () => {
+    const domain = verifiedDomain();
+    const connection = fake.connection({ domainId: domain.id });
+    authenticateRequest.mockResolvedValue(ssoSession("samlc_1"));
     saml.getSamlConnection.mockResolvedValue(
       clerkConnection({ id: "samlc_1", active: true }),
     );
@@ -477,26 +503,70 @@ describe("ssoRequirement", () => {
     });
   });
 
-  it("is satisfied by a SAML account for the connection", async () => {
+  const withClaims = (claims: Record<string, unknown>) =>
+    request({ auth: { claims: { sid: "sess_123", ...claims } } });
+
+  it("is not satisfied by a linked SAML account on a password session", async () => {
     enforced();
     getUser.mockResolvedValue(
       clerkUser({
         samlAccounts: [{ active: true, samlConnection: { id: "samlc_1" } }],
       }),
     );
-    expect(await ssoRequirement(request(), tenant)).toBeNull();
-  });
-
-  it("is not satisfied by a SAML account for another connection", async () => {
-    enforced();
-    getUser.mockResolvedValue(
-      clerkUser({
-        samlAccounts: [{ active: true, samlConnection: { id: "samlc_x" } }],
-      }),
-    );
-    expect(await ssoRequirement(request(), tenant)).toEqual({
+    expect(await ssoRequirement(withClaims({}), tenant)).toEqual({
       domain: "acme.com",
     });
+  });
+
+  it("is satisfied by a session established through the connection", async () => {
+    enforced();
+    expect(
+      await ssoRequirement(
+        withClaims({ sso_connection_id: "samlc_1" }),
+        tenant,
+      ),
+    ).toBeNull();
+  });
+
+  it("is not satisfied by a session established through another connection", async () => {
+    enforced();
+    expect(
+      await ssoRequirement(
+        withClaims({ sso_connection_id: "samlc_x" }),
+        tenant,
+      ),
+    ).toEqual({ domain: "acme.com" });
+  });
+
+  it("is not satisfied by an impersonation session", async () => {
+    enforced();
+    expect(
+      await ssoRequirement(
+        withClaims({ sso_connection_id: "samlc_1", act: { sub: "user_x" } }),
+        tenant,
+      ),
+    ).toEqual({ domain: "acme.com" });
+  });
+
+  it("denies sessions established through a connection that was replaced", async () => {
+    const domain = verifiedDomain();
+    fake.connection({
+      domainId: domain.id,
+      enforced: true,
+      clerkConnectionId: "samlc_2",
+    });
+    expect(
+      await ssoRequirement(
+        withClaims({ sso_connection_id: "samlc_1" }),
+        tenant,
+      ),
+    ).toEqual({ domain: "acme.com" });
+    expect(
+      await ssoRequirement(
+        request({ cliSession: { id: "cli", clerkSsoConnectionId: "samlc_1" } }),
+        tenant,
+      ),
+    ).toEqual({ domain: "acme.com" });
   });
 
   it("ignores members from other domains", async () => {
@@ -528,8 +598,20 @@ describe("ssoRequirement", () => {
   it("applies to CLI sessions like browser sessions", async () => {
     enforced();
     expect(
-      await ssoRequirement(request({ cliSession: { id: "cli" } }), tenant),
+      await ssoRequirement(
+        request({ cliSession: { id: "cli", clerkSsoConnectionId: null } }),
+        tenant,
+      ),
     ).toEqual({ domain: "acme.com" });
+    expect(
+      await ssoRequirement(
+        request({
+          cliSession: { id: "cli", clerkSsoConnectionId: "samlc_1" },
+          auth: { claims: { sso_connection_id: "samlc_x" } },
+        }),
+        tenant,
+      ),
+    ).toBeNull();
   });
 
   it("fails closed when Clerk is unreachable", async () => {

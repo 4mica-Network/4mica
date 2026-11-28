@@ -1,12 +1,8 @@
 import type { Tenant } from "@auth/tenant";
 import { appLogger } from "@logger/index";
-import {
-  type ClerkUser,
-  getClerkUser,
-  primaryEmailDomain,
-  samlConnectionIds,
-} from "@services/clerk-users";
+import { getClerkUser, primaryEmailDomain } from "@services/clerk-users";
 import type { FastifyRequest } from "fastify";
+import { SSO_SESSION_CLAIM, sessionSsoConnection } from "./provenance";
 import { enforcedConnections } from "./repository";
 
 export interface EnforcedConnection {
@@ -14,35 +10,60 @@ export interface EnforcedConnection {
   domain: { domain: string };
 }
 
+export interface SsoRequirement {
+  domain: string;
+}
+
 export const unmetRequirement = (
-  user: ClerkUser,
+  domains: readonly string[],
+  provenance: string | null,
   connections: EnforcedConnection[],
-): { domain: string } | null => {
-  const domain = primaryEmailDomain(user);
-  if (!domain) {
+): SsoRequirement | null => {
+  const matching = connections.filter((c) => domains.includes(c.domain.domain));
+  const first = matching[0];
+  if (!first) {
     return null;
   }
-  const matching = connections.filter((c) => c.domain.domain === domain);
-  if (matching.length === 0) {
-    return null;
-  }
-  const signedInVia = new Set(samlConnectionIds(user));
-  return matching.some(
-    (c) => c.clerkConnectionId !== null && signedInVia.has(c.clerkConnectionId),
-  )
+  return provenance !== null &&
+    matching.some((c) => c.clerkConnectionId === provenance)
     ? null
-    : { domain };
+    : { domain: first.domain.domain };
+};
+
+const emailDomain = (email: string | null | undefined): string | null => {
+  const at = email?.lastIndexOf("@") ?? -1;
+  return email && at > 0 ? email.slice(at + 1).toLowerCase() : null;
+};
+
+export const callerDomains = async (
+  request: FastifyRequest,
+  orgId: string | null,
+): Promise<string[]> => {
+  const clerkUserId = request.user?.clerkUserId;
+  if (clerkUserId) {
+    try {
+      const primary = primaryEmailDomain(await getClerkUser(clerkUserId));
+      return primary ? [primary] : [];
+    } catch (error) {
+      appLogger.warn("Could not load Clerk user for SSO enforcement", {
+        orgId,
+        clerkUserId,
+        error,
+      });
+    }
+  }
+  const local = emailDomain(request.user?.email);
+  return local ? [local] : [];
 };
 
 export const ssoRequirement = async (
   request: FastifyRequest,
   tenant: Tenant,
-): Promise<{ domain: string } | null> => {
+): Promise<SsoRequirement | null> => {
   if (tenant.personal || request.apiKey) {
     return null;
   }
-  const clerkUserId = request.user?.clerkUserId;
-  if (!clerkUserId) {
+  if (!request.user?.clerkUserId) {
     return null;
   }
 
@@ -51,17 +72,22 @@ export const ssoRequirement = async (
     return null;
   }
 
-  try {
-    return unmetRequirement(await getClerkUser(clerkUserId), connections);
-  } catch (error) {
-    appLogger.warn("Could not load Clerk user for SSO enforcement", {
+  const provenance = sessionSsoConnection(request);
+  const unmet = unmetRequirement(
+    await callerDomains(request, tenant.orgId),
+    provenance,
+    connections,
+  );
+  if (unmet) {
+    appLogger.warn("SSO enforcement denied a session without SSO provenance", {
       orgId: tenant.orgId,
-      clerkUserId,
-      error,
+      domain: unmet.domain,
+      via: request.cliSession ? "cli" : "browser",
+      cliSessionId: request.cliSession?.id ?? null,
+      provenance,
+      claim: SSO_SESSION_CLAIM,
+      claimPresent: request.auth?.claims[SSO_SESSION_CLAIM] !== undefined,
     });
-    const domain = request.user?.email?.split("@")[1]?.toLowerCase() ?? null;
-    return domain && connections.some((c) => c.domain.domain === domain)
-      ? { domain }
-      : null;
   }
+  return unmet;
 };

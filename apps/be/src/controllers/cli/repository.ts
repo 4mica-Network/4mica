@@ -109,6 +109,7 @@ export const findDeviceRequestByCode = (deviceCode: string) =>
       scopes: true,
       organizationId: true,
       mfaVerified: true,
+      clerkSsoConnectionId: true,
       intervalSecs: true,
       lastPolledAt: true,
       expiresAt: true,
@@ -143,6 +144,7 @@ export const redeemDeviceRequest = (request: {
   scopes: string[];
   organizationId: string | null;
   mfaVerified: boolean;
+  clerkSsoConnectionId: string | null;
 }) =>
   prisma.$transaction(async (tx) => {
     const { count } = await tx.cliDeviceRequest.updateMany({
@@ -171,6 +173,7 @@ export const redeemDeviceRequest = (request: {
         scopes: request.scopes,
         organizationId: request.organizationId,
         mfaVerified: request.mfaVerified,
+        clerkSsoConnectionId: request.clerkSsoConnectionId,
         expiresAt: new Date(Date.now() + DEVICE_SESSION_TTL_MS),
       },
       select: CLI_SESSION_SELECT,
@@ -189,9 +192,14 @@ export const decideDeviceRequest = async (
   userId: string,
   userCode: string,
   status: "APPROVED" | "DENIED",
-  approval: { organizationId: string | null; mfaVerified: boolean } = {
+  approval: {
+    organizationId: string | null;
+    mfaVerified: boolean;
+    clerkSsoConnectionId: string | null;
+  } = {
     organizationId: null,
     mfaVerified: false,
+    clerkSsoConnectionId: null,
   },
 ): Promise<boolean> => {
   const { count } = await prisma.cliDeviceRequest.updateMany({
@@ -222,6 +230,7 @@ export const createCliToken = async (
     expiresInDays: number;
     organizationId: string | null;
     mfaVerified: boolean;
+    clerkSsoConnectionId: string | null;
   },
 ) => {
   const secret = generateCliToken();
@@ -237,6 +246,7 @@ export const createCliToken = async (
       scopes: input.scopes,
       organizationId: input.organizationId,
       mfaVerified: input.mfaVerified,
+      clerkSsoConnectionId: input.clerkSsoConnectionId,
       expiresAt: new Date(Date.now() + input.expiresInDays * DAY_MS),
     },
     select: CLI_SESSION_SELECT,

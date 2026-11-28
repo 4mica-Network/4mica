@@ -41,6 +41,7 @@ export interface CliSessionContext {
   scopes: string[];
   organizationId: string | null;
   mfaVerified: boolean;
+  clerkSsoConnectionId: string | null;
   createdAt: Date;
   expiresAt: Date;
 }
@@ -127,6 +128,7 @@ export const authenticateCliToken =
       scopes: record.scopes,
       organizationId: record.organizationId,
       mfaVerified: record.mfaVerified,
+      clerkSsoConnectionId: record.clerkSsoConnectionId,
       createdAt: record.createdAt,
       expiresAt: record.expiresAt,
     };

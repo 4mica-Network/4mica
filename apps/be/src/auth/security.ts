@@ -123,7 +123,9 @@ export const enforceAccessPolicy = async (
   if (sso) {
     reply.code(403).send({
       error: "sso_required",
-      message: `Members with an @${sso.domain} email must sign in with single sign-on.`,
+      message: cli
+        ? `Members with an @${sso.domain} email must sign in with single sign-on. Sign in to the CLI again from a dashboard session that used it.`
+        : `Members with an @${sso.domain} email must sign in with single sign-on.`,
       domain: sso.domain,
     });
     return false;

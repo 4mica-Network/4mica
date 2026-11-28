@@ -267,6 +267,18 @@ describe("security sagas", () => {
     );
   });
 
+  it("explains the session claim when requiring single sign-on would lock the caller out", () => {
+    const message = saga.securityFailureMessage(
+      new HttpError(409, "Conflict", {
+        error: "would_lock_out",
+        message: "Locked out",
+      }),
+      "fallback",
+    );
+    expect(message).toContain("sso_connection_id");
+    expect(message).not.toContain("?");
+  });
+
   it("hands a new SCIM token and the base URL to the page once, and keeps them out of the store", async () => {
     const token = {
       id: "tok_1",

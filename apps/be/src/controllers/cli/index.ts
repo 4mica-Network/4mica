@@ -15,6 +15,7 @@ import {
   requireUserId,
   withAudit,
 } from "@controllers/shared";
+import { sessionSsoConnection } from "@controllers/sso/provenance";
 import { appLogger } from "@logger/index";
 import { formatUserCode, normalizeUserCode } from "@utils/secrets";
 import type { FastifyReply, FastifyRequest, RouteHandler } from "fastify";
@@ -188,6 +189,7 @@ export const deviceTokenHandler: RouteHandler = async (request, reply) => {
     scopes: found.scopes,
     organizationId: found.organizationId,
     mfaVerified: found.mfaVerified,
+    clerkSsoConnectionId: found.clerkSsoConnectionId,
   });
 
   if (!redeemed) {
@@ -311,6 +313,7 @@ export const approveDeviceRequestHandler: RouteHandler = async (
     !(await decideDeviceRequest(userId, userCode, "APPROVED", {
       organizationId,
       mfaVerified: issuedWithMfa(request),
+      clerkSsoConnectionId: sessionSsoConnection(request),
     }))
   ) {
     return unknownCode(reply);
@@ -375,6 +378,7 @@ export const createCliTokenHandler: RouteHandler = async (request, reply) => {
     expiresInDays: parsed.data.expiresInDays,
     organizationId,
     mfaVerified: issuedWithMfa(request),
+    clerkSsoConnectionId: sessionSsoConnection(request),
   });
   appLogger.info("CLI session created", {
     userId,

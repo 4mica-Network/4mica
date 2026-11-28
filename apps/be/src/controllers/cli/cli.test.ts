@@ -230,7 +230,10 @@ const SESSION_AUTH = { authorization: "Bearer clerk-session" };
 const ACME = "019fce62-0000-7000-8000-0000000000ac";
 const GLOBEX = "019fce62-0000-7000-8000-0000000000b0";
 
-const signedIn = (fva?: [number, number]) => ({
+const signedIn = (
+  fva?: [number, number],
+  claims: Record<string, unknown> = {},
+) => ({
   isAuthenticated: true,
   status: "signed-in",
   reason: null,
@@ -238,7 +241,12 @@ const signedIn = (fva?: [number, number]) => ({
     tokenType: "session_token",
     userId: "user_123",
     sessionId: "sess_123",
-    sessionClaims: { sub: "user_123", sid: "sess_123", ...(fva && { fva }) },
+    sessionClaims: {
+      sub: "user_123",
+      sid: "sess_123",
+      ...(fva && { fva }),
+      ...claims,
+    },
   }),
 });
 
@@ -461,6 +469,7 @@ describe("cli sign-in", () => {
         scopes: ["account:read"],
         organizationId: null,
         mfaVerified: false,
+        clerkSsoConnectionId: null,
       });
 
       expect(redeemed).toBeNull();
@@ -1209,29 +1218,85 @@ describe("cli sign-in", () => {
       expect(refused.json().error).toBe("session_too_old");
     });
 
-    it("requires single sign-on from CLI sessions of members on an enforced domain", async () => {
-      browser(MFA);
-      const { token } = await deviceToken();
-      vi.mocked(prisma.ssoConnection.findMany).mockResolvedValue([
-        { clerkConnectionId: "samlc_1", domain: { domain: "example.com" } },
-      ] as never);
+    const ssoBrowser = (connectionId: string) =>
+      authenticateRequest.mockResolvedValue(
+        signedIn(MFA, { sso_connection_id: connectionId }),
+      );
+
+    const enforceSso = (clerkConnectionId: string) =>
+      vi
+        .mocked(prisma.ssoConnection.findMany)
+        .mockResolvedValue([
+          { clerkConnectionId, domain: { domain: "example.com" } },
+        ] as never);
+
+    const onEnforcedDomain = (samlConnectionIds: string[] = []) =>
       getUser.mockResolvedValue({
         primaryEmailAddressId: "idn_1",
         emailAddresses: [{ id: "idn_1", emailAddress: "ada@example.com" }],
-        samlAccounts: [],
+        samlAccounts: samlConnectionIds.map((id) => ({
+          active: true,
+          samlConnection: { id },
+        })),
       });
+
+    it("records the SSO connection of the approving browser session", async () => {
+      ssoBrowser("samlc_1");
+      await deviceToken();
+      await post("/me/cli/sessions", { name: "ci" }, SESSION_AUTH);
+      browser(MFA);
+      await deviceToken();
+
+      expect(db.sessions.map((row) => row.clerkSsoConnectionId)).toEqual([
+        "samlc_1",
+        "samlc_1",
+        null,
+      ]);
+    });
+
+    it("refuses a CLI session approved from a password session even with a linked SAML account", async () => {
+      browser(MFA);
+      const { token } = await deviceToken();
+      enforceSso("samlc_1");
+      onEnforcedDomain(["samlc_1"]);
 
       const refused = await wallets(inAcme(token as string));
       expect(refused.statusCode).toBe(403);
       expect(refused.json().error).toBe("sso_required");
+    });
 
-      clearClerkUserCache();
-      getUser.mockResolvedValue({
-        primaryEmailAddressId: "idn_1",
-        emailAddresses: [{ id: "idn_1", emailAddress: "ada@example.com" }],
-        samlAccounts: [{ active: true, samlConnection: { id: "samlc_1" } }],
-      });
+    it("lets a CLI session approved from an SSO session through", async () => {
+      ssoBrowser("samlc_1");
+      const { token } = await deviceToken();
+      enforceSso("samlc_1");
+      onEnforcedDomain();
+
       expect((await wallets(inAcme(token as string))).statusCode).toBe(200);
+    });
+
+    it("refuses an existing CLI token once single sign-on becomes mandatory", async () => {
+      browser(MFA);
+      const { token } = await deviceToken();
+      onEnforcedDomain(["samlc_1"]);
+      expect((await wallets(inAcme(token as string))).statusCode).toBe(200);
+
+      enforceSso("samlc_1");
+      const refused = await wallets(inAcme(token as string));
+      expect(refused.statusCode).toBe(403);
+      expect(refused.json().error).toBe("sso_required");
+    });
+
+    it("refuses CLI sessions issued through a connection that was replaced", async () => {
+      ssoBrowser("samlc_1");
+      const { token } = await deviceToken();
+      onEnforcedDomain(["samlc_1", "samlc_2"]);
+      enforceSso("samlc_1");
+      expect((await wallets(inAcme(token as string))).statusCode).toBe(200);
+
+      enforceSso("samlc_2");
+      const refused = await wallets(inAcme(token as string));
+      expect(refused.statusCode).toBe(403);
+      expect(refused.json().error).toBe("sso_required");
     });
 
     it("refuses to bind a device sign-in when the approving session lacks the organization's MFA", async () => {

@@ -11,7 +11,6 @@ import {
   withAudit,
 } from "@controllers/shared";
 import { appLogger } from "@logger/index";
-import { getClerkUser } from "@services/clerk-users";
 import type { FastifyReply, FastifyRequest, RouteHandler } from "fastify";
 import {
   type ClerkSamlConnection,
@@ -24,7 +23,8 @@ import {
   serviceProviderOf,
   updateSamlConnection,
 } from "./clerk";
-import { unmetRequirement } from "./enforcement";
+import { callerDomains, unmetRequirement } from "./enforcement";
+import { SSO_SESSION_CLAIM, sessionSsoConnection } from "./provenance";
 import {
   type ConnectionRow,
   connectionForDomain,
@@ -280,23 +280,14 @@ const clerkChanges = (input: UpdateSsoConnectionInput) => {
 
 const wouldLockOut = async (
   request: FastifyRequest,
+  tenant: Tenant,
   row: ConnectionRow,
-): Promise<boolean | null> => {
-  const clerkUserId = request.user?.clerkUserId;
-  if (!clerkUserId) {
-    return false;
-  }
-  try {
-    const user = await getClerkUser(clerkUserId);
-    return (
-      unmetRequirement(user, [
-        { clerkConnectionId: row.clerkConnectionId, domain: row.domain },
-      ]) !== null
-    );
-  } catch {
-    return null;
-  }
-};
+): Promise<boolean> =>
+  unmetRequirement(
+    await callerDomains(request, tenant.orgId),
+    sessionSsoConnection(request),
+    [{ clerkConnectionId: row.clerkConnectionId, domain: row.domain }],
+  ) !== null;
 
 export const updateSsoConnectionHandler: RouteHandler = async (
   request,
@@ -329,14 +320,10 @@ export const updateSsoConnectionHandler: RouteHandler = async (
   }
 
   if (enforced && !current.enforced) {
-    const lockOut = await wouldLockOut(request, current);
-    if (lockOut === null) {
-      return sendClerkFailure(reply, { kind: "upstream" });
-    }
-    if (lockOut) {
+    if (await wouldLockOut(request, tenant, current)) {
       return reply.code(409).send({
         error: "would_lock_out",
-        message: `Sign in with single sign-on for ${current.domain.domain} before enforcing it, or you would lose access.`,
+        message: `Sign in with single sign-on for ${current.domain.domain} before enforcing it, or you would lose access. Enforcement needs the ${SSO_SESSION_CLAIM} session token claim, so this session must carry it.`,
       });
     }
   }

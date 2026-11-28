@@ -1504,21 +1504,22 @@ enum CliSessionKind {
 }
 
 model CliSession {
-  id             String         @id @default(uuid(7))
-  userId         String         @map("user_id")
-  kind           CliSessionKind
-  organizationId String?        @map("organization_id")
-  name           String         @db.VarChar(120)
-  prefix         String         @db.VarChar(32)
-  last4          String         @db.VarChar(4)
-  hashedToken    String         @unique @map("hashed_token")
-  scopes         String[]
-  mfaVerified    Boolean        @default(false) @map("mfa_verified")
-  lastUsedAt     DateTime?      @map("last_used_at")
-  expiresAt      DateTime       @map("expires_at")
-  revokedAt      DateTime?      @map("revoked_at")
-  createdAt      DateTime       @default(now()) @map("created_at")
-  updatedAt      DateTime       @updatedAt @map("updated_at")
+  id                   String         @id @default(uuid(7))
+  userId               String         @map("user_id")
+  kind                 CliSessionKind
+  organizationId       String?        @map("organization_id")
+  name                 String         @db.VarChar(120)
+  prefix               String         @db.VarChar(32)
+  last4                String         @db.VarChar(4)
+  hashedToken          String         @unique @map("hashed_token")
+  scopes               String[]
+  mfaVerified          Boolean        @default(false) @map("mfa_verified")
+  clerkSsoConnectionId String?        @map("clerk_sso_connection_id")
+  lastUsedAt           DateTime?      @map("last_used_at")
+  expiresAt            DateTime       @map("expires_at")
+  revokedAt            DateTime?      @map("revoked_at")
+  createdAt            DateTime       @default(now()) @map("created_at")
+  updatedAt            DateTime       @updatedAt @map("updated_at")
 
   user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -1535,22 +1536,23 @@ enum CliDeviceRequestStatus {
 }
 
 model CliDeviceRequest {
-  id             String                 @id @default(uuid(7))
-  deviceCodeHash String                 @unique @map("device_code_hash")
-  userCode       String                 @unique @map("user_code") @db.VarChar(16)
-  clientName     String                 @map("client_name") @db.VarChar(120)
-  scopes         String[]
-  organizationId String?                @map("organization_id")
-  status         CliDeviceRequestStatus @default(PENDING)
-  userId         String?                @map("user_id")
-  requestIp      String?                @map("request_ip") @db.VarChar(64)
-  intervalSecs   Int                    @map("interval_secs")
-  lastPolledAt   DateTime?              @map("last_polled_at")
-  expiresAt      DateTime               @map("expires_at")
-  mfaVerified    Boolean                @default(false) @map("mfa_verified")
-  decidedAt      DateTime?              @map("decided_at")
-  consumedAt     DateTime?              @map("consumed_at")
-  createdAt      DateTime               @default(now()) @map("created_at")
+  id                   String                 @id @default(uuid(7))
+  deviceCodeHash       String                 @unique @map("device_code_hash")
+  userCode             String                 @unique @map("user_code") @db.VarChar(16)
+  clientName           String                 @map("client_name") @db.VarChar(120)
+  scopes               String[]
+  organizationId       String?                @map("organization_id")
+  status               CliDeviceRequestStatus @default(PENDING)
+  userId               String?                @map("user_id")
+  requestIp            String?                @map("request_ip") @db.VarChar(64)
+  intervalSecs         Int                    @map("interval_secs")
+  lastPolledAt         DateTime?              @map("last_polled_at")
+  expiresAt            DateTime               @map("expires_at")
+  mfaVerified          Boolean                @default(false) @map("mfa_verified")
+  clerkSsoConnectionId String?                @map("clerk_sso_connection_id")
+  decidedAt            DateTime?              @map("decided_at")
+  consumedAt           DateTime?              @map("consumed_at")
+  createdAt            DateTime               @default(now()) @map("created_at")
 
   user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
 

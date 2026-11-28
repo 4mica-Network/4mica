@@ -89,6 +89,12 @@ export const securityFailureMessage = (
         "Enterprise SSO is not enabled for the 4mica sign-in service yet, so nothing was saved.",
       );
     case "would_lock_out":
+      if (typeof body.ip !== "string") {
+        return t(
+          "security.errors.ssoWouldLockOut",
+          "Sign in through this connection before requiring it. Requiring single sign-on needs the sso_connection_id session token claim, and your current session does not carry it for this connection.",
+        );
+      }
       return t(
         "security.errors.wouldLockOut",
         "This allowlist would lock you out. Add your current IP ({{ip}}) first.",
