@@ -14,6 +14,7 @@ import {
   listMembersHandler,
   listOrganizationsHandler,
   previewInvitationHandler,
+  publicInvitationPreviewHandler,
   reactivateMemberHandler,
   removeMemberHandler,
   resendInvitationHandler,
@@ -28,7 +29,10 @@ import {
   MEMBERSHIP_SOURCES,
   ORG_ROLES,
 } from "@controllers/organizations/schema";
-import { sensitiveRateLimit } from "@plugins/rate-limit";
+import {
+  publicSensitiveRateLimit,
+  sensitiveRateLimit,
+} from "@plugins/rate-limit";
 import type { FastifyPluginCallback } from "fastify";
 import { cliGuards, guards } from "./guards";
 import {
@@ -122,6 +126,38 @@ const invitationPreviewSchema = {
     role,
     invitedBy: { type: ["object", "null"], properties: { name: str } },
     expiresAt: dateTime,
+  },
+} as const;
+
+const publicInvitationPreviewSchema = {
+  type: "object",
+  required: ["organization", "invitedBy", "emailHint", "expiresAt"],
+  additionalProperties: false,
+  properties: {
+    organization: {
+      type: "object",
+      required: ["name", "avatarUrl"],
+      additionalProperties: false,
+      properties: { name: str, avatarUrl: nullableStr },
+    },
+    invitedBy: {
+      type: ["object", "null"],
+      additionalProperties: false,
+      properties: { name: str },
+    },
+    emailHint: str,
+    expiresAt: dateTime,
+  },
+} as const;
+
+const publicTokenParams = {
+  type: "object",
+  required: ["token"],
+  properties: {
+    token: {
+      type: "string",
+      pattern: "^4mica_inv_[A-Za-z0-9_-]{16,118}$",
+    },
   },
 } as const;
 
@@ -470,6 +506,22 @@ export const organizationRoutes: FastifyPluginCallback = (app, _opts, done) => {
       },
     },
     previewInvitationHandler,
+  );
+
+  app.get(
+    "/v1/invitations/:token/preview",
+    {
+      preHandler: [publicSensitiveRateLimit(app)],
+      schema: {
+        tags: ["organizations"],
+        summary: "Preview an invitation before signing in",
+        description:
+          "Unauthenticated by design: the token is the credential. Returns only the organization's name and avatar, the inviter's name, a masked hint of the invited address, and the expiry.",
+        params: publicTokenParams,
+        response: { ...errors, 200: publicInvitationPreviewSchema },
+      },
+    },
+    publicInvitationPreviewHandler,
   );
 
   app.post(

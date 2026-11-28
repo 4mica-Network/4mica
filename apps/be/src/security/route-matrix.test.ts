@@ -75,6 +75,7 @@ const PUBLIC = new Set([
   "POST /unsubscribe",
   "POST /v1/cli/device/code",
   "POST /v1/cli/device/token",
+  "GET /v1/invitations/:token/preview",
 ]);
 
 const API_KEY_ROUTES = new Set([

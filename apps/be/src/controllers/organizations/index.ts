@@ -876,6 +876,36 @@ export const previewInvitationHandler: RouteHandler = async (
   });
 };
 
+const maskEmail = (email: string): string => {
+  const at = email.lastIndexOf("@");
+  if (at < 1) {
+    return "***";
+  }
+  return `${email[0]}***${email.slice(at)}`;
+};
+
+export const publicInvitationPreviewHandler: RouteHandler = async (
+  request,
+  reply,
+) => {
+  const invitation = await invitationFromParams(request, reply);
+  if (!invitation) {
+    return reply;
+  }
+
+  return reply.send({
+    organization: {
+      name: invitation.organization.name,
+      avatarUrl: invitation.organization.avatarUrl,
+    },
+    invitedBy: invitation.invitedBy?.name.trim()
+      ? { name: invitation.invitedBy.name }
+      : null,
+    emailHint: maskEmail(invitation.email),
+    expiresAt: invitation.expiresAt,
+  });
+};
+
 const verifiedEmails = async (
   request: FastifyRequest,
   userId: string,

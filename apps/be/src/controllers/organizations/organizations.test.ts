@@ -923,6 +923,96 @@ describe("organization routes", () => {
     });
   });
 
+  describe("public invitation preview", () => {
+    const preview = async (token = TOKEN) => {
+      const instance = await app();
+      const res = await instance.inject({
+        method: "GET",
+        url: `/v1/invitations/${token}/preview`,
+      });
+      await instance.close();
+      return res;
+    };
+
+    it("answers without a session and leaks nothing but the preview", async () => {
+      authenticateRequest.mockReset();
+      db.invitation.findUnique.mockResolvedValue(
+        invitationByToken({
+          email: "grace.hopper@navy.example.com",
+          organization: {
+            id: ORG_ID,
+            name: "Acme",
+            handle: "acme",
+            avatarUrl: "https://cdn.example.com/acme.png",
+            deletedAt: null,
+          },
+        }),
+      );
+
+      const res = await preview();
+
+      expect(res.statusCode).toBe(200);
+      expect(res.json()).toEqual({
+        organization: {
+          name: "Acme",
+          avatarUrl: "https://cdn.example.com/acme.png",
+        },
+        invitedBy: { name: "Grace" },
+        emailHint: "g***@navy.example.com",
+        expiresAt: expect.any(String),
+      });
+      expect(res.body).not.toContain("grace.hopper");
+      expect(res.body).not.toContain(ORG_ID);
+      expect(res.body).not.toContain(INVITATION_ID);
+      expect(res.body).not.toContain("DEVELOPER");
+      expect(res.body).not.toContain('acme"');
+      expect(authenticateRequest).not.toHaveBeenCalled();
+      expect(db.invitation.findUnique.mock.calls[0][0].where).toEqual({
+        tokenHash: hashSecret(TOKEN),
+      });
+    });
+
+    it("hides an inviter without a name", async () => {
+      db.invitation.findUnique.mockResolvedValue(
+        invitationByToken({ invitedBy: { name: "  " } }),
+      );
+
+      const res = await preview();
+
+      expect(res.statusCode).toBe(200);
+      expect(res.json().invitedBy).toBeNull();
+    });
+
+    it("answers 404 for an unknown token", async () => {
+      db.invitation.findUnique.mockResolvedValue(null);
+
+      const res = await preview();
+
+      expect(res.statusCode).toBe(404);
+    });
+
+    it.each([
+      ["expired", { expiresAt: new Date(Date.now() - 1000) }],
+      ["revoked", { revokedAt: new Date() }],
+      ["accepted", { acceptedAt: new Date() }],
+    ])("answers 410 for an %s invitation", async (_label, over) => {
+      db.invitation.findUnique.mockResolvedValue(invitationByToken(over));
+
+      const res = await preview();
+
+      expect(res.statusCode).toBe(410);
+      expect(res.json().error).toBe("invitation_unavailable");
+      expect(res.body).not.toContain("ada@example.com");
+    });
+
+    it("rejects a token that is not an invitation token before any query", async () => {
+      const res = await preview("4mica_sk_live_abcdefghijklmnopqrstuvwxyz");
+
+      expect(res.statusCode).toBe(400);
+      expect(db.invitation.findUnique).not.toHaveBeenCalled();
+    });
+  });
+
   describe("the finance role", () => {
     it("gives finance read access, approvals and finance management but no keys or members", async () => {
       db.membership.findMany.mockResolvedValue([
