@@ -2,7 +2,7 @@ import { clerk } from "./clerk";
 
 export type ClerkUser = Awaited<ReturnType<typeof clerk.users.getUser>>;
 
-const TTL_MS = 5 * 60_000;
+export const CLERK_USER_TTL_MS = 60_000;
 const MAX_ENTRIES = 10_000;
 
 interface Entry {
@@ -14,7 +14,7 @@ const cache = new Map<string, Entry>();
 
 const remember = (clerkUserId: string, user: Promise<ClerkUser>) => {
   cache.delete(clerkUserId);
-  cache.set(clerkUserId, { user, expiresAt: Date.now() + TTL_MS });
+  cache.set(clerkUserId, { user, expiresAt: Date.now() + CLERK_USER_TTL_MS });
   while (cache.size > MAX_ENTRIES) {
     const oldest = cache.keys().next().value;
     if (oldest === undefined) {

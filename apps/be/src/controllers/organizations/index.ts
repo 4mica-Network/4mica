@@ -27,7 +27,11 @@ import {
 } from "@controllers/shared";
 import { appLogger } from "@logger/index";
 import { clerk } from "@services/clerk";
-import { getClerkUser, primaryEmailDomain } from "@services/clerk-users";
+import {
+  getClerkUser,
+  invalidateClerkUser,
+  primaryEmailDomain,
+} from "@services/clerk-users";
 import { CSV_ROW_LIMIT, sendCsv } from "@utils/csv";
 import { isUniqueViolation } from "@utils/prisma-errors";
 import { generateInvitationToken, hashSecret } from "@utils/secrets";
@@ -614,6 +618,7 @@ const revokeClerkSessions = async (clerkUserId: string): Promise<number> => {
     }
   }
   await Promise.all(ids.map((id) => clerk.sessions.revokeSession(id)));
+  invalidateClerkUser(clerkUserId);
   return ids.length;
 };
 

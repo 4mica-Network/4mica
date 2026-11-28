@@ -11,6 +11,7 @@ import {
   withAudit,
 } from "@controllers/shared";
 import { appLogger } from "@logger/index";
+import { clearClerkUserCache } from "@services/clerk-users";
 import type { FastifyReply, FastifyRequest, RouteHandler } from "fastify";
 import {
   type ClerkSamlConnection,
@@ -410,6 +411,7 @@ export const updateSsoConnectionHandler: RouteHandler = async (
       },
     }),
   );
+  clearClerkUserCache();
   return reply.send(
     toConnection(row, clerkConnection ?? (await fetchClerkConnection(row))),
   );
@@ -454,5 +456,6 @@ export const deleteSsoConnectionHandler: RouteHandler = async (
       metadata: { domain: current.domain.domain, provider: current.provider },
     },
   );
+  clearClerkUserCache();
   return reply.code(204).send();
 };

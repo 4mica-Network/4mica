@@ -3,6 +3,7 @@ import { loadUser } from "@auth/user-store";
 import type { AuditEntry } from "@controllers/audit/repository";
 import { appLogger } from "@logger/index";
 import { clerk } from "@services/clerk";
+import { invalidateClerkUser } from "@services/clerk-users";
 import { isUniqueViolation } from "@utils/prisma-errors";
 import { invalidValue, notFoundError, ScimError } from "./errors";
 import { groupFilterWhere, parseFilter, userFilterWhere } from "./filter";
@@ -437,6 +438,9 @@ const deprovision = async (
       revokedClerkSessions,
     }),
   );
+  if (user?.clerkUserId) {
+    invalidateClerkUser(user.clerkUserId);
+  }
 };
 
 interface UserChanges {

@@ -1,6 +1,7 @@
 import { clearUserCache } from "@auth/user-store";
 import { projectRoutes } from "@routes/projects";
 import { SCIM_PREFIX, scimRoutes } from "@routes/scim";
+import { clearClerkUserCache, getClerkUser } from "@services/clerk-users";
 import { hashSecret } from "@utils/secrets";
 import {
   afterAll,
@@ -1068,6 +1069,26 @@ describe("deprovisioning", () => {
     expect(clerkApi.getSessionList).not.toHaveBeenCalled();
     expect(clerkApi.revokeSession).not.toHaveBeenCalled();
     expect(membershipOf(orgA.id, ada.id)).toBeUndefined();
+  });
+
+  it("drops the deprovisioned user's cached Clerk identity", async () => {
+    clearClerkUserCache();
+    clerkApi.getUser.mockClear();
+    const { ada } = seedFootprint();
+    clerkApi.getUser.mockResolvedValue(clerkUser("user_ada", "ada@acme.com"));
+    await getClerkUser("user_ada");
+    await getClerkUser("user_ada");
+    expect(clerkApi.getUser).toHaveBeenCalledTimes(1);
+
+    const res = await scim(
+      "PATCH",
+      `/Users/${ada.id}`,
+      patchOp({ op: "replace", value: { active: false } }),
+    );
+    expect(res.statusCode).toBe(200);
+    await getClerkUser("user_ada");
+
+    expect(clerkApi.getUser).toHaveBeenCalledTimes(2);
   });
 
   it("refuses to deprovision an owner", async () => {
