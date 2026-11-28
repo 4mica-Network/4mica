@@ -1,8 +1,10 @@
+import { prisma } from "@4mica/db";
 import { clearUserCache } from "@auth/user-store";
 import { resourceKeyRoutes } from "@routes/resource-keys";
 import { hashSecret } from "@utils/secrets";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { initApp } from "@/server";
+import { runTransactionsOn } from "@/test-support/audit";
 import {
   APPROVAL_HEADERS,
   approvedFor,
@@ -78,6 +80,7 @@ vi.mock("@4mica/db", () => ({
     agent,
     resourcePolicy,
     faqItem,
+    $transaction: vi.fn(),
   },
   disconnect: vi.fn(async () => {}),
 }));
@@ -241,6 +244,7 @@ describe("resource key routes", () => {
       }
     }
     clearUserCache();
+    runTransactionsOn(prisma);
     actAs(tenancy);
     governOff(governance);
 

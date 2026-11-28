@@ -13,6 +13,8 @@ import type {
   UpdateServiceAccountInput,
 } from "./schema";
 
+type Db = Prisma.TransactionClient;
+
 const HOUR_MS = 60 * 60 * 1000;
 
 const serviceAccountSelect = (scope: ResourceScope) =>
@@ -61,8 +63,12 @@ export const listServiceAccounts = async (scope: ResourceScope) => {
   return rows.map(toServiceAccount);
 };
 
-export const getServiceAccount = async (scope: ResourceScope, id: string) => {
-  const row = await prisma.serviceAccount.findFirst({
+export const getServiceAccount = async (
+  scope: ResourceScope,
+  id: string,
+  db: Db = prisma,
+) => {
+  const row = await db.serviceAccount.findFirst({
     where: ownedWhere(scope, id),
     select: serviceAccountSelect(scope),
   });
@@ -73,8 +79,9 @@ export const createServiceAccount = async (
   scope: ResourceScope,
   userId: string,
   data: CreateServiceAccountInput,
+  db: Db = prisma,
 ) => {
-  const row = await prisma.serviceAccount.create({
+  const row = await db.serviceAccount.create({
     data: {
       organizationId: scope.orgId,
       projectId: scope.projectId,
@@ -91,19 +98,21 @@ export const updateServiceAccount = async (
   scope: ResourceScope,
   id: string,
   data: UpdateServiceAccountInput | { suspendedAt: Date | null },
+  db: Db = prisma,
 ) => {
-  const { count } = await prisma.serviceAccount.updateMany({
+  const { count } = await db.serviceAccount.updateMany({
     where: ownedWhere(scope, id),
     data,
   });
-  return count > 0 ? getServiceAccount(scope, id) : null;
+  return count > 0 ? getServiceAccount(scope, id, db) : null;
 };
 
 export const deleteServiceAccount = async (
   scope: ResourceScope,
   id: string,
+  db: Db,
 ): Promise<boolean> => {
-  const row = await prisma.serviceAccount.findFirst({
+  const row = await db.serviceAccount.findFirst({
     where: ownedWhere(scope, id),
     select: { id: true },
   });
@@ -112,16 +121,14 @@ export const deleteServiceAccount = async (
   }
 
   const now = new Date();
-  await prisma.$transaction([
-    prisma.serviceAccount.update({
-      where: { id: row.id },
-      data: { deletedAt: now },
-    }),
-    prisma.apiKey.updateMany({
-      where: { serviceAccountId: row.id, revokedAt: null },
-      data: { revokedAt: now },
-    }),
-  ]);
+  await db.serviceAccount.update({
+    where: { id: row.id },
+    data: { deletedAt: now },
+  });
+  await db.apiKey.updateMany({
+    where: { serviceAccountId: row.id, revokedAt: null },
+    data: { revokedAt: now },
+  });
   return true;
 };
 
@@ -150,9 +157,10 @@ export const createServiceAccountKey = async (
     expiresAt: Date | null;
     ipAllowlist: string[];
   },
+  db: Db = prisma,
 ) => {
   const secret = generateApiKey(scope.environment);
-  const row = await prisma.apiKey.create({
+  const row = await db.apiKey.create({
     data: {
       ...scopeData(scope),
       serviceAccountId,
@@ -175,24 +183,26 @@ export const updateServiceAccountKey = async (
   serviceAccountId: string,
   keyId: string,
   data: UpdateApiKeyInput,
+  db: Db = prisma,
 ) => {
-  const { count } = await prisma.apiKey.updateMany({
+  const { count } = await db.apiKey.updateMany({
     where: { id: keyId, ...keyWhere(scope, serviceAccountId) },
     data,
   });
-  return count > 0 ? findApiKey(keyId) : null;
+  return count > 0 ? findApiKey(keyId, db) : null;
 };
 
 export const revokeServiceAccountKey = async (
   scope: ResourceScope,
   serviceAccountId: string,
   keyId: string,
+  db: Db = prisma,
 ) => {
-  const { count } = await prisma.apiKey.updateMany({
+  const { count } = await db.apiKey.updateMany({
     where: { id: keyId, ...keyWhere(scope, serviceAccountId), revokedAt: null },
     data: { revokedAt: new Date() },
   });
-  return count > 0 ? findApiKey(keyId) : null;
+  return count > 0 ? findApiKey(keyId, db) : null;
 };
 
 export const rotateServiceAccountKey = async (
@@ -201,8 +211,9 @@ export const rotateServiceAccountKey = async (
   serviceAccountId: string,
   keyId: string,
   expireOldInHours: number,
+  db: Db = prisma,
 ) => {
-  const old = await prisma.apiKey.findFirst({
+  const old = await db.apiKey.findFirst({
     where: {
       id: keyId,
       ...keyWhere(scope, serviceAccountId),
@@ -233,7 +244,7 @@ export const rotateServiceAccountKey = async (
               : graceEnds,
         };
 
-  const { count } = await prisma.apiKey.updateMany({
+  const { count } = await db.apiKey.updateMany({
     where: { id: old.id, revokedAt: null },
     data: oldUpdate,
   });
@@ -241,10 +252,16 @@ export const rotateServiceAccountKey = async (
     return null;
   }
 
-  return createServiceAccountKey(scope, userId, serviceAccountId, {
-    name: old.name,
-    scopes: old.scopes,
-    expiresAt: old.expiresAt,
-    ipAllowlist: old.ipAllowlist,
-  });
+  return createServiceAccountKey(
+    scope,
+    userId,
+    serviceAccountId,
+    {
+      name: old.name,
+      scopes: old.scopes,
+      expiresAt: old.expiresAt,
+      ipAllowlist: old.ipAllowlist,
+    },
+    db,
+  );
 };

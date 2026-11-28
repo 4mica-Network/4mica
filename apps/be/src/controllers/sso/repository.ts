@@ -63,8 +63,9 @@ export const createConnection = (
   orgId: string,
   userId: string,
   data: ConnectionCreate,
+  db: Prisma.TransactionClient = prisma,
 ) =>
-  prisma.ssoConnection.create({
+  db.ssoConnection.create({
     data: { ...data, organizationId: orgId, createdById: userId },
     select: CONNECTION_SELECT,
   });
@@ -72,15 +73,19 @@ export const createConnection = (
 export const updateConnection = (
   id: string,
   data: Prisma.SsoConnectionUpdateInput,
+  db: Prisma.TransactionClient = prisma,
 ) =>
-  prisma.ssoConnection.update({
+  db.ssoConnection.update({
     where: { id },
     data,
     select: CONNECTION_SELECT,
   });
 
-export const deleteConnection = (orgId: string, id: string) =>
-  prisma.ssoConnection.deleteMany({ where: { id, organizationId: orgId } });
+export const deleteConnection = (
+  orgId: string,
+  id: string,
+  db: Prisma.TransactionClient = prisma,
+) => db.ssoConnection.deleteMany({ where: { id, organizationId: orgId } });
 
 export const enforcedConnections = (orgId: string) =>
   prisma.ssoConnection.findMany({

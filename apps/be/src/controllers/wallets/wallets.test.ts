@@ -1,9 +1,11 @@
+import { prisma } from "@4mica/db";
 import { clearUserCache } from "@auth/user-store";
 import { walletRoutes } from "@routes/wallets";
 import { buildWalletLinkMessage } from "@utils/siwe";
 import { privateKeyToAccount } from "viem/accounts";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { initApp } from "@/server";
+import { AUDIT_DOWN, failAuditInTransaction } from "@/test-support/audit";
 import {
   APPROVAL_HEADERS,
   APPROVAL_ID,
@@ -79,6 +81,8 @@ vi.mock("@4mica/db", () => ({
     $transaction: vi.fn(async (arg: unknown) =>
       typeof arg === "function"
         ? (arg as (tx: unknown) => unknown)({
+            ...tenancy,
+            ...governance,
             wallet,
             walletNonce,
             apiListing,
@@ -906,6 +910,35 @@ describe("wallet routes", () => {
         walletId: { in: [WALLET_ID] },
       });
       expect(agent.updateMany).toHaveBeenCalledTimes(2);
+      await app.close();
+    });
+
+    it("keeps the wallet when its removal cannot be audited", async () => {
+      const tx = failAuditInTransaction(prisma, {
+        wallet: {
+          findFirst: vi.fn().mockResolvedValue(STORED_WALLET),
+          deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
+        },
+        apiListing: { updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
+        agent: { updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
+      });
+      const app = await initApp([{ plugin: walletRoutes }]);
+
+      const res = await app.inject({
+        method: "DELETE",
+        url: `/me/wallets/${WALLET_ID}`,
+        headers: AUTH,
+      });
+
+      expect(res.statusCode).toBe(500);
+      expect(tx.wallet.deleteMany).toHaveBeenCalledOnce();
+      expect(wallet.deleteMany).not.toHaveBeenCalled();
+      expect(apiListing.updateMany).not.toHaveBeenCalled();
+      expect(agent.updateMany).not.toHaveBeenCalled();
+      await expect(
+        vi.mocked(prisma.$transaction).mock.results.at(-1)?.value,
+      ).rejects.toBe(AUDIT_DOWN);
+      expect(tenancy.auditLog.create).not.toHaveBeenCalled();
       await app.close();
     });
 

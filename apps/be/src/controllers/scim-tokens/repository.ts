@@ -1,4 +1,4 @@
-import { prisma } from "@4mica/db";
+import { type Prisma, prisma } from "@4mica/db";
 import type { GeneratedSecret } from "@utils/secrets";
 
 const TOKEN_SELECT = {
@@ -24,8 +24,9 @@ export const createScimToken = (
   userId: string,
   name: string,
   secret: GeneratedSecret,
+  db: Prisma.TransactionClient = prisma,
 ) =>
-  prisma.scimToken.create({
+  db.scimToken.create({
     data: {
       organizationId: orgId,
       createdById: userId,
@@ -43,8 +44,11 @@ export const findScimToken = (orgId: string, id: string) =>
     select: TOKEN_SELECT,
   });
 
-export const revokeScimToken = (id: string) =>
-  prisma.scimToken.update({
+export const revokeScimToken = (
+  id: string,
+  db: Prisma.TransactionClient = prisma,
+) =>
+  db.scimToken.update({
     where: { id },
     data: { revokedAt: new Date() },
     select: TOKEN_SELECT,

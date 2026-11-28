@@ -64,18 +64,21 @@ export const findPendingGovernanceRequest = (
     select: APPROVAL_SUMMARY_SELECT,
   });
 
-export const createGovernanceRequest = (data: {
-  orgId: string;
-  projectId: string | null;
-  userId: string;
-  action: string;
-  summary: string;
-  payload: Prisma.InputJsonValue;
-  hash: string;
-  requiredApprovals: number;
-  expiresAt: Date;
-}) =>
-  prisma.approvalRequest.create({
+export const createGovernanceRequest = (
+  data: {
+    orgId: string;
+    projectId: string | null;
+    userId: string;
+    action: string;
+    summary: string;
+    payload: Prisma.InputJsonValue;
+    hash: string;
+    requiredApprovals: number;
+    expiresAt: Date;
+  },
+  tx: Prisma.TransactionClient,
+) =>
+  tx.approvalRequest.create({
     data: {
       organizationId: data.orgId,
       projectId: data.projectId,

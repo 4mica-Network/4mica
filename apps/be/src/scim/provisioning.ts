@@ -167,8 +167,7 @@ export const syncRole = async (
   ) {
     return;
   }
-  await updateMember(member.id, grant);
-  await recordAudit({
+  await updateMember(member.id, grant, {
     orgId: context.orgId,
     actorUserId: context.actorUserId,
     actorApiKeyId: null,
@@ -479,13 +478,16 @@ const applyUserChanges = async (
       changes.externalId !== undefined &&
       changes.externalId !== member.scimExternalId
     ) {
-      await updateMember(member.id, { scimExternalId: changes.externalId });
-      await recordAudit({
-        ...entry(actor, "scim.user.updated", "user", id, {
-          externalId: changes.externalId,
-        }),
-        orgId: actor.orgId,
-      });
+      await updateMember(
+        member.id,
+        { scimExternalId: changes.externalId },
+        {
+          ...entry(actor, "scim.user.updated", "user", id, {
+            externalId: changes.externalId,
+          }),
+          orgId: actor.orgId,
+        },
+      );
     }
     return getUser(actor.orgId, id);
   }

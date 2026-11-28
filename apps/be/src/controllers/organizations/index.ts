@@ -18,10 +18,10 @@ import {
 } from "@controllers/roles/grants";
 import { findRole } from "@controllers/roles/repository";
 import {
-  audit,
   invalidBody,
   notFound,
   parseBody,
+  recordAudit,
   requireTenant,
   requireUserId,
 } from "@controllers/shared";
@@ -685,7 +685,7 @@ export const revokeMemberSessionsHandler: RouteHandler = async (
     });
   }
 
-  await audit(request, tenant, {
+  await recordAudit(request, tenant, {
     action: "member.sessions_revoked",
     targetType: "user",
     targetId: userId,
@@ -1039,7 +1039,7 @@ export const exportAuditLogsHandler: RouteHandler = async (request, reply) => {
     CSV_ROW_LIMIT,
   );
 
-  await audit(request, tenant, {
+  await recordAudit(request, tenant, {
     action: "report.exported",
     targetType: "report",
     targetId: "audit_logs",

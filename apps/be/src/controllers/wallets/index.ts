@@ -1,12 +1,12 @@
 import { requestedEnvironment } from "@auth/project";
 import { requireApproval } from "@controllers/approvals/gate";
 import {
-  audit,
   invalidBody,
   notFound,
   parseBody,
   requireTenant,
   requireUserId,
+  withAudit,
 } from "@controllers/shared";
 import { appLogger } from "@logger/index";
 import { isUniqueViolation } from "@utils/prisma-errors";
@@ -172,24 +172,30 @@ export const createWalletHandler: RouteHandler = async (request, reply) => {
   }
 
   try {
-    const wallet = await consumeNonceAndCreateWallet(
-      tenant.orgId,
-      tenant.userId,
-      challenge.id,
-      data,
-      challenge.chainId,
+    const wallet = await withAudit(
+      request,
+      tenant,
+      (tx) =>
+        consumeNonceAndCreateWallet(
+          tenant.orgId,
+          tenant.userId,
+          challenge.id,
+          data,
+          challenge.chainId,
+          tx,
+        ),
+      (created) =>
+        created && {
+          action: "wallet.added",
+          targetType: "wallet",
+          targetId: created.id,
+          metadata: { address: created.address, network: created.network },
+        },
     );
 
     if (!wallet) {
       return invalidChallenge(reply);
     }
-
-    await audit(request, tenant, {
-      action: "wallet.added",
-      targetType: "wallet",
-      targetId: wallet.id,
-      metadata: { address: wallet.address, network: wallet.network },
-    });
 
     appLogger.info("Wallet linked", {
       userId: tenant.userId,
@@ -263,17 +269,22 @@ export const updateWalletHandler: RouteHandler = async (request, reply) => {
     });
   }
 
-  const updated = await updateWallet(tenant.orgId, id, next);
+  const updated = await withAudit(
+    request,
+    tenant,
+    (tx) => updateWallet(tenant.orgId, id, next, tx),
+    (row) =>
+      row && {
+        action: "wallet.updated",
+        targetType: "wallet",
+        targetId: id,
+        metadata: { fields: Object.keys(next) },
+      },
+  );
   if (!updated) {
     return notFound(reply, "wallet");
   }
 
-  await audit(request, tenant, {
-    action: "wallet.updated",
-    targetType: "wallet",
-    targetId: id,
-    metadata: { fields: Object.keys(next) },
-  });
   return reply.send(updated);
 };
 
@@ -301,15 +312,24 @@ export const deleteWalletHandler: RouteHandler = async (request, reply) => {
     return reply;
   }
 
-  const deleted = await deleteWallet(tenant.orgId, id);
+  const deleted = await withAudit(
+    request,
+    tenant,
+    (tx) => deleteWallet(tenant.orgId, id, tx),
+    (found) =>
+      found
+        ? {
+            action: "wallet.removed",
+            targetType: "wallet",
+            targetId: id,
+            ...(gate.approvalId
+              ? { metadata: { approvalId: gate.approvalId } }
+              : {}),
+          }
+        : null,
+  );
 
   if (deleted) {
-    await audit(request, tenant, {
-      action: "wallet.removed",
-      targetType: "wallet",
-      targetId: id,
-      ...(gate.approvalId ? { metadata: { approvalId: gate.approvalId } } : {}),
-    });
     appLogger.info("Wallet removed", { userId: tenant.userId, walletId: id });
     return reply.code(204).send();
   }
@@ -344,17 +364,22 @@ export const batchDeleteWalletsHandler: RouteHandler = async (
     return reply;
   }
 
-  const result = await batchDeleteWallets(tenant.orgId, parsed.data.ids);
-  if (result.deleted.length > 0) {
-    await audit(request, tenant, {
-      action: "wallet.removed",
-      targetType: "wallet",
-      metadata: {
-        ids: result.deleted,
-        ...(gate.approvalId ? { approvalId: gate.approvalId } : {}),
-      },
-    });
-  }
+  const result = await withAudit(
+    request,
+    tenant,
+    (tx) => batchDeleteWallets(tenant.orgId, parsed.data.ids, tx),
+    (removed) =>
+      removed.deleted.length > 0
+        ? {
+            action: "wallet.removed",
+            targetType: "wallet",
+            metadata: {
+              ids: removed.deleted,
+              ...(gate.approvalId ? { approvalId: gate.approvalId } : {}),
+            },
+          }
+        : null,
+  );
   appLogger.info("Wallets removed", {
     userId: tenant.userId,
     count: result.deleted.length,

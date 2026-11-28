@@ -4,11 +4,11 @@ import type { Tenant } from "@auth/tenant";
 import { requireApproval } from "@controllers/approvals/gate";
 import { GOVERNED_ROLES } from "@controllers/organizations/schema";
 import {
-  audit,
   invalidBody,
   notFound,
   parseBody,
   requireTenant,
+  withAudit,
 } from "@controllers/shared";
 import {
   classifyClerkError,
@@ -91,18 +91,24 @@ export const createDomainHandler: RouteHandler = async (request, reply) => {
   }
 
   try {
-    const row = await createDomain(
-      tenant.orgId,
-      tenant.userId,
-      domain,
-      randomBytes(24).toString("hex"),
+    const row = await withAudit(
+      request,
+      tenant,
+      (tx) =>
+        createDomain(
+          tenant.orgId,
+          tenant.userId,
+          domain,
+          randomBytes(24).toString("hex"),
+          tx,
+        ),
+      (created) => ({
+        action: "domain.added",
+        targetType: "domain",
+        targetId: created.id,
+        metadata: { domain },
+      }),
     );
-    await audit(request, tenant, {
-      action: "domain.added",
-      targetType: "domain",
-      targetId: row.id,
-      metadata: { domain },
-    });
     return reply.code(201).send(toDomain(row));
   } catch (error) {
     if (isUniqueViolation(error)) {
@@ -139,7 +145,20 @@ export const verifyDomainHandler: RouteHandler = async (request, reply) => {
     return domainTaken(reply);
   }
 
-  const row = await recordCheck(current.id, matched);
+  const row = await withAudit(
+    request,
+    tenant,
+    (tx) => recordCheck(current.id, matched, tx),
+    (checked) =>
+      matched
+        ? {
+            action: "domain.verified",
+            targetType: "domain",
+            targetId: checked.id,
+            metadata: { domain: checked.domain },
+          }
+        : null,
+  );
   if (!matched) {
     appLogger.info("Domain verification failed", {
       orgId: tenant.orgId,
@@ -156,12 +175,6 @@ export const verifyDomainHandler: RouteHandler = async (request, reply) => {
     });
   }
 
-  await audit(request, tenant, {
-    action: "domain.verified",
-    targetType: "domain",
-    targetId: row.id,
-    metadata: { domain: row.domain },
-  });
   return reply.send(toDomain(row));
 };
 
@@ -210,13 +223,20 @@ export const updateDomainHandler: RouteHandler = async (request, reply) => {
     }
   }
 
-  const row = await updateDomain(id, parsed.data);
-  await audit(request, tenant, {
-    action: "domain.updated",
-    targetType: "domain",
-    targetId: id,
-    metadata: { autoJoin: row.autoJoin, autoJoinRole: row.autoJoinRole },
-  });
+  const row = await withAudit(
+    request,
+    tenant,
+    (tx) => updateDomain(id, parsed.data, tx),
+    (updated) => ({
+      action: "domain.updated",
+      targetType: "domain",
+      targetId: id,
+      metadata: {
+        autoJoin: updated.autoJoin,
+        autoJoinRole: updated.autoJoinRole,
+      },
+    }),
+  );
   return reply.send(toDomain(row));
 };
 
@@ -250,8 +270,7 @@ export const deleteDomainHandler: RouteHandler = async (request, reply) => {
     }
   }
 
-  await deleteDomain(tenant.orgId, id);
-  await audit(request, tenant, {
+  await withAudit(request, tenant, (tx) => deleteDomain(tenant.orgId, id, tx), {
     action: "domain.removed",
     targetType: "domain",
     targetId: id,

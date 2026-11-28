@@ -1,7 +1,13 @@
+import { prisma } from "@4mica/db";
 import { clearUserCache } from "@auth/user-store";
 import { developerRoutes } from "@routes/developer";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { initApp } from "@/server";
+import {
+  AUDIT_DOWN,
+  failAuditInTransaction,
+  runTransactionsOn,
+} from "@/test-support/audit";
 import {
   APPROVAL_HEADERS,
   APPROVAL_ID,
@@ -75,6 +81,7 @@ vi.mock("@4mica/db", () => ({
     business: { findUnique: vi.fn(), upsert: vi.fn() },
     apiKey,
     webhook,
+    $transaction: vi.fn(),
   },
   disconnect: vi.fn(async () => {}),
 }));
@@ -153,6 +160,7 @@ describe("developer routes", () => {
       }
     }
     clearUserCache();
+    runTransactionsOn(prisma);
     actAs(tenancy);
     governOff(governance);
 
@@ -350,6 +358,31 @@ describe("developer routes", () => {
       action: "api_key.revoked",
       targetId: "key_1",
     });
+
+    await app.close();
+  });
+
+  it("does not mint a key when its audit entry cannot be written", async () => {
+    const tx = failAuditInTransaction(prisma, {
+      apiKey: { create: vi.fn().mockResolvedValue(STORED_KEY) },
+    });
+    const app = await initApp([{ plugin: developerRoutes }]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/me/api-keys",
+      headers: AUTH,
+      payload: { name: "CI" },
+    });
+
+    expect(res.statusCode).toBe(500);
+    expect(res.body).not.toMatch(/4mica_sk_/);
+    expect(tx.apiKey.create).toHaveBeenCalledOnce();
+    expect(apiKey.create).not.toHaveBeenCalled();
+    await expect(
+      vi.mocked(prisma.$transaction).mock.results[0].value,
+    ).rejects.toBe(AUDIT_DOWN);
+    expect(tenancy.auditLog.create).not.toHaveBeenCalled();
 
     await app.close();
   });

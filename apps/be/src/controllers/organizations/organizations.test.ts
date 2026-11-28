@@ -5,6 +5,7 @@ import { clearClerkUserCache } from "@services/clerk-users";
 import { hashSecret } from "@utils/secrets";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { initApp } from "@/server";
+import { AUDIT_DOWN, failAuditInTransaction } from "@/test-support/audit";
 import {
   APPROVAL_HEADERS,
   APPROVAL_ID,
@@ -570,6 +571,40 @@ describe("organization routes", () => {
         targetId: OTHER_USER_ID,
         metadata: { from: "DEVELOPER", to: "ADMIN" },
       });
+
+      await instance.close();
+    });
+
+    it("keeps the old role when the change cannot be audited", async () => {
+      actInTeam("OWNER");
+      db.membership.findUnique.mockResolvedValue(
+        memberRow(OTHER_USER_ID, "DEVELOPER"),
+      );
+      const tx = failAuditInTransaction(db, {
+        $queryRaw: vi.fn().mockResolvedValue([{ id: "m1" }]),
+        membership: {
+          findUnique: vi
+            .fn()
+            .mockResolvedValue(memberRow(OTHER_USER_ID, "DEVELOPER")),
+          update: vi.fn().mockResolvedValue(memberRow(OTHER_USER_ID, "ADMIN")),
+        },
+      });
+      const instance = await app();
+
+      const res = await instance.inject({
+        method: "PATCH",
+        url: `/me/organization/members/${OTHER_USER_ID}`,
+        headers: TEAM,
+        payload: { role: "ADMIN" },
+      });
+
+      expect(res.statusCode).toBe(500);
+      expect(tx.membership.update).toHaveBeenCalledOnce();
+      expect(db.membership.update).not.toHaveBeenCalled();
+      await expect(db.$transaction.mock.results.at(-1)?.value).rejects.toBe(
+        AUDIT_DOWN,
+      );
+      expect(db.auditLog.create).not.toHaveBeenCalled();
 
       await instance.close();
     });

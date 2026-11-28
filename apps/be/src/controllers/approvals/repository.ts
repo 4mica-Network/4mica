@@ -210,72 +210,72 @@ const reread = (tx: Tx, id: string) =>
     select: APPROVAL_SELECT,
   });
 
-export const decideApproval = (
+export const decideApproval = async (
+  tx: Tx,
   orgId: string,
   id: string,
   viewer: Viewer,
   vote: ApprovalVote,
   comment: string | null,
-): Promise<ApprovalChange> =>
-  prisma.$transaction(async (tx) => {
-    const row = await lockApproval(tx, orgId, id);
-    if (!row) {
-      return { ok: false, reason: "not_found" };
-    }
-    if (isExpired(row)) {
-      await closeAs(tx, row, "EXPIRED");
-      return { ok: false, reason: "closed" };
-    }
-    const blocker = decisionBlocker(row, viewer);
-    if (blocker) {
-      return { ok: false, reason: blocker };
-    }
+): Promise<ApprovalChange> => {
+  const row = await lockApproval(tx, orgId, id);
+  if (!row) {
+    return { ok: false, reason: "not_found" };
+  }
+  if (isExpired(row)) {
+    await closeAs(tx, row, "EXPIRED");
+    return { ok: false, reason: "closed" };
+  }
+  const blocker = decisionBlocker(row, viewer);
+  if (blocker) {
+    return { ok: false, reason: blocker };
+  }
 
-    await tx.approvalDecision.create({
-      data: { approvalRequestId: id, userId: viewer.userId, vote, comment },
-    });
-
-    const approvals =
-      row.decisions.filter((decision) => decision.vote === "APPROVE").length +
-      (vote === "APPROVE" ? 1 : 0);
-    const status: ApprovalStatus =
-      vote === "REJECT"
-        ? "REJECTED"
-        : approvals >= row.requiredApprovals
-          ? "APPROVED"
-          : "PENDING";
-
-    if (status !== "PENDING") {
-      await closeAs(tx, row, status);
-    }
-
-    return { ok: true, row: await reread(tx, id), status };
+  await tx.approvalDecision.create({
+    data: { approvalRequestId: id, userId: viewer.userId, vote, comment },
   });
 
-export const cancelApproval = (
+  const approvals =
+    row.decisions.filter((decision) => decision.vote === "APPROVE").length +
+    (vote === "APPROVE" ? 1 : 0);
+  const status: ApprovalStatus =
+    vote === "REJECT"
+      ? "REJECTED"
+      : approvals >= row.requiredApprovals
+        ? "APPROVED"
+        : "PENDING";
+
+  if (status !== "PENDING") {
+    await closeAs(tx, row, status);
+  }
+
+  return { ok: true, row: await reread(tx, id), status };
+};
+
+export const cancelApproval = async (
+  tx: Tx,
   orgId: string,
   id: string,
   userId: string,
-): Promise<ApprovalChange> =>
-  prisma.$transaction(async (tx) => {
-    const row = await lockApproval(tx, orgId, id);
-    if (!row) {
-      return { ok: false, reason: "not_found" };
-    }
-    if (isExpired(row)) {
-      await closeAs(tx, row, "EXPIRED");
-      return { ok: false, reason: "closed" };
-    }
-    if (row.status !== "PENDING") {
-      return { ok: false, reason: "closed" };
-    }
-    if (row.requestedById !== userId) {
-      return { ok: false, reason: "not_requester" };
-    }
+): Promise<ApprovalChange> => {
+  const row = await lockApproval(tx, orgId, id);
+  if (!row) {
+    return { ok: false, reason: "not_found" };
+  }
+  if (isExpired(row)) {
+    await closeAs(tx, row, "EXPIRED");
+    return { ok: false, reason: "closed" };
+  }
+  if (row.status !== "PENDING") {
+    return { ok: false, reason: "closed" };
+  }
+  if (row.requestedById !== userId) {
+    return { ok: false, reason: "not_requester" };
+  }
 
-    await closeAs(tx, row, "CANCELLED");
-    return { ok: true, row: await reread(tx, id), status: "CANCELLED" };
-  });
+  await closeAs(tx, row, "CANCELLED");
+  return { ok: true, row: await reread(tx, id), status: "CANCELLED" };
+};
 
 export const normalizeAmount = (value: string): string => {
   const [whole = "0", fraction = ""] = value.trim().split(".");
@@ -321,15 +321,16 @@ export const createSellerApproval = async (
   key: { id: string; orgId: string; projectId: string },
   input: CreateSellerApprovalInput,
   summary: string,
+  tx: Tx,
 ) => {
-  const settings = await prisma.governanceSettings.findUnique({
+  const settings = await tx.governanceSettings.findUnique({
     where: { organizationId: key.orgId },
     select: { approvalsRequired: true, approvalTtlHours: true },
   });
   const payload = sellerPaymentPayload(input);
   const ttl = settings?.approvalTtlHours ?? DEFAULT_APPROVAL_TTL_HOURS;
 
-  return prisma.approvalRequest.create({
+  return tx.approvalRequest.create({
     data: {
       organizationId: key.orgId,
       projectId: key.projectId,
@@ -447,8 +448,12 @@ export const nonMembers = async (
   return userIds.filter((id) => !members.has(id));
 };
 
-export const saveGovernance = (orgId: string, input: UpdateGovernanceInput) =>
-  prisma.governanceSettings.upsert({
+export const saveGovernance = (
+  orgId: string,
+  input: UpdateGovernanceInput,
+  tx: Tx,
+) =>
+  tx.governanceSettings.upsert({
     where: { organizationId: orgId },
     create: { ...GOVERNANCE_DEFAULTS, ...input, organizationId: orgId },
     update: input,

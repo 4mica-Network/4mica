@@ -1,10 +1,10 @@
 import { can } from "@auth/permissions";
 import { requireRecentAuth } from "@auth/security";
 import {
-  audit,
   invalidBody,
   parseBody,
   requireTenant,
+  withAudit,
 } from "@controllers/shared";
 import { ipAllowed } from "@utils/ip-allowlist";
 import type { RouteHandler } from "fastify";
@@ -68,13 +68,17 @@ export const updateSecuritySettingsHandler: RouteHandler = async (
     });
   }
 
-  const saved = await saveSecuritySettings(tenant.orgId, next);
-  await audit(request, tenant, {
-    action: "security.updated",
-    targetType: "organization",
-    targetId: tenant.orgId,
-    metadata: { ...saved, changed: Object.keys(parsed.data) },
-  });
+  const saved = await withAudit(
+    request,
+    tenant,
+    (tx) => saveSecuritySettings(tenant.orgId, next, tx),
+    (row) => ({
+      action: "security.updated",
+      targetType: "organization",
+      targetId: tenant.orgId,
+      metadata: { ...row, changed: Object.keys(parsed.data) },
+    }),
+  );
 
   return reply.send(saved);
 };

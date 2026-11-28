@@ -14,6 +14,8 @@ import type {
   UpdateCustomerIdentityInput,
 } from "./schema";
 
+type Db = Prisma.TransactionClient;
+
 export interface CustomerScope {
   orgId: string;
   projectId: string;
@@ -666,7 +668,8 @@ export const setCustomerStatus = async (
   scope: CustomerScope,
   id: string,
   input: SetCustomerStatusInput,
-): Promise<CustomerRow | null> => {
+  db: Db,
+): Promise<boolean> => {
   const data: Prisma.CustomerUpdateManyMutationInput =
     input.status === "ACTIVE"
       ? { status: "ACTIVE", suspendedUntil: null, statusReason: null }
@@ -682,12 +685,12 @@ export const setCustomerStatus = async (
             statusReason: input.reason ?? null,
           };
 
-  const { count } = await prisma.customer.updateMany({
+  const { count } = await db.customer.updateMany({
     where: { id, ...customerWhere(scope) },
     data,
   });
 
-  return count > 0 ? getCustomer(scope, id) : null;
+  return count > 0;
 };
 
 export const setCustomerPolicy = async (
@@ -725,13 +728,14 @@ export const customerLimitNetwork = async (
 export const resetCustomerUsage = async (
   scope: CustomerScope,
   id: string,
-): Promise<CustomerRow | null> => {
-  const { count } = await prisma.customer.updateMany({
+  db: Db,
+): Promise<boolean> => {
+  const { count } = await db.customer.updateMany({
     where: { id, ...customerWhere(scope) },
     data: { quotaResetAt: new Date() },
   });
 
-  return count > 0 ? getCustomer(scope, id) : null;
+  return count > 0;
 };
 
 export interface CreditBalance {
@@ -808,44 +812,36 @@ export const grantCredit = async (
   orgId: string,
   customerId: string,
   input: GrantCustomerCreditInput,
+  tx: Db,
 ): Promise<CustomerCreditRow | null> => {
-  const row = await prisma.$transaction(
-    async (tx) => {
-      if (input.amount.startsWith("-")) {
-        const { _sum } = await tx.customerCreditEntry.aggregate({
-          where: { organizationId: orgId, customerId },
-          _sum: { amount: true },
-        });
-        const after = (_sum.amount ?? new Prisma.Decimal(0)).plus(input.amount);
+  if (input.amount.startsWith("-")) {
+    const { _sum } = await tx.customerCreditEntry.aggregate({
+      where: { organizationId: orgId, customerId },
+      _sum: { amount: true },
+    });
+    const after = (_sum.amount ?? new Prisma.Decimal(0)).plus(input.amount);
 
-        if (after.isNegative()) {
-          return null;
-        }
-      }
-
-      return tx.customerCreditEntry.create({
-        data: {
-          organizationId: orgId,
-          customerId,
-          kind: input.kind,
-          amount: input.amount,
-          reason: input.reason ?? null,
-        },
-        select: {
-          id: true,
-          kind: true,
-          amount: true,
-          reason: true,
-          createdAt: true,
-        },
-      });
-    },
-    { isolationLevel: "Serializable" },
-  );
-
-  if (!row) {
-    return null;
+    if (after.isNegative()) {
+      return null;
+    }
   }
+
+  const row = await tx.customerCreditEntry.create({
+    data: {
+      organizationId: orgId,
+      customerId,
+      kind: input.kind,
+      amount: input.amount,
+      reason: input.reason ?? null,
+    },
+    select: {
+      id: true,
+      kind: true,
+      amount: true,
+      reason: true,
+      createdAt: true,
+    },
+  });
 
   return {
     id: row.id,
@@ -860,27 +856,23 @@ export const zeroCredit = async (
   orgId: string,
   customerId: string,
   reason: string | null,
+  tx: Db,
 ): Promise<CreditBalance> => {
-  await prisma.$transaction(
-    async (tx) => {
-      const balance = await creditBalance(orgId, customerId, tx);
+  const balance = await creditBalance(orgId, customerId, tx);
 
-      if (Number(balance.total) !== 0) {
-        await tx.customerCreditEntry.create({
-          data: {
-            organizationId: orgId,
-            customerId,
-            kind: "ADJUSTMENT",
-            amount: new Prisma.Decimal(balance.total).negated(),
-            reason,
-          },
-        });
-      }
-    },
-    { isolationLevel: "Serializable" },
-  );
+  if (Number(balance.total) !== 0) {
+    await tx.customerCreditEntry.create({
+      data: {
+        organizationId: orgId,
+        customerId,
+        kind: "ADJUSTMENT",
+        amount: new Prisma.Decimal(balance.total).negated(),
+        reason,
+      },
+    });
+  }
 
-  return creditBalance(orgId, customerId);
+  return creditBalance(orgId, customerId, tx);
 };
 
 export const CUSTOMER_COUPON_SELECT = {
@@ -955,8 +947,9 @@ export const createCoupon = async (
   orgId: string,
   customerId: string,
   input: CreateCustomerCouponInput,
+  db: Db = prisma,
 ): Promise<CustomerCouponRow> => {
-  const row = await prisma.customerCoupon.create({
+  const row = await db.customerCoupon.create({
     data: {
       organizationId: orgId,
       customerId,
@@ -977,6 +970,7 @@ export const updateCoupon = async (
   customerId: string,
   couponId: string,
   input: UpdateCustomerCouponInput,
+  db: Db = prisma,
 ): Promise<CustomerCouponRow | null> => {
   const data: Prisma.CustomerCouponUpdateManyMutationInput = {};
 
@@ -990,7 +984,7 @@ export const updateCoupon = async (
     data.revokedAt = input.revoked ? new Date() : null;
   }
 
-  const { count } = await prisma.customerCoupon.updateMany({
+  const { count } = await db.customerCoupon.updateMany({
     where: { id: couponId, customerId, organizationId: orgId },
     data,
   });
@@ -999,7 +993,7 @@ export const updateCoupon = async (
     return null;
   }
 
-  const row = await prisma.customerCoupon.findFirst({
+  const row = await db.customerCoupon.findFirst({
     where: { id: couponId, customerId, organizationId: orgId },
     select: CUSTOMER_COUPON_SELECT,
   });
@@ -1011,8 +1005,9 @@ export const deleteCoupon = async (
   orgId: string,
   customerId: string,
   couponId: string,
+  db: Db = prisma,
 ): Promise<boolean> => {
-  const { count } = await prisma.customerCoupon.deleteMany({
+  const { count } = await db.customerCoupon.deleteMany({
     where: { id: couponId, customerId, organizationId: orgId },
   });
 

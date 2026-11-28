@@ -162,11 +162,16 @@ export const updateMember = (
     role?: OrgRole;
     customRoleId?: string | null;
   },
+  audit: AuditEntry,
 ) =>
-  prisma.membership.update({
-    where: { id: membershipId },
-    data,
-    select: MEMBER_SELECT,
+  prisma.$transaction(async (tx) => {
+    const updated = await tx.membership.update({
+      where: { id: membershipId },
+      data,
+      select: MEMBER_SELECT,
+    });
+    await writeAudit(tx, audit);
+    return updated;
   });
 
 export const deprovisionMember = (

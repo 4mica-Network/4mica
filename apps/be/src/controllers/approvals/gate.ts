@@ -1,5 +1,5 @@
-import { type Prisma, prisma } from "@4mica/db";
-import { writeAudit } from "@controllers/audit/repository";
+import type { Prisma } from "@4mica/db";
+import { withAudit } from "@controllers/shared";
 import { appLogger } from "@logger/index";
 import { payloadHash } from "@utils/canonical";
 import type { FastifyReply, FastifyRequest } from "fastify";
@@ -81,34 +81,34 @@ export const requireApproval = async (
   );
   const pending =
     existing ??
-    (await createGovernanceRequest({
-      orgId: context.orgId,
-      projectId: context.projectId ?? null,
-      userId: context.userId,
-      action,
-      summary,
-      payload,
-      hash,
-      requiredApprovals: settings.approvalsRequired,
-      expiresAt: new Date(Date.now() + settings.approvalTtlHours * HOUR_MS),
-    }));
-
-  if (!existing) {
-    try {
-      await writeAudit(prisma, {
-        orgId: context.orgId,
+    (await withAudit(
+      request,
+      context,
+      (tx) =>
+        createGovernanceRequest(
+          {
+            orgId: context.orgId,
+            projectId: context.projectId ?? null,
+            userId: context.userId,
+            action,
+            summary,
+            payload,
+            hash,
+            requiredApprovals: settings.approvalsRequired,
+            expiresAt: new Date(
+              Date.now() + settings.approvalTtlHours * HOUR_MS,
+            ),
+          },
+          tx,
+        ),
+      (created) => ({
         projectId: context.projectId ?? null,
-        actorUserId: context.userId,
         action: "approval.requested",
         targetType: "approval_request",
-        targetId: pending.id,
+        targetId: created.id,
         metadata: { governedAction: action },
-        ip: request.ip,
-      });
-    } catch (error) {
-      appLogger.error("Could not record approval request", { error });
-    }
-  }
+      }),
+    ));
 
   reply.code(202).send({
     status: "approval_required",

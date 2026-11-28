@@ -1,12 +1,18 @@
-import type { OrgRole } from "@4mica/db";
+import { type OrgRole, prisma } from "@4mica/db";
 import { clearUserCache } from "@auth/user-store";
 import { securityRoutes } from "@routes/security";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { initApp } from "@/server";
+import {
+  AUDIT_DOWN,
+  failAuditInTransaction,
+  runTransactionsOn,
+} from "@/test-support/audit";
 import { actAs, membershipRow, ORG_ID } from "@/test-support/tenancy";
 
-const { authenticateRequest, db } = vi.hoisted(() => ({
+const { authenticateRequest, $transaction, db } = vi.hoisted(() => ({
   authenticateRequest: vi.fn(),
+  $transaction: vi.fn(),
   db: {
     membership: { findFirst: vi.fn() },
     auditLog: { create: vi.fn() },
@@ -20,7 +26,10 @@ vi.mock("@clerk/backend", () => ({
   createClerkClient: vi.fn(() => ({ authenticateRequest })),
 }));
 
-vi.mock("@4mica/db", () => ({ prisma: db, disconnect: vi.fn() }));
+vi.mock("@4mica/db", () => ({
+  prisma: { ...db, $transaction },
+  disconnect: vi.fn(),
+}));
 
 const USER_ID = "019fce62-0000-7000-8000-000000000000";
 const CALLER_IP = "203.0.113.10";
@@ -76,6 +85,7 @@ describe("security settings routes", () => {
       }
     }
     clearUserCache();
+    runTransactionsOn(prisma);
     authenticateRequest.mockReset();
     authenticateRequest.mockResolvedValue(signedIn());
     db.user.upsert.mockResolvedValue({
@@ -125,6 +135,22 @@ describe("security settings routes", () => {
   });
 
   describe("PUT", () => {
+    it("leaves the policy unchanged when its audit entry cannot be written", async () => {
+      const tx = failAuditInTransaction(prisma, {
+        securitySettings: {
+          upsert: vi.fn(async ({ update }: { update: object }) => update),
+        },
+      });
+
+      const res = await request("PUT", { requireMfa: true });
+
+      expect(res.statusCode).toBe(500);
+      expect(tx.securitySettings.upsert).toHaveBeenCalledOnce();
+      expect(db.securitySettings.upsert).not.toHaveBeenCalled();
+      await expect($transaction.mock.results[0].value).rejects.toBe(AUDIT_DOWN);
+      expect(db.auditLog.create).not.toHaveBeenCalled();
+    });
+
     it("normalizes and saves the policy, and audits it", async () => {
       const res = await request("PUT", {
         requireMfa: true,

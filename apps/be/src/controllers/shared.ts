@@ -1,4 +1,4 @@
-import { prisma } from "@4mica/db";
+import { type Prisma, prisma } from "@4mica/db";
 import {
   can,
   isWrite,
@@ -8,6 +8,7 @@ import {
 import { type ProjectScope, resolveProject } from "@auth/project";
 import { enforceAccessPolicy } from "@auth/security";
 import { resolveTenant, type Tenant } from "@auth/tenant";
+import type { MandatoryAuditAction } from "@controllers/audit/classification";
 import { type AuditEntry, writeAudit } from "@controllers/audit/repository";
 import type { SellerWalletResult } from "@controllers/wallets/repository";
 import { appLogger } from "@logger/index";
@@ -164,52 +165,107 @@ export const requireProject = async (
   return null;
 };
 
+type AuditInput = Omit<AuditEntry, "orgId" | "actorUserId" | "ip">;
+
+interface AuditActor {
+  orgId: string;
+  userId: string | null;
+}
+
+export type MandatoryAuditInput = AuditInput & {
+  action: MandatoryAuditAction;
+};
+
+type AuditFor<T> =
+  | MandatoryAuditInput
+  | ((result: T) => MandatoryAuditInput | null);
+
+const projectEntry = <E extends AuditInput>(
+  scope: ProjectScope,
+  entry: E,
+): E => ({
+  ...entry,
+  projectId: scope.projectId,
+  metadata: {
+    projectId: scope.projectId,
+    environment: scope.environment,
+    ...(entry.metadata &&
+    typeof entry.metadata === "object" &&
+    !Array.isArray(entry.metadata)
+      ? (entry.metadata as Record<string, unknown>)
+      : entry.metadata === undefined
+        ? {}
+        : { value: entry.metadata }),
+  } as AuditEntry["metadata"],
+});
+
+export const withAudit = <T>(
+  request: FastifyRequest,
+  actor: AuditActor,
+  mutation: (tx: Prisma.TransactionClient) => Promise<T>,
+  entry: AuditFor<T>,
+  options?: { isolationLevel?: Prisma.TransactionIsolationLevel },
+): Promise<T> =>
+  prisma.$transaction(async (tx) => {
+    const result = await mutation(tx);
+    const resolved = typeof entry === "function" ? entry(result) : entry;
+    if (resolved) {
+      await writeAudit(tx, {
+        ...resolved,
+        orgId: actor.orgId,
+        actorUserId: actor.userId,
+        ip: request.ip,
+      });
+    }
+    return result;
+  }, options);
+
+export const recordAudit = (
+  request: FastifyRequest,
+  actor: AuditActor,
+  entry: MandatoryAuditInput,
+): Promise<void> => withAudit(request, actor, async () => undefined, entry);
+
+export const withProjectAudit = <T>(
+  request: FastifyRequest,
+  scope: ProjectScope,
+  mutation: (tx: Prisma.TransactionClient) => Promise<T>,
+  entry: AuditFor<T>,
+  options?: { isolationLevel?: Prisma.TransactionIsolationLevel },
+): Promise<T> =>
+  withAudit(
+    request,
+    scope,
+    mutation,
+    (result) => {
+      const resolved = typeof entry === "function" ? entry(result) : entry;
+      return resolved ? projectEntry(scope, resolved) : null;
+    },
+    options,
+  );
+
 export const auditProject = (
   request: FastifyRequest,
   scope: ProjectScope,
-  entry: Omit<AuditEntry, "orgId" | "actorUserId" | "ip">,
-) =>
-  audit(
-    request,
-    {
-      orgId: scope.orgId,
-      userId: scope.userId,
-      role: scope.orgRole,
-      personal: false,
-    },
-    {
-      ...entry,
-      projectId: scope.projectId,
-      metadata: {
-        projectId: scope.projectId,
-        environment: scope.environment,
-        ...(entry.metadata &&
-        typeof entry.metadata === "object" &&
-        !Array.isArray(entry.metadata)
-          ? (entry.metadata as Record<string, unknown>)
-          : entry.metadata === undefined
-            ? {}
-            : { value: entry.metadata }),
-      } as AuditEntry["metadata"],
-    },
-  );
+  entry: AuditInput,
+) => audit(request, scope, projectEntry(scope, entry));
 
 export const audit = async (
   request: FastifyRequest,
-  tenant: Tenant,
-  entry: Omit<AuditEntry, "orgId" | "actorUserId" | "ip">,
+  actor: AuditActor,
+  entry: AuditInput,
 ): Promise<void> => {
   try {
     await writeAudit(prisma, {
       ...entry,
-      orgId: tenant.orgId,
-      actorUserId: tenant.userId,
+      orgId: actor.orgId,
+      actorUserId: actor.userId,
       ip: request.ip,
     });
   } catch (error) {
     appLogger.error("Could not record audit entry", {
       action: entry.action,
-      orgId: tenant.orgId,
+      orgId: actor.orgId,
       error,
     });
   }

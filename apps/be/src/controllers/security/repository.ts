@@ -1,4 +1,4 @@
-import { prisma } from "@4mica/db";
+import { type Prisma, prisma } from "@4mica/db";
 
 export interface SecuritySettingsRow {
   requireMfa: boolean;
@@ -35,8 +35,9 @@ export const findSecuritySettings = async (
 export const saveSecuritySettings = (
   orgId: string,
   settings: SecuritySettingsRow,
+  db: Prisma.TransactionClient = prisma,
 ): Promise<SecuritySettingsRow> =>
-  prisma.securitySettings.upsert({
+  db.securitySettings.upsert({
     where: { organizationId: orgId },
     create: { organizationId: orgId, ...settings },
     update: settings,

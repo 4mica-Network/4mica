@@ -11,6 +11,7 @@ import {
   vi,
 } from "vitest";
 import { initApp } from "@/server";
+import { AUDIT_DOWN, failAuditInTransaction } from "@/test-support/audit";
 import type { SpendDb } from "@/test-support/spend-db";
 import {
   actAs,
@@ -179,6 +180,28 @@ describe("spending policy CRUD", () => {
       createdById: USER_ID,
     });
     expect(actions()).toContain("spending_policy.created");
+  });
+
+  it("creates no policy when its audit entry cannot be written", async () => {
+    const tx = failAuditInTransaction(h.db.prisma, {
+      spendingPolicy: {
+        create: vi.fn(async () => ({
+          id: "019fce62-0000-7000-8000-0000000000e9",
+          projectId: null,
+        })),
+      },
+    });
+
+    const res = await send("POST", "/me/spending-policies", valid());
+
+    expect(res.statusCode).toBe(500);
+    expect(tx.spendingPolicy.create).toHaveBeenCalledOnce();
+    expect(h.db.spendingPolicy.rows).toEqual([]);
+    await expect(
+      (h.db.prisma.$transaction as ReturnType<typeof vi.fn>).mock.results.at(-1)
+        ?.value,
+    ).rejects.toBe(AUDIT_DOWN);
+    expect(actions()).not.toContain("spending_policy.created");
   });
 
   it("forbids viewers and developers from writing", async () => {

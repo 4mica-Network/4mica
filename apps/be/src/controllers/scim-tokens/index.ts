@@ -1,10 +1,10 @@
 import { requireRecentAuth } from "@auth/security";
 import {
-  audit,
   invalidBody,
   notFound,
   parseBody,
   requireTenant,
+  withAudit,
 } from "@controllers/shared";
 import { appLogger } from "@logger/index";
 import { generateScimToken } from "@utils/secrets";
@@ -49,18 +49,24 @@ export const createScimTokenHandler: RouteHandler = async (request, reply) => {
   }
 
   const secret = generateScimToken();
-  const token = await createScimToken(
-    tenant.orgId,
-    tenant.userId,
-    parsed.data.name,
-    secret,
+  const token = await withAudit(
+    request,
+    tenant,
+    (tx) =>
+      createScimToken(
+        tenant.orgId,
+        tenant.userId,
+        parsed.data.name,
+        secret,
+        tx,
+      ),
+    (created) => ({
+      action: "scim_token.created",
+      targetType: "scim_token",
+      targetId: created.id,
+      metadata: { name: created.name, prefix: created.prefix },
+    }),
   );
-  await audit(request, tenant, {
-    action: "scim_token.created",
-    targetType: "scim_token",
-    targetId: token.id,
-    metadata: { name: token.name, prefix: token.prefix },
-  });
   appLogger.info("SCIM token created", {
     orgId: tenant.orgId,
     tokenId: token.id,
@@ -84,13 +90,17 @@ export const revokeScimTokenHandler: RouteHandler = async (request, reply) => {
     return reply.send(current);
   }
 
-  const revoked = await revokeScimToken(id);
-  await audit(request, tenant, {
-    action: "scim_token.revoked",
-    targetType: "scim_token",
-    targetId: id,
-    metadata: { name: revoked.name, prefix: revoked.prefix },
-  });
+  const revoked = await withAudit(
+    request,
+    tenant,
+    (tx) => revokeScimToken(id, tx),
+    (row) => ({
+      action: "scim_token.revoked",
+      targetType: "scim_token",
+      targetId: id,
+      metadata: { name: row.name, prefix: row.prefix },
+    }),
+  );
   appLogger.info("SCIM token revoked", { orgId: tenant.orgId, tokenId: id });
 
   return reply.send(revoked);

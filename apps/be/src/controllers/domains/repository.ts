@@ -73,8 +73,9 @@ export const createDomain = (
   userId: string,
   domain: string,
   verificationToken: string,
+  db: Prisma.TransactionClient = prisma,
 ) =>
-  prisma.organizationDomain.create({
+  db.organizationDomain.create({
     data: {
       organizationId: orgId,
       domain,
@@ -84,8 +85,12 @@ export const createDomain = (
     select: DOMAIN_SELECT,
   });
 
-export const recordCheck = (id: string, verified: boolean) =>
-  prisma.organizationDomain.update({
+export const recordCheck = (
+  id: string,
+  verified: boolean,
+  db: Prisma.TransactionClient = prisma,
+) =>
+  db.organizationDomain.update({
     where: { id },
     data: {
       lastCheckedAt: new Date(),
@@ -97,8 +102,9 @@ export const recordCheck = (id: string, verified: boolean) =>
 export const updateDomain = (
   id: string,
   data: { autoJoin?: boolean; autoJoinRole?: OrgRole },
+  db: Prisma.TransactionClient = prisma,
 ) =>
-  prisma.organizationDomain.update({
+  db.organizationDomain.update({
     where: { id },
     data,
     select: DOMAIN_SELECT,
@@ -110,8 +116,12 @@ export const connectionsOfDomain = (orgId: string, domainId: string) =>
     select: { id: true, clerkConnectionId: true },
   });
 
-export const deleteDomain = (orgId: string, id: string) =>
-  prisma.organizationDomain.deleteMany({
+export const deleteDomain = (
+  orgId: string,
+  id: string,
+  db: Prisma.TransactionClient = prisma,
+) =>
+  db.organizationDomain.deleteMany({
     where: { id, organizationId: orgId },
   });
 

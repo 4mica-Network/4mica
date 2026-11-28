@@ -7,6 +7,7 @@ import {
   notFound,
   parseBody,
   requireProject,
+  withProjectAudit,
 } from "@controllers/shared";
 import { appLogger } from "@logger/index";
 import { optionalAmountText } from "@utils/amount";
@@ -188,18 +189,26 @@ export const setCustomerStatusHandler: RouteHandler = async (
   }
 
   const { id } = request.params as { id: string };
-  const updated = await setCustomerStatus(scope, id, parsed.data);
+  const changed = await withProjectAudit(
+    request,
+    scope,
+    (tx) => setCustomerStatus(scope, id, parsed.data, tx),
+    (found) =>
+      found
+        ? {
+            action: "customer.status_changed",
+            targetType: "customer",
+            targetId: id,
+            metadata: { status: parsed.data.status },
+          }
+        : null,
+  );
+  const updated = changed ? await getCustomer(scope, id) : null;
 
   if (!updated) {
     return notFound(reply, "customer");
   }
 
-  await auditProject(request, scope, {
-    action: "customer.status_changed",
-    targetType: "customer",
-    targetId: id,
-    metadata: { status: parsed.data.status },
-  });
   appLogger.info("Customer status changed", {
     userId: scope.userId,
     customerId: id,
@@ -275,17 +284,25 @@ export const resetCustomerUsageHandler: RouteHandler = async (
   }
 
   const { id } = request.params as { id: string };
-  const updated = await resetCustomerUsage(scope, id);
+  const reset = await withProjectAudit(
+    request,
+    scope,
+    (tx) => resetCustomerUsage(scope, id, tx),
+    (found) =>
+      found
+        ? {
+            action: "customer.usage_reset",
+            targetType: "customer",
+            targetId: id,
+          }
+        : null,
+  );
+  const updated = reset ? await getCustomer(scope, id) : null;
 
   if (!updated) {
     return notFound(reply, "customer");
   }
 
-  await auditProject(request, scope, {
-    action: "customer.usage_reset",
-    targetType: "customer",
-    targetId: id,
-  });
   appLogger.info("Customer usage reset", {
     userId: scope.userId,
     customerId: id,
@@ -510,7 +527,23 @@ export const grantCustomerCreditHandler: RouteHandler = async (
     return notFound(reply, "customer");
   }
 
-  const entry = await grantCredit(scope.orgId, id, parsed.data);
+  const entry = await withProjectAudit(
+    request,
+    scope,
+    (tx) => grantCredit(scope.orgId, id, parsed.data, tx),
+    (granted) =>
+      granted && {
+        action: "customer.credit_adjusted",
+        targetType: "customer",
+        targetId: id,
+        metadata: {
+          entryId: granted.id,
+          kind: granted.kind,
+          amount: granted.amount,
+        },
+      },
+    { isolationLevel: "Serializable" },
+  );
   if (!entry) {
     const message = "would take the credit balance below zero";
     return reply.code(409).send({
@@ -521,13 +554,6 @@ export const grantCustomerCreditHandler: RouteHandler = async (
   }
 
   const balance = await creditBalance(scope.orgId, id);
-
-  await auditProject(request, scope, {
-    action: "customer.credit_adjusted",
-    targetType: "customer",
-    targetId: id,
-    metadata: { entryId: entry.id, kind: entry.kind, amount: entry.amount },
-  });
 
   appLogger.info("Customer credit granted", {
     userId: scope.userId,
@@ -553,15 +579,19 @@ export const zeroCustomerCreditHandler: RouteHandler = async (
     return notFound(reply, "customer");
   }
 
-  const balance = await zeroCredit(scope.orgId, id, "reset");
+  const balance = await withProjectAudit(
+    request,
+    scope,
+    (tx) => zeroCredit(scope.orgId, id, "reset", tx),
+    {
+      action: "customer.credit_adjusted",
+      targetType: "customer",
+      targetId: id,
+      metadata: { kind: "reset" },
+    },
+    { isolationLevel: "Serializable" },
+  );
   const entries = await listCreditEntries(scope.orgId, id);
-
-  await auditProject(request, scope, {
-    action: "customer.credit_adjusted",
-    targetType: "customer",
-    targetId: id,
-    metadata: { kind: "reset" },
-  });
 
   appLogger.info("Customer credit zeroed", {
     userId: scope.userId,
@@ -615,14 +645,17 @@ export const createCustomerCouponHandler: RouteHandler = async (
   }
 
   try {
-    const coupon = await createCoupon(scope.orgId, id, parsed.data);
-
-    await auditProject(request, scope, {
-      action: "customer.coupon_created",
-      targetType: "customer",
-      targetId: id,
-      metadata: { couponId: coupon.id, code: coupon.code },
-    });
+    const coupon = await withProjectAudit(
+      request,
+      scope,
+      (tx) => createCoupon(scope.orgId, id, parsed.data, tx),
+      (created) => ({
+        action: "customer.coupon_created",
+        targetType: "customer",
+        targetId: id,
+        metadata: { couponId: created.id, code: created.code },
+      }),
+    );
 
     appLogger.info("Customer coupon created", {
       userId: scope.userId,
@@ -663,20 +696,25 @@ export const updateCustomerCouponHandler: RouteHandler = async (
     return notFound(reply, "customer");
   }
 
-  const coupon = await updateCoupon(scope.orgId, id, couponId, parsed.data);
+  const coupon = await withProjectAudit(
+    request,
+    scope,
+    (tx) => updateCoupon(scope.orgId, id, couponId, parsed.data, tx),
+    (updated) =>
+      updated && {
+        action:
+          parsed.data.revoked === true
+            ? "customer.coupon_revoked"
+            : "customer.coupon_updated",
+        targetType: "customer",
+        targetId: id,
+        metadata: { couponId, fields: Object.keys(parsed.data) },
+      },
+  );
   if (!coupon) {
     return notFound(reply, "coupon");
   }
 
-  await auditProject(request, scope, {
-    action:
-      parsed.data.revoked === true
-        ? "customer.coupon_revoked"
-        : "customer.coupon_updated",
-    targetType: "customer",
-    targetId: id,
-    metadata: { couponId, fields: Object.keys(parsed.data) },
-  });
   return reply.send(coupon);
 };
 
@@ -695,15 +733,22 @@ export const deleteCustomerCouponHandler: RouteHandler = async (
     return notFound(reply, "customer");
   }
 
-  const removed = await deleteCoupon(scope.orgId, id, couponId);
+  const removed = await withProjectAudit(
+    request,
+    scope,
+    (tx) => deleteCoupon(scope.orgId, id, couponId, tx),
+    (found) =>
+      found
+        ? {
+            action: "customer.coupon_deleted",
+            targetType: "customer",
+            targetId: id,
+            metadata: { couponId },
+          }
+        : null,
+  );
 
   if (removed) {
-    await auditProject(request, scope, {
-      action: "customer.coupon_deleted",
-      targetType: "customer",
-      targetId: id,
-      metadata: { couponId },
-    });
     appLogger.info("Customer coupon removed", {
       userId: scope.userId,
       customerId: id,

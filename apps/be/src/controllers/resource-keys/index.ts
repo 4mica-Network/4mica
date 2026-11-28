@@ -6,11 +6,11 @@ import { getApiListing } from "@controllers/api-listings/repository";
 import { requireProductionKeyApproval } from "@controllers/approvals/key-gate";
 import { UpdateApiKeySchema } from "@controllers/developer/schema";
 import {
-  auditProject,
   invalidBody,
   notFound,
   parseBody,
   requireProject,
+  withProjectAudit,
 } from "@controllers/shared";
 import {
   getPolicy,
@@ -89,22 +89,20 @@ export const createResourceKeyHandler = (kind: ResourceKind): RouteHandler =>
       return reply;
     }
 
-    const { apiKey, plaintext } = await createResourceKey(
+    const { apiKey, plaintext } = await withProjectAudit(
+      request,
       scope,
-      scope.userId,
-      kind,
-      id,
-      parsed.data,
+      (tx) => createResourceKey(scope, scope.userId, kind, id, parsed.data, tx),
+      (created) => ({
+        action: "api_key.created",
+        targetType: "api_key",
+        targetId: created.apiKey.id,
+        metadata: {
+          ...resourceRef(kind, id),
+          ...(gate.approvalId ? { approvalId: gate.approvalId } : {}),
+        },
+      }),
     );
-    await auditProject(request, scope, {
-      action: "api_key.created",
-      targetType: "api_key",
-      targetId: apiKey.id,
-      metadata: {
-        ...resourceRef(kind, id),
-        ...(gate.approvalId ? { approvalId: gate.approvalId } : {}),
-      },
-    });
     appLogger.info("API key created", {
       userId: scope.userId,
       apiKeyId: apiKey.id,
@@ -117,15 +115,20 @@ export const createResourceKeyHandler = (kind: ResourceKind): RouteHandler =>
 export const revokeResourceKeyHandler = (kind: ResourceKind): RouteHandler =>
   withOwnedResource(kind, "keys.manage", async (id, scope, request, reply) => {
     const { keyId } = request.params as { keyId: string };
-    const revoked = await revokeResourceKey(scope, kind, id, keyId);
+    const revoked = await withProjectAudit(
+      request,
+      scope,
+      (tx) => revokeResourceKey(scope, kind, id, keyId, tx),
+      (row) =>
+        row && {
+          action: "api_key.revoked",
+          targetType: "api_key",
+          targetId: keyId,
+          metadata: resourceRef(kind, id),
+        },
+    );
 
     if (revoked) {
-      await auditProject(request, scope, {
-        action: "api_key.revoked",
-        targetType: "api_key",
-        targetId: keyId,
-        metadata: resourceRef(kind, id),
-      });
       appLogger.info("API key revoked", {
         userId: scope.userId,
         apiKeyId: keyId,
@@ -144,41 +147,47 @@ export const updateResourceKeyHandler = (kind: ResourceKind): RouteHandler =>
     }
 
     const { keyId } = request.params as { keyId: string };
-    const updated = await updateResourceKey(
+    const updated = await withProjectAudit(
+      request,
       scope,
-      kind,
-      id,
-      keyId,
-      parsed.data,
+      (tx) => updateResourceKey(scope, kind, id, keyId, parsed.data, tx),
+      (row) =>
+        row && {
+          action: "api_key.updated",
+          targetType: "api_key",
+          targetId: keyId,
+          metadata: { ...resourceRef(kind, id), ...parsed.data },
+        },
     );
     if (!updated) {
       return notFound(reply, "key");
     }
 
-    await auditProject(request, scope, {
-      action: "api_key.updated",
-      targetType: "api_key",
-      targetId: keyId,
-      metadata: { ...resourceRef(kind, id), ...parsed.data },
-    });
     return reply.send(updated);
   });
 
 export const deleteResourceKeyHandler = (kind: ResourceKind): RouteHandler =>
   withOwnedResource(kind, "keys.manage", async (id, scope, request, reply) => {
     const { keyId } = request.params as { keyId: string };
-    const deleted = await deleteResourceKey(scope, kind, id, keyId);
+    const deleted = await withProjectAudit(
+      request,
+      scope,
+      (tx) => deleteResourceKey(scope, kind, id, keyId, tx),
+      (found) =>
+        found
+          ? {
+              action: "api_key.deleted",
+              targetType: "api_key",
+              targetId: keyId,
+              metadata: resourceRef(kind, id),
+            }
+          : null,
+    );
 
     if (!deleted) {
       return notFound(reply, "key");
     }
 
-    await auditProject(request, scope, {
-      action: "api_key.deleted",
-      targetType: "api_key",
-      targetId: keyId,
-      metadata: resourceRef(kind, id),
-    });
     return reply.code(204).send();
   });
 

@@ -6,6 +6,7 @@ import { roleRoutes } from "@routes/roles";
 import type { FastifyPluginCallback } from "fastify";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { initApp } from "@/server";
+import { AUDIT_DOWN, failAuditInTransaction } from "@/test-support/audit";
 import { APPROVAL_ID, governOff, governOn } from "@/test-support/governance";
 import { ORG_ID, projectRow } from "@/test-support/tenancy";
 
@@ -399,6 +400,33 @@ describe("custom roles", () => {
         createdById: USER_ID,
       });
       expect(auditActions()).toContain("role.created");
+      await instance.close();
+    });
+
+    it("creates no role when its audit entry cannot be written", async () => {
+      const tx = failAuditInTransaction(db, {
+        customRole: {
+          create: vi.fn(async ({ data }: { data: Record<string, unknown> }) =>
+            roleRow({ ...data }),
+          ),
+        },
+      });
+      const instance = await app();
+
+      const res = await instance.inject({
+        method: "POST",
+        url: "/me/organization/roles",
+        headers: HEADERS,
+        payload: { name: "Treasury", permissions: ["finance.read"] },
+      });
+
+      expect(res.statusCode).toBe(500);
+      expect(tx.customRole.create).toHaveBeenCalledOnce();
+      expect(db.customRole.create).not.toHaveBeenCalled();
+      await expect(db.$transaction.mock.results.at(-1)?.value).rejects.toBe(
+        AUDIT_DOWN,
+      );
+      expect(auditActions()).not.toContain("role.created");
       await instance.close();
     });
 

@@ -119,31 +119,40 @@ export const listPolicies = (orgId: string, filter: ListPoliciesFilter) =>
     select: POLICY_SELECT,
   });
 
-export const findPolicy = (orgId: string, id: string) =>
-  prisma.spendingPolicy.findFirst({
+type Db = Prisma.TransactionClient;
+
+export const findPolicy = (orgId: string, id: string, db: Db = prisma) =>
+  db.spendingPolicy.findFirst({
     where: { id, organizationId: orgId, deletedAt: null },
     select: POLICY_SELECT,
   });
 
-export const createPolicy = (data: Prisma.SpendingPolicyUncheckedCreateInput) =>
-  prisma.spendingPolicy.create({ data, select: POLICY_SELECT });
+export const createPolicy = (
+  data: Prisma.SpendingPolicyUncheckedCreateInput,
+  db: Db = prisma,
+) => db.spendingPolicy.create({ data, select: POLICY_SELECT });
 
 export const updatePolicy = async (
   orgId: string,
   id: string,
   data: Prisma.SpendingPolicyUncheckedUpdateManyInput,
   where: Prisma.SpendingPolicyWhereInput = {},
+  db: Db = prisma,
 ) => {
-  const { count } = await prisma.spendingPolicy.updateMany({
+  const { count } = await db.spendingPolicy.updateMany({
     where: { id, organizationId: orgId, deletedAt: null, ...where },
     data,
   });
-  return count > 0 ? findPolicy(orgId, id) : null;
+  return count > 0 ? findPolicy(orgId, id, db) : null;
 };
 
-export const deletePolicy = async (orgId: string, id: string) =>
+export const deletePolicy = async (
+  orgId: string,
+  id: string,
+  db: Db = prisma,
+) =>
   (
-    await prisma.spendingPolicy.updateMany({
+    await db.spendingPolicy.updateMany({
       where: { id, organizationId: orgId, deletedAt: null },
       data: { deletedAt: new Date() },
     })

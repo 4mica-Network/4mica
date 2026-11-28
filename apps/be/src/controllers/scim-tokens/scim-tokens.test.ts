@@ -4,6 +4,7 @@ import { scimGroupRoutes } from "@routes/scim-groups";
 import { scimTokenRoutes } from "@routes/scim-tokens";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { initApp } from "@/server";
+import { AUDIT_DOWN } from "@/test-support/audit";
 import { scimDb } from "@/test-support/scim-db";
 
 const clerkApi = vi.hoisted(() => ({
@@ -148,6 +149,34 @@ describe("SCIM token management", () => {
       headers: { authorization: `Bearer ${body.secret}` },
     });
     expect(refused.statusCode).toBe(401);
+  });
+
+  it("does not create a token when its audit entry cannot be written", async () => {
+    const transaction = db.prisma.$transaction;
+    const create = vi.fn(async () => ({
+      id: "019fce62-0000-7000-8000-00000000cafe",
+      name: "Okta",
+      prefix: "4mica_scim_ab12",
+    }));
+    db.prisma.$transaction = async (input: unknown) =>
+      (input as (tx: unknown) => Promise<unknown>)({
+        scimToken: { create },
+        auditLog: { create: vi.fn().mockRejectedValue(AUDIT_DOWN) },
+      });
+
+    try {
+      const res = await call("POST", "/me/organization/scim-tokens", {
+        name: "Okta",
+      });
+
+      expect(res.statusCode).toBe(500);
+      expect(res.body).not.toMatch(/4mica_scim_[a-z0-9]{8,}/i);
+      expect(create).toHaveBeenCalledOnce();
+      expect(db.rows("scimToken")).toEqual([]);
+      expect(audits("scim_token.created")).toEqual([]);
+    } finally {
+      db.prisma.$transaction = transaction;
+    }
   });
 
   it("requires a recent sign-in to create a token", async () => {

@@ -1,14 +1,12 @@
-import { prisma } from "@4mica/db";
 import { environmentForNetwork } from "@4mica/rules";
 import { requireApiKeyScope } from "@auth/api-key";
 import { requireRecentAuth } from "@auth/security";
-import { writeAudit } from "@controllers/audit/repository";
 import {
-  audit,
   invalidBody,
   notFound,
   parseBody,
   requireTenant,
+  withAudit,
 } from "@controllers/shared";
 import { appLogger } from "@logger/index";
 import type { FastifyReply, RouteHandler } from "fastify";
@@ -110,23 +108,31 @@ export const decideApprovalHandler: RouteHandler = async (request, reply) => {
 
   const { id } = request.params as { id: string };
   const { vote, comment } = parsed.data;
-  const result = await decideApproval(tenant.orgId, id, tenant, vote, comment);
+  const result = await withAudit(
+    request,
+    tenant,
+    (tx) => decideApproval(tx, tenant.orgId, id, tenant, vote, comment),
+    (change) =>
+      change.ok
+        ? {
+            action:
+              vote === "APPROVE" ? "approval.approved" : "approval.rejected",
+            targetType: "approval_request",
+            targetId: id,
+            projectId: change.row.projectId,
+            metadata: {
+              kind: change.row.kind,
+              action: change.row.action,
+              status: change.status,
+              ...(comment ? { comment } : {}),
+            },
+          }
+        : null,
+  );
   if (!result.ok) {
     return changeFailed(reply, result.reason);
   }
 
-  await audit(request, tenant, {
-    action: vote === "APPROVE" ? "approval.approved" : "approval.rejected",
-    targetType: "approval_request",
-    targetId: id,
-    projectId: result.row.projectId,
-    metadata: {
-      kind: result.row.kind,
-      action: result.row.action,
-      status: result.status,
-      ...(comment ? { comment } : {}),
-    },
-  });
   appLogger.info("Approval decided", {
     orgId: tenant.orgId,
     approvalId: id,
@@ -144,18 +150,24 @@ export const cancelApprovalHandler: RouteHandler = async (request, reply) => {
   }
 
   const { id } = request.params as { id: string };
-  const result = await cancelApproval(tenant.orgId, id, tenant.userId);
+  const result = await withAudit(
+    request,
+    tenant,
+    (tx) => cancelApproval(tx, tenant.orgId, id, tenant.userId),
+    (change) =>
+      change.ok
+        ? {
+            action: "approval.cancelled",
+            targetType: "approval_request",
+            targetId: id,
+            projectId: change.row.projectId,
+            metadata: { kind: change.row.kind, action: change.row.action },
+          }
+        : null,
+  );
   if (!result.ok) {
     return changeFailed(reply, result.reason);
   }
-
-  await audit(request, tenant, {
-    action: "approval.cancelled",
-    targetType: "approval_request",
-    targetId: id,
-    projectId: result.row.projectId,
-    metadata: { kind: result.row.kind, action: result.row.action },
-  });
 
   return reply.send(toApproval(result.row, tenant));
 };
@@ -200,30 +212,23 @@ export const createSellerApprovalHandler: RouteHandler = async (
     return notFound(reply, "customer");
   }
 
-  const created = await createSellerApproval(key, input, sellerSummary(input));
-
-  try {
-    await writeAudit(prisma, {
-      orgId: key.orgId,
+  const created = await withAudit(
+    request,
+    { orgId: key.orgId, userId: null },
+    (tx) => createSellerApproval(key, input, sellerSummary(input), tx),
+    (row) => ({
       projectId: key.projectId,
       actorApiKeyId: key.id,
       action: "approval.requested",
       targetType: "approval_request",
-      targetId: created.id,
+      targetId: row.id,
       metadata: {
         kind: "SELLER_PAYMENT",
         network: input.network,
         amount: input.amount,
       },
-      ip: request.ip,
-    });
-  } catch (error) {
-    appLogger.error("Could not record audit entry", {
-      action: "approval.requested",
-      orgId: key.orgId,
-      error,
-    });
-  }
+    }),
+  );
 
   return reply.code(201).send(created);
 };
@@ -276,13 +281,17 @@ export const updateGovernanceHandler: RouteHandler = async (request, reply) => {
     );
   }
 
-  const saved = await saveGovernance(tenant.orgId, parsed.data);
-  await audit(request, tenant, {
-    action: "governance.updated",
-    targetType: "organization",
-    targetId: tenant.orgId,
-    metadata: saved,
-  });
+  const saved = await withAudit(
+    request,
+    tenant,
+    (tx) => saveGovernance(tenant.orgId, parsed.data, tx),
+    (row) => ({
+      action: "governance.updated",
+      targetType: "organization",
+      targetId: tenant.orgId,
+      metadata: row,
+    }),
+  );
 
   return reply.send(saved);
 };

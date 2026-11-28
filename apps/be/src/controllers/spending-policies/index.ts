@@ -3,11 +3,11 @@ import { effectiveProjectRole } from "@auth/permissions";
 import type { Tenant } from "@auth/tenant";
 import { requireApproval } from "@controllers/approvals/gate";
 import {
-  audit,
   invalidBody,
   notFound,
   parseBody,
   requireTenant,
+  withAudit,
 } from "@controllers/shared";
 import type { FastifyReply, FastifyRequest, RouteHandler } from "fastify";
 import {
@@ -250,19 +250,22 @@ export const createSpendingPolicyHandler: RouteHandler = async (
     return reply;
   }
 
-  const row = await createPolicy({
-    ...values,
-    organizationId: tenant.orgId,
-    createdById: tenant.userId,
-  });
-
-  await audit(request, tenant, {
-    action: "spending_policy.created",
-    projectId: row.projectId,
-    targetType: "spending_policy",
-    targetId: row.id,
-    metadata: { ...values, approvalId: gate.approvalId },
-  });
+  const row = await withAudit(
+    request,
+    tenant,
+    (tx) =>
+      createPolicy(
+        { ...values, organizationId: tenant.orgId, createdById: tenant.userId },
+        tx,
+      ),
+    (created) => ({
+      action: "spending_policy.created",
+      projectId: created.projectId,
+      targetType: "spending_policy",
+      targetId: created.id,
+      metadata: { ...values, approvalId: gate.approvalId },
+    }),
+  );
 
   return respond(reply, tenant, row, 201);
 };
@@ -326,18 +329,22 @@ export const updateSpendingPolicyHandler: RouteHandler = async (
     return reply;
   }
 
-  const updated = await updatePolicy(tenant.orgId, row.id, changes);
+  const updated = await withAudit(
+    request,
+    tenant,
+    (tx) => updatePolicy(tenant.orgId, row.id, changes, {}, tx),
+    (policy) =>
+      policy && {
+        action: "spending_policy.updated",
+        projectId: policy.projectId,
+        targetType: "spending_policy",
+        targetId: policy.id,
+        metadata: { changes, approvalId: gate.approvalId },
+      },
+  );
   if (!updated) {
     return notFound(reply, "spending policy");
   }
-
-  await audit(request, tenant, {
-    action: "spending_policy.updated",
-    projectId: updated.projectId,
-    targetType: "spending_policy",
-    targetId: updated.id,
-    metadata: { changes, approvalId: gate.approvalId },
-  });
 
   return respond(reply, tenant, updated);
 };
@@ -364,17 +371,24 @@ export const deleteSpendingPolicyHandler: RouteHandler = async (
     return reply;
   }
 
-  if (!(await deletePolicy(tenant.orgId, row.id))) {
+  const deleted = await withAudit(
+    request,
+    tenant,
+    (tx) => deletePolicy(tenant.orgId, row.id, tx),
+    (found) =>
+      found
+        ? {
+            action: "spending_policy.deleted",
+            projectId: row.projectId,
+            targetType: "spending_policy",
+            targetId: row.id,
+            metadata: { name: row.name, approvalId: gate.approvalId },
+          }
+        : null,
+  );
+  if (!deleted) {
     return notFound(reply, "spending policy");
   }
-
-  await audit(request, tenant, {
-    action: "spending_policy.deleted",
-    projectId: row.projectId,
-    targetType: "spending_policy",
-    targetId: row.id,
-    metadata: { name: row.name, approvalId: gate.approvalId },
-  });
 
   return reply.code(204).send();
 };
@@ -393,25 +407,29 @@ export const freezeSpendingPolicyHandler: RouteHandler = async (
     return respond(reply, tenant, row);
   }
 
-  const updated = await updatePolicy(
-    tenant.orgId,
-    row.id,
-    { frozenAt: new Date() },
-    { frozenAt: null },
+  const updated = await withAudit(
+    request,
+    tenant,
+    (tx) =>
+      updatePolicy(
+        tenant.orgId,
+        row.id,
+        { frozenAt: new Date() },
+        { frozenAt: null },
+        tx,
+      ),
+    (policy) =>
+      policy && {
+        action: "spending_policy.frozen",
+        projectId: row.projectId,
+        targetType: "spending_policy",
+        targetId: row.id,
+        metadata: { name: row.name },
+      },
   );
   const result = updated ?? (await findPolicy(tenant.orgId, row.id));
   if (!result) {
     return notFound(reply, "spending policy");
-  }
-
-  if (updated) {
-    await audit(request, tenant, {
-      action: "spending_policy.frozen",
-      projectId: row.projectId,
-      targetType: "spending_policy",
-      targetId: row.id,
-      metadata: { name: row.name },
-    });
   }
 
   return respond(reply, tenant, result);
@@ -443,20 +461,22 @@ export const unfreezeSpendingPolicyHandler: RouteHandler = async (
     return reply;
   }
 
-  const updated = await updatePolicy(tenant.orgId, row.id, {
-    frozenAt: null,
-  });
+  const updated = await withAudit(
+    request,
+    tenant,
+    (tx) => updatePolicy(tenant.orgId, row.id, { frozenAt: null }, {}, tx),
+    (policy) =>
+      policy && {
+        action: "spending_policy.unfrozen",
+        projectId: row.projectId,
+        targetType: "spending_policy",
+        targetId: row.id,
+        metadata: { name: row.name, approvalId: gate.approvalId },
+      },
+  );
   if (!updated) {
     return notFound(reply, "spending policy");
   }
-
-  await audit(request, tenant, {
-    action: "spending_policy.unfrozen",
-    projectId: row.projectId,
-    targetType: "spending_policy",
-    targetId: row.id,
-    metadata: { name: row.name, approvalId: gate.approvalId },
-  });
 
   return respond(reply, tenant, updated);
 };

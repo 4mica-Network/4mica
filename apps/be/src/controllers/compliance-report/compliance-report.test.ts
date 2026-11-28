@@ -1,44 +1,48 @@
-import type { OrgRole } from "@4mica/db";
+import { type OrgRole, prisma } from "@4mica/db";
 import { clearUserCache } from "@auth/user-store";
 import { complianceReportRoutes } from "@routes/compliance-report";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { initApp } from "@/server";
+import { AUDIT_DOWN, runTransactionsOn } from "@/test-support/audit";
 import { ORG_ID } from "@/test-support/tenancy";
 import { buildReport, type ClerkIdentity } from "./report";
 import type { ComplianceSnapshot } from "./repository";
 
-const { authenticateRequest, getUserList, db } = vi.hoisted(() => {
-  const model = () => ({
-    findMany: vi.fn(),
-    findFirst: vi.fn(),
-    findUnique: vi.fn(),
-    count: vi.fn(),
-    groupBy: vi.fn(),
-    upsert: vi.fn(),
-    create: vi.fn(),
-  });
-  return {
-    authenticateRequest: vi.fn(),
-    getUserList: vi.fn(),
-    db: {
-      organization: model(),
-      membership: model(),
-      customRole: model(),
-      project: model(),
-      apiKey: model(),
-      cliSession: model(),
-      scimToken: model(),
-      ssoConnection: model(),
-      spendingPolicy: model(),
-      governanceSettings: model(),
-      approvalRequest: model(),
-      auditStream: model(),
-      securitySettings: model(),
-      auditLog: model(),
-      user: model(),
-    },
-  };
-});
+const { authenticateRequest, getUserList, $transaction, db } = vi.hoisted(
+  () => {
+    const model = () => ({
+      findMany: vi.fn(),
+      findFirst: vi.fn(),
+      findUnique: vi.fn(),
+      count: vi.fn(),
+      groupBy: vi.fn(),
+      upsert: vi.fn(),
+      create: vi.fn(),
+    });
+    return {
+      authenticateRequest: vi.fn(),
+      getUserList: vi.fn(),
+      $transaction: vi.fn(),
+      db: {
+        organization: model(),
+        membership: model(),
+        customRole: model(),
+        project: model(),
+        apiKey: model(),
+        cliSession: model(),
+        scimToken: model(),
+        ssoConnection: model(),
+        spendingPolicy: model(),
+        governanceSettings: model(),
+        approvalRequest: model(),
+        auditStream: model(),
+        securitySettings: model(),
+        auditLog: model(),
+        user: model(),
+      },
+    };
+  },
+);
 
 vi.mock("@clerk/backend", () => ({
   createClerkClient: vi.fn(() => ({
@@ -47,7 +51,10 @@ vi.mock("@clerk/backend", () => ({
   })),
 }));
 
-vi.mock("@4mica/db", () => ({ prisma: db, disconnect: vi.fn(async () => {}) }));
+vi.mock("@4mica/db", () => ({
+  prisma: { ...db, $transaction },
+  disconnect: vi.fn(async () => {}),
+}));
 
 const NOW = new Date("2026-11-27T12:00:00Z");
 const DAY = 86_400_000;
@@ -265,6 +272,7 @@ describe("compliance report routes", () => {
     }
     getUserList.mockReset();
     clearUserCache();
+    runTransactionsOn(prisma);
     authenticateRequest.mockResolvedValue({
       isAuthenticated: true,
       status: "signed-in",
@@ -344,6 +352,21 @@ describe("compliance report routes", () => {
       targetId: "compliance",
       metadata: { report: "compliance", format: "json" },
     });
+    await app.close();
+  });
+
+  it("withholds the report when its export cannot be audited", async () => {
+    db.auditLog.create.mockRejectedValue(AUDIT_DOWN);
+    const app = await initApp([{ plugin: complianceReportRoutes }]);
+
+    const res = await app.inject({
+      method: "GET",
+      url: "/me/organization/compliance-report",
+      headers: HEADERS,
+    });
+
+    expect(res.statusCode).toBe(500);
+    expect(res.body).not.toContain("mfa_coverage");
     await app.close();
   });
 

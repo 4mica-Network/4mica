@@ -18,6 +18,8 @@ import type {
   UpdateWalletInput,
 } from "./schema";
 
+type Tx = Prisma.TransactionClient;
+
 export const WALLET_SELECT = {
   id: true,
   label: true,
@@ -203,98 +205,94 @@ export const consumeNonceAndCreateWallet = async (
   nonceId: string,
   data: CreateWalletInput,
   chainId: number,
+  tx: Tx,
 ): Promise<WalletRow | null> => {
-  const row = await prisma.$transaction(async (tx) => {
-    const { count } = await tx.walletNonce.updateMany({
-      where: { id: nonceId, consumedAt: null, expiresAt: { gt: new Date() } },
-      data: { consumedAt: new Date() },
-    });
-
-    if (count === 0) {
-      return null;
-    }
-
-    return tx.wallet.create({
-      data: {
-        organizationId: orgId,
-        createdById: userId,
-        label: data.label,
-        description: data.description ?? null,
-        address: data.address,
-        network: data.network,
-        role: data.role,
-        verifiedAt: new Date(),
-        verificationMethod: "EOA_SIGNATURE",
-        verifiedChainId: chainId,
-      },
-      select: WALLET_SELECT,
-    });
+  const { count } = await tx.walletNonce.updateMany({
+    where: { id: nonceId, consumedAt: null, expiresAt: { gt: new Date() } },
+    data: { consumedAt: new Date() },
   });
-  return row ? withEnvironment(row) : null;
+
+  if (count === 0) {
+    return null;
+  }
+
+  const row = await tx.wallet.create({
+    data: {
+      organizationId: orgId,
+      createdById: userId,
+      label: data.label,
+      description: data.description ?? null,
+      address: data.address,
+      network: data.network,
+      role: data.role,
+      verifiedAt: new Date(),
+      verificationMethod: "EOA_SIGNATURE",
+      verifiedChainId: chainId,
+    },
+    select: WALLET_SELECT,
+  });
+  return withEnvironment(row);
 };
 
 export const updateWallet = async (
   orgId: string,
   id: string,
   data: UpdateWalletInput,
+  tx: Tx,
 ): Promise<WalletRow | null> => {
   const { isDefault, ...rest } = data;
 
-  const row = await prisma.$transaction(async (tx) => {
-    const current = await tx.wallet.findFirst({
-      where: { id, organizationId: orgId },
-      select: { id: true, network: true, role: true, status: true },
-    });
+  const current = await tx.wallet.findFirst({
+    where: { id, organizationId: orgId },
+    select: { id: true, network: true, role: true, status: true },
+  });
 
-    if (!current) {
-      return null;
-    }
+  if (!current) {
+    return null;
+  }
 
-    if (isDefault === true) {
-      await tx.wallet.updateMany({
-        where: {
-          organizationId: orgId,
-          network: current.network,
-          isDefault: true,
-        },
-        data: { isDefault: false },
-      });
-    }
-
-    await tx.wallet.update({
-      where: { id: current.id },
-      data: { ...rest, ...(isDefault === undefined ? {} : { isDefault }) },
-    });
-
-    const canReceive =
-      (rest.status ?? current.status) === "ACTIVE" &&
-      (rest.role ?? current.role) !== "PAYER";
-
-    if (!canReceive) {
-      const receiving = {
+  if (isDefault === true) {
+    await tx.wallet.updateMany({
+      where: {
         organizationId: orgId,
-        walletId: current.id,
-        visibility: "PUBLIC" as const,
-      };
-      await tx.apiListing.updateMany({
-        where: receiving,
-        data: { visibility: "PRIVATE" },
-      });
-      await tx.agent.updateMany({
-        where: receiving,
-        data: { visibility: "PRIVATE" },
-      });
-    }
-
-    return tx.wallet.findUnique({
-      where: { id: current.id },
-      select: WALLET_SELECT,
+        network: current.network,
+        isDefault: true,
+      },
+      data: { isDefault: false },
     });
+  }
+
+  await tx.wallet.update({
+    where: { id: current.id },
+    data: { ...rest, ...(isDefault === undefined ? {} : { isDefault }) },
+  });
+
+  const canReceive =
+    (rest.status ?? current.status) === "ACTIVE" &&
+    (rest.role ?? current.role) !== "PAYER";
+
+  if (!canReceive) {
+    const receiving = {
+      organizationId: orgId,
+      walletId: current.id,
+      visibility: "PUBLIC" as const,
+    };
+    await tx.apiListing.updateMany({
+      where: receiving,
+      data: { visibility: "PRIVATE" },
+    });
+    await tx.agent.updateMany({
+      where: receiving,
+      data: { visibility: "PRIVATE" },
+    });
+  }
+
+  const row = await tx.wallet.findUnique({
+    where: { id: current.id },
+    select: WALLET_SELECT,
   });
   return row ? withEnvironment(row) : null;
 };
-
-type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
 
 const removeWallets = async (
   tx: Tx,
@@ -322,8 +320,8 @@ const removeWallets = async (
   return count;
 };
 
-export const deleteWallet = async (orgId: string, id: string) => {
-  const owned = await prisma.wallet.findFirst({
+export const deleteWallet = async (orgId: string, id: string, tx: Tx) => {
+  const owned = await tx.wallet.findFirst({
     where: { id, organizationId: orgId },
     select: { id: true },
   });
@@ -331,17 +329,16 @@ export const deleteWallet = async (orgId: string, id: string) => {
     return false;
   }
 
-  const count = await prisma.$transaction((tx) =>
-    removeWallets(tx, orgId, [owned.id]),
-  );
+  const count = await removeWallets(tx, orgId, [owned.id]);
   return count > 0;
 };
 
 export const batchDeleteWallets = async (
   orgId: string,
   ids: string[],
+  tx: Tx,
 ): Promise<{ deleted: string[]; notFound: string[] }> => {
-  const owned = await prisma.wallet.findMany({
+  const owned = await tx.wallet.findMany({
     where: { id: { in: ids }, organizationId: orgId },
     select: { id: true },
   });
@@ -349,7 +346,7 @@ export const batchDeleteWallets = async (
   const deleted = owned.map((wallet) => wallet.id);
 
   if (deleted.length > 0) {
-    await prisma.$transaction((tx) => removeWallets(tx, orgId, deleted));
+    await removeWallets(tx, orgId, deleted);
   }
 
   const deletedSet = new Set(deleted);

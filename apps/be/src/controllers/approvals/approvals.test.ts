@@ -4,6 +4,7 @@ import { approvalRoutes } from "@routes/approvals";
 import { getAddress } from "viem";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { initApp } from "@/server";
+import { AUDIT_DOWN, failAuditInTransaction } from "@/test-support/audit";
 import {
   actAs,
   ORG_ID,
@@ -427,6 +428,34 @@ describe("approval routes", () => {
         kind: "GOVERNANCE",
         status: "APPROVED",
       });
+    });
+
+    it("records no decision when the decision cannot be audited", async () => {
+      const row = stored({ decisions: [decision(OTHER_ID, "APPROVE")] });
+      const tx = failAuditInTransaction(db, {
+        $queryRaw: vi.fn().mockResolvedValue([]),
+        approvalRequest: {
+          findFirst: vi.fn().mockResolvedValue(row),
+          updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+          findUniqueOrThrow: vi
+            .fn()
+            .mockResolvedValue({ ...row, status: "APPROVED" }),
+        },
+        approvalDecision: { create: vi.fn().mockResolvedValue({}) },
+      });
+
+      const res = await decide();
+
+      expect(res.statusCode).toBe(500);
+      expect(tx.approvalDecision.create).toHaveBeenCalledOnce();
+      expect(tx.approvalRequest.updateMany).toHaveBeenCalledOnce();
+      expect(onApprovalResolved).toHaveBeenCalledWith(tx, expect.anything());
+      expect(db.approvalDecision.create).not.toHaveBeenCalled();
+      expect(db.approvalRequest.updateMany).not.toHaveBeenCalled();
+      await expect(db.$transaction.mock.results.at(-1)?.value).rejects.toBe(
+        AUDIT_DOWN,
+      );
+      expect(db.auditLog.create).not.toHaveBeenCalled();
     });
 
     it("rejects on any single rejection", async () => {

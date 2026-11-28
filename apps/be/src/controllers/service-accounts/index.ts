@@ -1,11 +1,11 @@
 import { requireProductionKeyApproval } from "@controllers/approvals/key-gate";
 import { UpdateApiKeySchema } from "@controllers/developer/schema";
 import {
-  auditProject,
   invalidBody,
   notFound,
   parseBody,
   requireProject,
+  withProjectAudit,
 } from "@controllers/shared";
 import { appLogger } from "@logger/index";
 import type { FastifyReply, RouteHandler } from "fastify";
@@ -62,12 +62,16 @@ export const createServiceAccountHandler: RouteHandler = async (
     return invalidBody(reply, parsed.issues);
   }
 
-  const account = await createServiceAccount(scope, scope.userId, parsed.data);
-  await auditProject(request, scope, {
-    action: "service_account.created",
-    targetType: "service_account",
-    targetId: account.id,
-  });
+  const account = await withProjectAudit(
+    request,
+    scope,
+    (tx) => createServiceAccount(scope, scope.userId, parsed.data, tx),
+    (created) => ({
+      action: "service_account.created",
+      targetType: "service_account",
+      targetId: created.id,
+    }),
+  );
   appLogger.info("Service account created", {
     userId: scope.userId,
     serviceAccountId: account.id,
@@ -91,16 +95,21 @@ export const updateServiceAccountHandler: RouteHandler = async (
   }
 
   const { id } = params(request);
-  const updated = await updateServiceAccount(scope, id, parsed.data);
+  const updated = await withProjectAudit(
+    request,
+    scope,
+    (tx) => updateServiceAccount(scope, id, parsed.data, tx),
+    (row) =>
+      row && {
+        action: "service_account.updated",
+        targetType: "service_account",
+        targetId: id,
+      },
+  );
   if (!updated) {
     return notFound(reply, "service account");
   }
 
-  await auditProject(request, scope, {
-    action: "service_account.updated",
-    targetType: "service_account",
-    targetId: id,
-  });
   return reply.send(updated);
 };
 
@@ -125,20 +134,29 @@ const setSuspended =
       return reply.send(current);
     }
 
-    const updated = await updateServiceAccount(scope, id, {
-      suspendedAt: suspend ? new Date() : null,
-    });
+    const updated = await withProjectAudit(
+      request,
+      scope,
+      (tx) =>
+        updateServiceAccount(
+          scope,
+          id,
+          { suspendedAt: suspend ? new Date() : null },
+          tx,
+        ),
+      (row) =>
+        row && {
+          action: suspend
+            ? "service_account.suspended"
+            : "service_account.reactivated",
+          targetType: "service_account",
+          targetId: id,
+        },
+    );
     if (!updated) {
       return notFound(reply, "service account");
     }
 
-    await auditProject(request, scope, {
-      action: suspend
-        ? "service_account.suspended"
-        : "service_account.reactivated",
-      targetType: "service_account",
-      targetId: id,
-    });
     appLogger.info(
       suspend ? "Service account suspended" : "Service account reactivated",
       { userId: scope.userId, serviceAccountId: id },
@@ -159,15 +177,23 @@ export const deleteServiceAccountHandler: RouteHandler = async (
   }
 
   const { id } = params(request);
-  if (!(await deleteServiceAccount(scope, id))) {
+  const deleted = await withProjectAudit(
+    request,
+    scope,
+    (tx) => deleteServiceAccount(scope, id, tx),
+    (found) =>
+      found
+        ? {
+            action: "service_account.deleted",
+            targetType: "service_account",
+            targetId: id,
+          }
+        : null,
+  );
+  if (!deleted) {
     return notFound(reply, "service account");
   }
 
-  await auditProject(request, scope, {
-    action: "service_account.deleted",
-    targetType: "service_account",
-    targetId: id,
-  });
   appLogger.info("Service account removed", {
     userId: scope.userId,
     serviceAccountId: id,
@@ -226,22 +252,35 @@ export const createServiceAccountKeyHandler: RouteHandler = async (
     return reply;
   }
 
-  const key = await createServiceAccountKey(scope, scope.userId, id, {
-    name: parsed.data.name,
-    scopes: parsed.data.scopes,
-    expiresAt: parsed.data.expiresAt ? new Date(parsed.data.expiresAt) : null,
-    ipAllowlist: parsed.data.ipAllowlist ?? [],
-  });
-  await auditProject(request, scope, {
-    action: "api_key.created",
-    targetType: "api_key",
-    targetId: key.id,
-    metadata: {
-      serviceAccountId: id,
-      scopes: key.scopes,
-      ...(gate.approvalId ? { approvalId: gate.approvalId } : {}),
-    },
-  });
+  const key = await withProjectAudit(
+    request,
+    scope,
+    (tx) =>
+      createServiceAccountKey(
+        scope,
+        scope.userId,
+        id,
+        {
+          name: parsed.data.name,
+          scopes: parsed.data.scopes,
+          expiresAt: parsed.data.expiresAt
+            ? new Date(parsed.data.expiresAt)
+            : null,
+          ipAllowlist: parsed.data.ipAllowlist ?? [],
+        },
+        tx,
+      ),
+    (created) => ({
+      action: "api_key.created",
+      targetType: "api_key",
+      targetId: created.id,
+      metadata: {
+        serviceAccountId: id,
+        scopes: created.scopes,
+        ...(gate.approvalId ? { approvalId: gate.approvalId } : {}),
+      },
+    }),
+  );
   appLogger.info("API key created", {
     userId: scope.userId,
     apiKeyId: key.id,
@@ -270,17 +309,22 @@ export const updateServiceAccountKeyHandler: RouteHandler = async (
     return notFound(reply, "service account");
   }
 
-  const updated = await updateServiceAccountKey(scope, id, keyId, parsed.data);
+  const updated = await withProjectAudit(
+    request,
+    scope,
+    (tx) => updateServiceAccountKey(scope, id, keyId, parsed.data, tx),
+    (row) =>
+      row && {
+        action: "api_key.updated",
+        targetType: "api_key",
+        targetId: keyId,
+        metadata: { serviceAccountId: id, ...parsed.data },
+      },
+  );
   if (!updated) {
     return notFound(reply, "key");
   }
 
-  await auditProject(request, scope, {
-    action: "api_key.updated",
-    targetType: "api_key",
-    targetId: keyId,
-    metadata: { serviceAccountId: id, ...parsed.data },
-  });
   return reply.send(updated);
 };
 
@@ -298,17 +342,22 @@ export const revokeServiceAccountKeyHandler: RouteHandler = async (
     return notFound(reply, "service account");
   }
 
-  const revoked = await revokeServiceAccountKey(scope, id, keyId);
+  const revoked = await withProjectAudit(
+    request,
+    scope,
+    (tx) => revokeServiceAccountKey(scope, id, keyId, tx),
+    (row) =>
+      row && {
+        action: "api_key.revoked",
+        targetType: "api_key",
+        targetId: keyId,
+        metadata: { serviceAccountId: id },
+      },
+  );
   if (!revoked) {
     return notFound(reply, "active key");
   }
 
-  await auditProject(request, scope, {
-    action: "api_key.revoked",
-    targetType: "api_key",
-    targetId: keyId,
-    metadata: { serviceAccountId: id },
-  });
   appLogger.info("API key revoked", {
     userId: scope.userId,
     apiKeyId: keyId,
@@ -356,28 +405,35 @@ export const rotateServiceAccountKeyHandler: RouteHandler = async (
     return reply;
   }
 
-  const key = await rotateServiceAccountKey(
+  const key = await withProjectAudit(
+    request,
     scope,
-    scope.userId,
-    id,
-    keyId,
-    parsed.data.expireOldInHours,
+    (tx) =>
+      rotateServiceAccountKey(
+        scope,
+        scope.userId,
+        id,
+        keyId,
+        parsed.data.expireOldInHours,
+        tx,
+      ),
+    (created) =>
+      created && {
+        action: "api_key.rotated",
+        targetType: "api_key",
+        targetId: keyId,
+        metadata: {
+          serviceAccountId: id,
+          replacedBy: created.id,
+          expireOldInHours: parsed.data.expireOldInHours,
+          ...(gate.approvalId ? { approvalId: gate.approvalId } : {}),
+        },
+      },
   );
   if (!key) {
     return notFound(reply, "active key");
   }
 
-  await auditProject(request, scope, {
-    action: "api_key.rotated",
-    targetType: "api_key",
-    targetId: keyId,
-    metadata: {
-      serviceAccountId: id,
-      replacedBy: key.id,
-      expireOldInHours: parsed.data.expireOldInHours,
-      ...(gate.approvalId ? { approvalId: gate.approvalId } : {}),
-    },
-  });
   appLogger.info("API key rotated", {
     userId: scope.userId,
     apiKeyId: keyId,

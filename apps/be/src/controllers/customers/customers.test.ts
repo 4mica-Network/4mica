@@ -132,7 +132,9 @@ vi.mock("@4mica/db", () => ({
     $transaction: vi.fn(async (arg: unknown) =>
       typeof arg === "function"
         ? (arg as (tx: unknown) => unknown)({
+            ...tenancy,
             customer,
+            customerCoupon,
             customerCreditEntry,
             customerPaymentIdentity,
           })

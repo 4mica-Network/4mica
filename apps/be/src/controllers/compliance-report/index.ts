@@ -1,4 +1,4 @@
-import { audit, requireTenant } from "@controllers/shared";
+import { recordAudit, requireTenant } from "@controllers/shared";
 import { appLogger } from "@logger/index";
 import { clerk } from "@services/clerk";
 import { sendCsv } from "@utils/csv";
@@ -53,11 +53,11 @@ const generate = async (orgId: string) => {
 
 const recordExport = (
   request: FastifyRequest,
-  tenant: Parameters<typeof audit>[1],
+  tenant: Parameters<typeof recordAudit>[1],
   format: "json" | "csv",
   report: Awaited<ReturnType<typeof generate>>,
 ) =>
-  audit(request, tenant, {
+  recordAudit(request, tenant, {
     action: "report.exported",
     targetType: "report",
     targetId: "compliance",

@@ -4,11 +4,11 @@ import type { Tenant } from "@auth/tenant";
 import { requireApproval } from "@controllers/approvals/gate";
 import { GOVERNED_ROLES } from "@controllers/organizations/schema";
 import {
-  audit,
   invalidBody,
   notFound,
   parseBody,
   requireTenant,
+  withAudit,
 } from "@controllers/shared";
 import { appLogger } from "@logger/index";
 import { getClerkUser } from "@services/clerk-users";
@@ -212,18 +212,41 @@ export const createSsoConnectionHandler: RouteHandler = async (
 
   let row: ConnectionRow;
   try {
-    row = await createConnection(tenant.orgId, tenant.userId, {
-      domainId: domain.id,
-      provider: input.provider,
-      name: input.name,
-      clerkConnectionId: clerkConnection.id,
-      idpEntityId: input.idpMetadataUrl ? null : (input.idpEntityId ?? null),
-      idpSsoUrl: input.idpMetadataUrl ? null : (input.idpSsoUrl ?? null),
-      idpMetadataUrl: input.idpMetadataUrl ?? null,
-      active: clerkConnection.active,
-      jitProvisioning: input.jitProvisioning,
-      defaultRole: input.defaultRole,
-    });
+    row = await withAudit(
+      request,
+      tenant,
+      (tx) =>
+        createConnection(
+          tenant.orgId,
+          tenant.userId,
+          {
+            domainId: domain.id,
+            provider: input.provider,
+            name: input.name,
+            clerkConnectionId: clerkConnection.id,
+            idpEntityId: input.idpMetadataUrl
+              ? null
+              : (input.idpEntityId ?? null),
+            idpSsoUrl: input.idpMetadataUrl ? null : (input.idpSsoUrl ?? null),
+            idpMetadataUrl: input.idpMetadataUrl ?? null,
+            active: clerkConnection.active,
+            jitProvisioning: input.jitProvisioning,
+            defaultRole: input.defaultRole,
+          },
+          tx,
+        ),
+      (created) => ({
+        action: "sso.created",
+        targetType: "sso_connection",
+        targetId: created.id,
+        metadata: {
+          domain: domain.domain,
+          provider: input.provider,
+          defaultRole: input.defaultRole,
+          jitProvisioning: input.jitProvisioning,
+        },
+      }),
+    );
   } catch (error) {
     await deleteSamlConnection(clerkConnection.id).catch((cleanup: unknown) =>
       appLogger.error("Could not roll back a SAML connection", {
@@ -234,17 +257,6 @@ export const createSsoConnectionHandler: RouteHandler = async (
     throw error;
   }
 
-  await audit(request, tenant, {
-    action: "sso.created",
-    targetType: "sso_connection",
-    targetId: row.id,
-    metadata: {
-      domain: domain.domain,
-      provider: input.provider,
-      defaultRole: input.defaultRole,
-      jitProvisioning: input.jitProvisioning,
-    },
-  });
   return reply.code(201).send(toConnection(row, clerkConnection));
 };
 
@@ -375,32 +387,42 @@ export const updateSsoConnectionHandler: RouteHandler = async (
   }
 
   const confirmedActive = clerkConnection ? clerkConnection.active : active;
-  const row = await updateConnection(id, {
-    ...(input.name !== undefined ? { name: input.name } : {}),
-    ...(input.idpMetadataUrl !== undefined
-      ? { idpMetadataUrl: input.idpMetadataUrl }
-      : {}),
-    ...(input.idpEntityId !== undefined
-      ? { idpEntityId: input.idpEntityId }
-      : {}),
-    ...(input.idpSsoUrl !== undefined ? { idpSsoUrl: input.idpSsoUrl } : {}),
-    active: confirmedActive,
-    enforced: enforced && confirmedActive,
-    jitProvisioning,
-    defaultRole,
-  });
-
-  await audit(request, tenant, {
-    action: "sso.updated",
-    targetType: "sso_connection",
-    targetId: id,
-    metadata: {
-      fields: Object.keys(input).filter((key) => key !== "idpCertificate"),
-      certificateReplaced: input.idpCertificate !== undefined,
-      active: row.active,
-      enforced: row.enforced,
-    },
-  });
+  const row = await withAudit(
+    request,
+    tenant,
+    (tx) =>
+      updateConnection(
+        id,
+        {
+          ...(input.name !== undefined ? { name: input.name } : {}),
+          ...(input.idpMetadataUrl !== undefined
+            ? { idpMetadataUrl: input.idpMetadataUrl }
+            : {}),
+          ...(input.idpEntityId !== undefined
+            ? { idpEntityId: input.idpEntityId }
+            : {}),
+          ...(input.idpSsoUrl !== undefined
+            ? { idpSsoUrl: input.idpSsoUrl }
+            : {}),
+          active: confirmedActive,
+          enforced: enforced && confirmedActive,
+          jitProvisioning,
+          defaultRole,
+        },
+        tx,
+      ),
+    (updated) => ({
+      action: "sso.updated",
+      targetType: "sso_connection",
+      targetId: id,
+      metadata: {
+        fields: Object.keys(input).filter((key) => key !== "idpCertificate"),
+        certificateReplaced: input.idpCertificate !== undefined,
+        active: updated.active,
+        enforced: updated.enforced,
+      },
+    }),
+  );
   return reply.send(
     toConnection(row, clerkConnection ?? (await fetchClerkConnection(row))),
   );
@@ -434,12 +456,16 @@ export const deleteSsoConnectionHandler: RouteHandler = async (
     }
   }
 
-  await deleteConnection(tenant.orgId, id);
-  await audit(request, tenant, {
-    action: "sso.deleted",
-    targetType: "sso_connection",
-    targetId: id,
-    metadata: { domain: current.domain.domain, provider: current.provider },
-  });
+  await withAudit(
+    request,
+    tenant,
+    (tx) => deleteConnection(tenant.orgId, id, tx),
+    {
+      action: "sso.deleted",
+      targetType: "sso_connection",
+      targetId: id,
+      metadata: { domain: current.domain.domain, provider: current.provider },
+    },
+  );
   return reply.code(204).send();
 };

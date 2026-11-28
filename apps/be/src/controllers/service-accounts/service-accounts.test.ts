@@ -1,9 +1,11 @@
+import { prisma } from "@4mica/db";
 import { clearUserCache } from "@auth/user-store";
 import { resourceKeyRoutes } from "@routes/resource-keys";
 import { serviceAccountRoutes } from "@routes/service-accounts";
 import { hashSecret } from "@utils/secrets";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { initApp } from "@/server";
+import { runTransactionsOn } from "@/test-support/audit";
 import {
   APPROVAL_HEADERS,
   approvedFor,
@@ -217,9 +219,7 @@ describe("service account routes", () => {
     apiKey.create.mockImplementation(async () => storedKey({ id: NEW_KEY_ID }));
     apiKey.update.mockResolvedValue({});
     apiKey.updateMany.mockResolvedValue({ count: 1 });
-    $transaction.mockImplementation(async (arg: unknown) =>
-      Promise.all(arg as Promise<unknown>[]),
-    );
+    runTransactionsOn(prisma);
   });
 
   afterEach(() => {
@@ -350,8 +350,10 @@ describe("service account routes", () => {
       );
       expect(res.statusCode, `${method} ${url}`).toBe(404);
     }
-    expect($transaction).not.toHaveBeenCalled();
+    expect(serviceAccount.update).not.toHaveBeenCalled();
+    expect(apiKey.updateMany).not.toHaveBeenCalled();
     expect(apiKey.create).not.toHaveBeenCalled();
+    expect(tenancy.auditLog.create).not.toHaveBeenCalled();
   });
 
   it("404s on a foreign X-Project-Id without reading anything", async () => {

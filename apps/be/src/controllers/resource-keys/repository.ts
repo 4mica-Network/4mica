@@ -1,4 +1,4 @@
-import { prisma } from "@4mica/db";
+import { type Prisma, prisma } from "@4mica/db";
 import {
   API_KEY_SELECT,
   findApiKey,
@@ -33,10 +33,11 @@ export const createResourceKey = async (
   kind: ResourceKind,
   id: string,
   data: CreateResourceKeyInput,
+  db: Prisma.TransactionClient = prisma,
 ) => {
   const secret = generateApiKey(scope.environment);
 
-  const row = await prisma.apiKey.create({
+  const row = await db.apiKey.create({
     data: {
       ...scopeData(scope),
       createdById: userId,
@@ -61,13 +62,14 @@ export const updateResourceKey = async (
   id: string,
   keyId: string,
   data: UpdateApiKeyInput,
+  db: Prisma.TransactionClient = prisma,
 ) => {
-  const { count } = await prisma.apiKey.updateMany({
+  const { count } = await db.apiKey.updateMany({
     where: { id: keyId, ...target(kind, id), ...scopeWhere(scope) },
     data,
   });
 
-  return count > 0 ? findApiKey(keyId) : null;
+  return count > 0 ? findApiKey(keyId, db) : null;
 };
 
 export const revokeResourceKey = async (
@@ -75,8 +77,9 @@ export const revokeResourceKey = async (
   kind: ResourceKind,
   id: string,
   keyId: string,
+  db: Prisma.TransactionClient = prisma,
 ) => {
-  const { count } = await prisma.apiKey.updateMany({
+  const { count } = await db.apiKey.updateMany({
     where: {
       id: keyId,
       ...target(kind, id),
@@ -86,7 +89,7 @@ export const revokeResourceKey = async (
     data: { revokedAt: new Date() },
   });
 
-  return count > 0 ? findApiKey(keyId) : null;
+  return count > 0 ? findApiKey(keyId, db) : null;
 };
 
 export const deleteResourceKey = async (
@@ -94,8 +97,9 @@ export const deleteResourceKey = async (
   kind: ResourceKind,
   id: string,
   keyId: string,
+  db: Prisma.TransactionClient = prisma,
 ) => {
-  const { count } = await prisma.apiKey.deleteMany({
+  const { count } = await db.apiKey.deleteMany({
     where: { id: keyId, ...target(kind, id), ...scopeWhere(scope) },
   });
   return count > 0;

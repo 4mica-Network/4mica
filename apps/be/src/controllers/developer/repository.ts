@@ -9,6 +9,8 @@ import {
   type UpdateWebhookInput,
 } from "./schema";
 
+type Db = Prisma.TransactionClient;
+
 export const API_KEY_SELECT = {
   id: true,
   name: true,
@@ -36,8 +38,11 @@ export const toApiKey = ({ environment, ...rest }: RawApiKey): ApiKeyRow => ({
   environment: environment.kind,
 });
 
-export const findApiKey = async (id: string): Promise<ApiKeyRow | null> => {
-  const row = await prisma.apiKey.findUnique({
+export const findApiKey = async (
+  id: string,
+  db: Db = prisma,
+): Promise<ApiKeyRow | null> => {
+  const row = await db.apiKey.findUnique({
     where: { id },
     select: API_KEY_SELECT,
   });
@@ -80,10 +85,11 @@ export const createApiKey = async (
   scope: ResourceScope,
   userId: string,
   data: CreateApiKeyInput,
+  db: Db = prisma,
 ) => {
   const secret = generateApiKey(scope.environment);
 
-  const row = await prisma.apiKey.create({
+  const row = await db.apiKey.create({
     data: {
       ...scopeData(scope),
       createdById: userId,
@@ -105,26 +111,35 @@ export const updateApiKey = async (
   scope: ResourceScope,
   id: string,
   data: UpdateApiKeyInput,
+  db: Db = prisma,
 ) => {
-  const { count } = await prisma.apiKey.updateMany({
+  const { count } = await db.apiKey.updateMany({
     where: { id, ...scopeWhere(scope), ...ACCOUNT_KEY },
     data,
   });
 
-  return count > 0 ? findApiKey(id) : null;
+  return count > 0 ? findApiKey(id, db) : null;
 };
 
-export const revokeApiKey = async (scope: ResourceScope, id: string) => {
-  const { count } = await prisma.apiKey.updateMany({
+export const revokeApiKey = async (
+  scope: ResourceScope,
+  id: string,
+  db: Db = prisma,
+) => {
+  const { count } = await db.apiKey.updateMany({
     where: { id, ...scopeWhere(scope), ...ACCOUNT_KEY, revokedAt: null },
     data: { revokedAt: new Date() },
   });
 
-  return count > 0 ? findApiKey(id) : null;
+  return count > 0 ? findApiKey(id, db) : null;
 };
 
-export const deleteApiKey = async (scope: ResourceScope, id: string) => {
-  const { count } = await prisma.apiKey.deleteMany({
+export const deleteApiKey = async (
+  scope: ResourceScope,
+  id: string,
+  db: Db = prisma,
+) => {
+  const { count } = await db.apiKey.deleteMany({
     where: { id, ...scopeWhere(scope), ...ACCOUNT_KEY },
   });
   return count > 0;
@@ -141,10 +156,11 @@ export const createWebhook = async (
   scope: ResourceScope,
   userId: string,
   data: CreateWebhookInput,
+  db: Db = prisma,
 ) => {
   const secret = generateWebhookSecret();
 
-  const webhook = await prisma.webhook.create({
+  const webhook = await db.webhook.create({
     data: {
       ...scopeData(scope),
       createdById: userId,
@@ -164,8 +180,9 @@ export const updateWebhook = async (
   scope: ResourceScope,
   id: string,
   data: UpdateWebhookInput,
+  db: Db = prisma,
 ) => {
-  const { count } = await prisma.webhook.updateMany({
+  const { count } = await db.webhook.updateMany({
     where: { id, ...scopeWhere(scope) },
     data,
   });
@@ -174,13 +191,17 @@ export const updateWebhook = async (
     return null;
   }
 
-  return prisma.webhook.findUnique({ where: { id }, select: WEBHOOK_SELECT });
+  return db.webhook.findUnique({ where: { id }, select: WEBHOOK_SELECT });
 };
 
-export const rotateWebhookSecret = async (scope: ResourceScope, id: string) => {
+export const rotateWebhookSecret = async (
+  scope: ResourceScope,
+  id: string,
+  db: Db = prisma,
+) => {
   const secret = generateWebhookSecret();
 
-  const { count } = await prisma.webhook.updateMany({
+  const { count } = await db.webhook.updateMany({
     where: { id, ...scopeWhere(scope) },
     data: { secretHash: secret.hash, secretPrefix: secret.prefix },
   });
@@ -189,7 +210,7 @@ export const rotateWebhookSecret = async (scope: ResourceScope, id: string) => {
     return null;
   }
 
-  const webhook = await prisma.webhook.findUnique({
+  const webhook = await db.webhook.findUnique({
     where: { id },
     select: WEBHOOK_SELECT,
   });
@@ -197,8 +218,12 @@ export const rotateWebhookSecret = async (scope: ResourceScope, id: string) => {
   return webhook ? { webhook, plaintext: secret.plaintext } : null;
 };
 
-export const deleteWebhook = async (scope: ResourceScope, id: string) => {
-  const { count } = await prisma.webhook.deleteMany({
+export const deleteWebhook = async (
+  scope: ResourceScope,
+  id: string,
+  db: Db = prisma,
+) => {
+  const { count } = await db.webhook.deleteMany({
     where: { id, ...scopeWhere(scope) },
   });
   return count > 0;
