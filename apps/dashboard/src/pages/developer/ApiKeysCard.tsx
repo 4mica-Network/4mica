@@ -3,20 +3,32 @@ import {
   createApiKey,
   deleteApiKey,
   developerPendingKeys,
+  renameApiKey,
   revokeApiKey,
   selectApiKeys,
   selectDeveloperError,
   selectDeveloperIssues,
   selectIsDeveloperPending,
 } from "@stores/developer";
-import type { ApiKey, RevealSecret } from "@stores/developer/type";
+import {
+  API_KEY_SCOPES,
+  type ApiKey,
+  type ApiKeyScope,
+  type RevealSecret,
+} from "@stores/developer/type";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
+import { PROJECT_PERMISSION } from "@stores/project/type";
 import { formatDate } from "@utils/format";
+import { invalidAllowlistEntries, parseAllowlist } from "@utils/ipAllowlist";
 import { KeyRound, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { ApiKeyTags, ScopePicker } from "@/components/ApiKey";
 import { ConfirmAction } from "@/components/ConfirmAction";
+import { IpAllowlistField } from "@/components/IpAllowlistField";
+import { IpAllowlistEditor } from "@/components/IpAllowlistField/IpAllowlistEditor";
 import { SettingsSection } from "@/components/layout";
+import { ProjectRestricted } from "@/components/Project/ProjectRestricted";
 import { Spinner } from "@/components/Spinner";
 import { useOnSuccess } from "@/hooks/useOnSuccess";
 
@@ -44,6 +56,7 @@ function ApiKeyRow({ apiKey }: { apiKey: ApiKey }) {
         <p className="mt-0.5 font-mono text-ink-muted text-xs">
           {apiKey.prefix}…{apiKey.last4}
         </p>
+        <ApiKeyTags apiKey={apiKey} />
         <p className="mt-0.5 text-ink-subtle text-xs">
           {t("developer.keys.created")} {formatDate(apiKey.createdAt)} ·{" "}
           {t("developer.keys.lastUsed")} {formatDate(apiKey.lastUsedAt)}
@@ -52,6 +65,17 @@ function ApiKeyRow({ apiKey }: { apiKey: ApiKey }) {
 
       <div className="flex shrink-0 items-center gap-2">
         {isPending && <Spinner size="sm" className="text-ink-subtle" />}
+        {!isRevoked && (
+          <IpAllowlistEditor
+            id={`api-key-ip-${apiKey.id}`}
+            keyName={apiKey.name}
+            value={apiKey.ipAllowlist}
+            disabled={isPending}
+            onSave={(ipAllowlist) =>
+              dispatch(renameApiKey({ id: apiKey.id, ipAllowlist }))
+            }
+          />
+        )}
         {!isRevoked && (
           <ConfirmAction
             title={t("developer.keys.revokeConfirm", { name: apiKey.name })}
@@ -91,15 +115,32 @@ export function ApiKeysCard({ onReveal }: { onReveal: RevealSecret }) {
   const error = useAppSelector(selectDeveloperError);
   const isCreating = useAppSelector(selectIsDeveloperPending("createApiKey"));
   const [name, setName] = useState("");
+  const [scopes, setScopes] = useState<ApiKeyScope[]>([...API_KEY_SCOPES]);
+  const [ipAllowlist, setIpAllowlist] = useState("");
+  const allowlist = parseAllowlist(ipAllowlist);
+  const allowlistValid = invalidAllowlistEntries(allowlist).length === 0;
 
-  useOnSuccess(isCreating, error !== null, () => setName(""));
+  useOnSuccess(isCreating, error !== null, () => {
+    setName("");
+    setScopes([...API_KEY_SCOPES]);
+    setIpAllowlist("");
+  });
 
   const create = () => {
     const trimmed = name.trim();
-    if (!trimmed || isCreating) {
+    if (!trimmed || scopes.length === 0 || isCreating || !allowlistValid) {
       return;
     }
-    dispatch(createApiKey({ name: trimmed }, onReveal));
+    dispatch(
+      createApiKey(
+        {
+          name: trimmed,
+          scopes,
+          ...(allowlist.length > 0 ? { ipAllowlist: allowlist } : {}),
+        },
+        onReveal,
+      ),
+    );
   };
 
   return (
@@ -107,48 +148,67 @@ export function ApiKeysCard({ onReveal }: { onReveal: RevealSecret }) {
       title={t("developer.keys.title")}
       description={t("developer.keys.description")}
     >
-      <Card>
-        <form
-          className="flex flex-col gap-3 sm:flex-row sm:items-start"
-          onSubmit={(e) => {
-            e.preventDefault();
-            create();
-          }}
-        >
-          <div className="flex-1">
-            <InputField
-              id="api-key-name"
-              aria-label={t("developer.keys.nameLabel")}
-              value={name}
-              placeholder={t("developer.keys.namePlaceholder")}
-              error={issues.name}
-              maxLength={120}
-              onChange={(e) => setName(e.target.value)}
+      <ProjectRestricted permission={PROJECT_PERMISSION.KEYS_MANAGE}>
+        <Card>
+          <form
+            className="flex flex-col gap-3 sm:flex-row sm:items-start"
+            onSubmit={(e) => {
+              e.preventDefault();
+              create();
+            }}
+          >
+            <div className="flex-1">
+              <InputField
+                id="api-key-name"
+                aria-label={t("developer.keys.nameLabel")}
+                value={name}
+                placeholder={t("developer.keys.namePlaceholder")}
+                error={issues.name}
+                maxLength={120}
+                onChange={(e) => setName(e.target.value)}
+              />
+            </div>
+            <Button
+              type="submit"
+              size="sm"
+              intent="invert"
+              className="btn-no-lift min-w-28 shrink-0 whitespace-nowrap border border-transparent py-2.5 text-sm leading-5"
+              loading={isCreating}
+              disabled={!name.trim() || scopes.length === 0 || !allowlistValid}
+            >
+              {t("developer.keys.create")}
+            </Button>
+          </form>
+          <div className="mt-3">
+            <ScopePicker
+              idPrefix="api-key-scope"
+              value={scopes}
+              onChange={setScopes}
+              error={
+                scopes.length === 0 ? t("apiKey.scopesRequired") : issues.scopes
+              }
             />
           </div>
-          <Button
-            type="submit"
-            size="sm"
-            intent="invert"
-            className="btn-no-lift min-w-28 shrink-0 whitespace-nowrap border border-transparent py-2.5 text-sm leading-5"
-            loading={isCreating}
-            disabled={!name.trim()}
-          >
-            {t("developer.keys.create")}
-          </Button>
-        </form>
-      </Card>
+          <div className="mt-3">
+            <IpAllowlistField
+              id="api-key-ip"
+              value={ipAllowlist}
+              onChange={setIpAllowlist}
+            />
+          </div>
+        </Card>
 
-      {apiKeys.length === 0 ? (
-        <EmptyState
-          icon={<KeyRound size={20} />}
-          title={t("developer.keys.emptyTitle")}
-          description={t("developer.keys.emptyDescription")}
-          data-testid="api-keys"
-        />
-      ) : (
-        apiKeys.map((apiKey) => <ApiKeyRow key={apiKey.id} apiKey={apiKey} />)
-      )}
+        {apiKeys.length === 0 ? (
+          <EmptyState
+            icon={<KeyRound size={20} />}
+            title={t("developer.keys.emptyTitle")}
+            description={t("developer.keys.emptyDescription")}
+            data-testid="api-keys"
+          />
+        ) : (
+          apiKeys.map((apiKey) => <ApiKeyRow key={apiKey.id} apiKey={apiKey} />)
+        )}
+      </ProjectRestricted>
     </SettingsSection>
   );
 }

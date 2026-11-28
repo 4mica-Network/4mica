@@ -1,8 +1,25 @@
+import { prisma } from "@4mica/db";
 import { clearUserCache } from "@auth/user-store";
 import { resourceKeyRoutes } from "@routes/resource-keys";
 import { hashSecret } from "@utils/secrets";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { initApp } from "@/server";
+import { runTransactionsOn } from "@/test-support/audit";
+import {
+  APPROVAL_HEADERS,
+  approvedFor,
+  governOff,
+  governOn,
+} from "@/test-support/governance";
+import {
+  actAs,
+  ORG_ID,
+  OTHER_ORG_ID,
+  OTHER_PROJECT_ID,
+  PRODUCTION_ENV_ID,
+  PROJECT_ID,
+  SANDBOX_ENV_ID,
+} from "@/test-support/tenancy";
 
 const {
   authenticateRequest,
@@ -14,7 +31,22 @@ const {
   agent,
   resourcePolicy,
   faqItem,
+  tenancy,
+  governance,
 } = vi.hoisted(() => ({
+  governance: {
+    governanceSettings: { findUnique: vi.fn() },
+    approvalRequest: {
+      findFirst: vi.fn(),
+      create: vi.fn(),
+      updateMany: vi.fn(),
+    },
+  },
+  tenancy: {
+    membership: { findFirst: vi.fn(), create: vi.fn() },
+    auditLog: { create: vi.fn() },
+    project: { findFirst: vi.fn() },
+  },
   authenticateRequest: vi.fn(),
   getUser: vi.fn(),
   findUnique: vi.fn(),
@@ -39,6 +71,8 @@ vi.mock("@clerk/backend", () => ({
 
 vi.mock("@4mica/db", () => ({
   prisma: {
+    ...tenancy,
+    ...governance,
     user: { findUnique, upsert, update: vi.fn() },
     business: { findUnique: vi.fn(), upsert: vi.fn() },
     apiKey,
@@ -46,6 +80,7 @@ vi.mock("@4mica/db", () => ({
     agent,
     resourcePolicy,
     faqItem,
+    $transaction: vi.fn(),
   },
   disconnect: vi.fn(async () => {}),
 }));
@@ -95,6 +130,9 @@ const STORED_KEY = {
   name: "Production",
   prefix: "4mica_sk_ab12",
   last4: "wxyz",
+  scopes: ["PAYMENTS_WRITE", "CUSTOMERS_READ", "RESOURCE_READ"],
+  serviceAccountId: null,
+  environment: { kind: "SANDBOX" },
   lastUsedAt: null,
   expiresAt: null,
   revokedAt: null,
@@ -104,12 +142,19 @@ const STORED_KEY = {
 
 const storedKey = (over: Record<string, unknown> = {}) => ({
   id: KEY_ID,
-  ownerId: USER_ID,
+  organizationId: ORG_ID,
+  projectId: PROJECT_ID,
+  environmentId: SANDBOX_ENV_ID,
+  serviceAccountId: null,
+  scopes: ["PAYMENTS_WRITE", "CUSTOMERS_READ", "RESOURCE_READ"],
   listingId: null,
   agentId: null,
   revokedAt: null,
   expiresAt: null,
-  owner: { banned: false, locked: false, deletedAt: null },
+  organization: { deletedAt: null },
+  project: { deletedAt: null, archivedAt: null },
+  environment: { kind: "SANDBOX" },
+  serviceAccount: null,
   listing: null,
   agent: null,
   ...over,
@@ -199,6 +244,9 @@ describe("resource key routes", () => {
       }
     }
     clearUserCache();
+    runTransactionsOn(prisma);
+    actAs(tenancy);
+    governOff(governance);
 
     authenticateRequest.mockResolvedValue(signedIn());
     upsert.mockResolvedValue(AUTH_USER);
@@ -242,10 +290,15 @@ describe("resource key routes", () => {
       expect(res.json().items).toHaveLength(1);
       expect(apiKey.findMany.mock.calls[0][0].where).toEqual({
         listingId: LISTING_ID,
+        organizationId: ORG_ID,
+        projectId: PROJECT_ID,
+        environmentId: SANDBOX_ENV_ID,
       });
       expect(apiListing.findFirst.mock.calls[0][0].where).toEqual({
         id: LISTING_ID,
-        ownerId: USER_ID,
+        organizationId: ORG_ID,
+        projectId: PROJECT_ID,
+        environmentId: SANDBOX_ENV_ID,
         deletedAt: null,
       });
       await instance.close();
@@ -289,15 +342,59 @@ describe("resource key routes", () => {
 
       expect(res.statusCode).toBe(201);
       const { apiKey: created, plaintext } = res.json();
-      expect(plaintext).toMatch(/^4mica_sk_/);
+      expect(plaintext).toMatch(/^4mica_sk_test_/);
       expect(created).not.toHaveProperty("hashedKey");
 
       const data = apiKey.create.mock.calls[0][0].data;
-      expect(data.ownerId).toBe(USER_ID);
+      expect(data.organizationId).toBe(ORG_ID);
+      expect(data.projectId).toBe(PROJECT_ID);
+      expect(data.environmentId).toBe(SANDBOX_ENV_ID);
+      expect(data.scopes).toEqual([
+        "PAYMENTS_WRITE",
+        "CUSTOMERS_READ",
+        "RESOURCE_READ",
+      ]);
+      expect(data.createdById).toBe(USER_ID);
       expect(data.listingId).toBe(LISTING_ID);
       expect(data).not.toHaveProperty("agentId");
       expect(data.hashedKey).toBe(hashSecret(plaintext));
       expect(JSON.stringify(data)).not.toContain(plaintext);
+      await instance.close();
+    });
+
+    it("audits creation without the secret", async () => {
+      const instance = await app();
+
+      const res = await instance.inject({
+        method: "POST",
+        url: `/me/api-listings/${LISTING_ID}/keys`,
+        headers: AUTH,
+        payload: { name: "Production" },
+      });
+
+      const entry = tenancy.auditLog.create.mock.calls[0][0].data;
+      expect(entry).toMatchObject({
+        organizationId: ORG_ID,
+        actorUserId: USER_ID,
+        action: "api_key.created",
+        targetId: KEY_ID,
+      });
+      expect(JSON.stringify(entry)).not.toContain(res.json().plaintext);
+      await instance.close();
+    });
+
+    it("404s and probes nothing for an organization the caller is not in", async () => {
+      const instance = await app();
+
+      const res = await instance.inject({
+        method: "GET",
+        url: `/me/api-listings/${LISTING_ID}/keys`,
+        headers: { ...AUTH, "x-org-id": OTHER_ORG_ID },
+      });
+
+      expect(res.statusCode).toBe(404);
+      expect(apiListing.findFirst).not.toHaveBeenCalled();
+      expect(apiKey.findMany).not.toHaveBeenCalled();
       await instance.close();
     });
 
@@ -333,6 +430,34 @@ describe("resource key routes", () => {
       await instance.close();
     });
 
+    it("changes the allowlist of a key bound to this resource only", async () => {
+      const instance = await app();
+
+      const res = await instance.inject({
+        method: "PATCH",
+        url: `/me/agents/${AGENT_ID}/keys/${KEY_ID}`,
+        headers: AUTH,
+        payload: { ipAllowlist: ["198.51.100.0/24"] },
+      });
+
+      expect(res.statusCode).toBe(200);
+      expect(apiKey.updateMany.mock.calls[0][0]).toEqual({
+        where: {
+          id: KEY_ID,
+          agentId: AGENT_ID,
+          organizationId: ORG_ID,
+          projectId: PROJECT_ID,
+          environmentId: SANDBOX_ENV_ID,
+        },
+        data: { ipAllowlist: ["198.51.100.0/24"] },
+      });
+      expect(tenancy.auditLog.create.mock.calls[0][0].data).toMatchObject({
+        action: "api_key.updated",
+        targetId: KEY_ID,
+      });
+      await instance.close();
+    });
+
     it("revokes only a key bound to this resource", async () => {
       const instance = await app();
 
@@ -346,7 +471,14 @@ describe("resource key routes", () => {
       expect(apiKey.updateMany.mock.calls[0][0].where).toEqual({
         id: KEY_ID,
         agentId: AGENT_ID,
+        organizationId: ORG_ID,
+        projectId: PROJECT_ID,
+        environmentId: SANDBOX_ENV_ID,
         revokedAt: null,
+      });
+      expect(tenancy.auditLog.create.mock.calls[0][0].data).toMatchObject({
+        action: "api_key.revoked",
+        targetId: KEY_ID,
       });
       await instance.close();
     });
@@ -385,6 +517,9 @@ describe("resource key routes", () => {
       expect(apiKey.deleteMany.mock.calls[0][0].where).toEqual({
         id: KEY_ID,
         listingId: LISTING_ID,
+        organizationId: ORG_ID,
+        projectId: PROJECT_ID,
+        environmentId: SANDBOX_ENV_ID,
       });
       await instance.close();
     });
@@ -475,7 +610,9 @@ describe("resource key routes", () => {
 
       expect(apiListing.findFirst.mock.calls[0][0].where).toEqual({
         id: LISTING_ID,
-        ownerId: USER_ID,
+        organizationId: ORG_ID,
+        projectId: PROJECT_ID,
+        environmentId: SANDBOX_ENV_ID,
         deletedAt: null,
       });
       expect(resourcePolicy.findFirst.mock.calls[0][0].where).toEqual({
@@ -560,6 +697,185 @@ describe("resource key routes", () => {
       expect(apiListing.findFirst).not.toHaveBeenCalled();
       expect(agent.findFirst).not.toHaveBeenCalled();
       await instance.close();
+    });
+  });
+  describe("projects, environments and scopes", () => {
+    it("mints a live key for a production resource with the scopes asked for", async () => {
+      const instance = await app();
+
+      const res = await instance.inject({
+        method: "POST",
+        url: `/me/api-listings/${LISTING_ID}/keys`,
+        headers: { ...AUTH, "x-environment": "production" },
+        payload: { name: "Production", scopes: ["RESOURCE_READ"] },
+      });
+
+      expect(res.statusCode).toBe(201);
+      expect(res.json().plaintext).toMatch(/^4mica_sk_live_/);
+      expect(apiListing.findFirst.mock.calls[0][0].where).toMatchObject({
+        projectId: PROJECT_ID,
+        environmentId: PRODUCTION_ENV_ID,
+      });
+      expect(apiKey.create.mock.calls[0][0].data).toMatchObject({
+        projectId: PROJECT_ID,
+        environmentId: PRODUCTION_ENV_ID,
+        scopes: ["RESOURCE_READ"],
+      });
+      await instance.close();
+    });
+
+    it("404s on a project the caller cannot see", async () => {
+      const instance = await app();
+
+      const res = await instance.inject({
+        method: "GET",
+        url: `/me/api-listings/${LISTING_ID}/keys`,
+        headers: { ...AUTH, "x-project-id": OTHER_PROJECT_ID },
+      });
+
+      expect(res.statusCode).toBe(404);
+      expect(apiListing.findFirst).not.toHaveBeenCalled();
+      await instance.close();
+    });
+
+    it("lets a viewer list keys but not mint or revoke them", async () => {
+      actAs(tenancy, "VIEWER");
+      const instance = await app();
+
+      const list = await instance.inject({
+        method: "GET",
+        url: `/me/api-listings/${LISTING_ID}/keys`,
+        headers: AUTH,
+      });
+      expect(list.statusCode).toBe(200);
+
+      for (const [method, url] of [
+        ["POST", `/me/api-listings/${LISTING_ID}/keys`],
+        ["POST", `/me/api-listings/${LISTING_ID}/keys/${KEY_ID}/revoke`],
+        ["DELETE", `/me/api-listings/${LISTING_ID}/keys/${KEY_ID}`],
+      ] as const) {
+        const res = await instance.inject({
+          method,
+          url,
+          headers: AUTH,
+          ...(method === "POST" ? { payload: { name: "x" } } : {}),
+        });
+        expect(res.statusCode, `${method} ${url}`).toBe(403);
+        expect(res.json().permission).toBe("keys.manage");
+      }
+      expect(apiKey.create).not.toHaveBeenCalled();
+      expect(apiKey.updateMany).not.toHaveBeenCalled();
+      expect(apiKey.deleteMany).not.toHaveBeenCalled();
+      await instance.close();
+    });
+
+    it("refuses a key without the RESOURCE_READ scope", async () => {
+      apiKey.findUnique.mockResolvedValue(
+        storedKey({
+          listingId: LISTING_ID,
+          listing: { deletedAt: null },
+          scopes: ["PAYMENTS_WRITE"],
+        }),
+      );
+      const instance = await app();
+
+      const res = await instance.inject({
+        method: "GET",
+        url: "/v1/resource",
+        headers: KEY_AUTH,
+      });
+
+      expect(res.statusCode).toBe(403);
+      expect(res.json()).toMatchObject({
+        error: "insufficient_scope",
+        scope: "RESOURCE_READ",
+      });
+      expect(apiListing.findFirst).not.toHaveBeenCalled();
+      await instance.close();
+    });
+
+    it("reads the resource in the key's project and environment", async () => {
+      apiKey.findUnique.mockResolvedValue(
+        storedKey({
+          listingId: LISTING_ID,
+          listing: { deletedAt: null },
+          environmentId: PRODUCTION_ENV_ID,
+          environment: { kind: "PRODUCTION" },
+        }),
+      );
+      apiListing.findFirst.mockResolvedValue(storedListing());
+      const instance = await app();
+
+      await instance.inject({
+        method: "GET",
+        url: "/v1/resource",
+        headers: KEY_AUTH,
+      });
+
+      expect(apiListing.findFirst.mock.calls[0][0].where).toEqual({
+        id: LISTING_ID,
+        organizationId: ORG_ID,
+        projectId: PROJECT_ID,
+        environmentId: PRODUCTION_ENV_ID,
+        deletedAt: null,
+      });
+      await instance.close();
+    });
+  });
+
+  describe("governed production keys", () => {
+    const create = async (headers: Record<string, string> = {}) => {
+      const instance = await app();
+      const res = await instance.inject({
+        method: "POST",
+        url: `/me/api-listings/${LISTING_ID}/keys`,
+        headers: { ...AUTH, "x-environment": "production", ...headers },
+        payload: { name: "Production", scopes: ["RESOURCE_READ"] },
+      });
+      await instance.close();
+      return res;
+    };
+    const payload = {
+      projectId: PROJECT_ID,
+      kind: "listing",
+      resourceId: LISTING_ID,
+      name: "Production",
+      scopes: ["RESOURCE_READ"],
+    };
+
+    beforeEach(() => {
+      governOn(governance, "api_key.create_production");
+    });
+
+    it("asks for approval before minting a production resource key", async () => {
+      const res = await create();
+
+      expect(res.statusCode).toBe(202);
+      expect(
+        governance.approvalRequest.create.mock.calls[0][0].data.payload,
+      ).toEqual(payload);
+      expect(apiKey.create).not.toHaveBeenCalled();
+    });
+
+    it("mints the key with a matching approval", async () => {
+      approvedFor(governance, "api_key.create_production", payload);
+
+      const res = await create(APPROVAL_HEADERS);
+
+      expect(res.statusCode).toBe(201);
+      expect(apiKey.create).toHaveBeenCalledOnce();
+    });
+
+    it("refuses an approval for another resource", async () => {
+      approvedFor(governance, "api_key.create_production", {
+        ...payload,
+        resourceId: AGENT_ID,
+      });
+
+      const res = await create(APPROVAL_HEADERS);
+
+      expect(res.statusCode).toBe(409);
+      expect(apiKey.create).not.toHaveBeenCalled();
     });
   });
 });

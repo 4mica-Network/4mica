@@ -271,5 +271,11 @@
   "customer.remove.confirmTitle": "¿Quitar este cliente?",
   "customer.remove.confirmDescription": "Volverá a la lista de clientes.",
   "customer.remove.confirm": "Quitar",
-  "customer.credit.promotionalNegative": "El crédito promocional no puede ser negativo. Use un ajuste para retirar crédito."
+  "customer.credit.promotionalNegative": "El crédito promocional no puede ser negativo. Use un ajuste para retirar crédito.",
+  "customer.limits.token": "Token",
+  "customer.limits.tokenHint": "Los límites solo cuentan el gasto en este token.",
+  "customer.limits.chooseToken": "Elija un token",
+  "customer.limits.tokenRequired": "Elija el token de estos límites.",
+  "customer.limits.allTokens": "Todos los tokens (antiguo)",
+  "customer.limits.allTokensHint": "Estos límites suman todos los tokens. Elija uno para que sean precisos."
 }

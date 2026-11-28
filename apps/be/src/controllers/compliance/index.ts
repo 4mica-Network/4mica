@@ -2,7 +2,8 @@ import {
   invalidBody,
   notFound,
   parseBody,
-  requireUserId,
+  requireTenant,
+  withAudit,
 } from "@controllers/shared";
 import { appLogger } from "@logger/index";
 import type { FastifyReply, RouteHandler } from "fastify";
@@ -41,16 +42,16 @@ const ownershipExceeded = (reply: FastifyReply, available: number) =>
   ]);
 
 export const getComplianceHandler: RouteHandler = async (request, reply) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const tenant = await requireTenant(request, reply, "resources.read");
+  if (!tenant) {
     return reply;
   }
-  return reply.send(await getComplianceState(userId));
+  return reply.send(await getComplianceState(tenant.orgId));
 };
 
 export const updateComplianceHandler: RouteHandler = async (request, reply) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const tenant = await requireTenant(request, reply, "business.manage");
+  if (!tenant) {
     return reply;
   }
 
@@ -59,30 +60,42 @@ export const updateComplianceHandler: RouteHandler = async (request, reply) => {
     return invalidBody(reply, parsed.issues);
   }
 
-  if (await isComplianceLocked(userId)) {
+  if (await isComplianceLocked(tenant.orgId)) {
     return locked(reply);
   }
 
-  return reply.send(await updateComplianceProfile(userId, parsed.data));
+  await withAudit(
+    request,
+    tenant,
+    (tx) => updateComplianceProfile(tenant.orgId, parsed.data, tx),
+    {
+      action: "compliance.updated",
+      targetType: "compliance",
+      targetId: tenant.orgId,
+      metadata: { fields: Object.keys(parsed.data) },
+    },
+  );
+
+  return reply.send(await getComplianceState(tenant.orgId));
 };
 
 export const listBeneficialOwnersHandler: RouteHandler = async (
   request,
   reply,
 ) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const tenant = await requireTenant(request, reply, "resources.read");
+  if (!tenant) {
     return reply;
   }
-  return reply.send(await listBeneficialOwners(userId));
+  return reply.send(await listBeneficialOwners(tenant.orgId));
 };
 
 export const createBeneficialOwnerHandler: RouteHandler = async (
   request,
   reply,
 ) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const tenant = await requireTenant(request, reply, "business.manage");
+  if (!tenant) {
     return reply;
   }
 
@@ -91,24 +104,36 @@ export const createBeneficialOwnerHandler: RouteHandler = async (
     return invalidBody(reply, parsed.issues);
   }
 
-  if (await isComplianceLocked(userId)) {
+  if (await isComplianceLocked(tenant.orgId)) {
     return locked(reply);
   }
 
-  if ((await countBeneficialOwners(userId)) >= MAX_BENEFICIAL_OWNERS) {
+  if ((await countBeneficialOwners(tenant.orgId)) >= MAX_BENEFICIAL_OWNERS) {
     return reply.code(409).send({
       error: "limit_reached",
       message: `A business can list at most ${MAX_BENEFICIAL_OWNERS} people.`,
     });
   }
 
-  const held = await ownershipHeldByOthers(userId);
+  const held = await ownershipHeldByOthers(tenant.orgId);
   if (held + (parsed.data.ownershipPercent ?? 0) > 100) {
     return ownershipExceeded(reply, 100 - held);
   }
 
-  const owner = await createBeneficialOwner(userId, parsed.data);
-  appLogger.info("Beneficial owner added", { userId, ownerId: owner.id });
+  const owner = await withAudit(
+    request,
+    tenant,
+    (tx) => createBeneficialOwner(tenant.orgId, parsed.data, tx),
+    (created) => ({
+      action: "beneficial_owner.added",
+      targetType: "beneficial_owner",
+      targetId: created.id,
+    }),
+  );
+  appLogger.info("Beneficial owner added", {
+    userId: tenant.userId,
+    beneficialOwnerId: owner.id,
+  });
 
   return reply.code(201).send(owner);
 };
@@ -117,8 +142,8 @@ export const updateBeneficialOwnerHandler: RouteHandler = async (
   request,
   reply,
 ) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const tenant = await requireTenant(request, reply, "business.manage");
+  if (!tenant) {
     return reply;
   }
 
@@ -127,50 +152,81 @@ export const updateBeneficialOwnerHandler: RouteHandler = async (
     return invalidBody(reply, parsed.issues);
   }
 
-  if (await isComplianceLocked(userId)) {
+  if (await isComplianceLocked(tenant.orgId)) {
     return locked(reply);
   }
 
   const { id } = request.params as { id: string };
 
   if (typeof parsed.data.ownershipPercent === "number") {
-    const held = await ownershipHeldByOthers(userId, id);
+    const held = await ownershipHeldByOthers(tenant.orgId, id);
     if (held + parsed.data.ownershipPercent > 100) {
       return ownershipExceeded(reply, 100 - held);
     }
   }
 
-  const updated = await updateBeneficialOwner(userId, id, parsed.data);
+  const updated = await withAudit(
+    request,
+    tenant,
+    (tx) => updateBeneficialOwner(tenant.orgId, id, parsed.data, tx),
+    (owner) =>
+      owner
+        ? {
+            action: "beneficial_owner.updated",
+            targetType: "beneficial_owner",
+            targetId: id,
+            metadata: { fields: Object.keys(parsed.data) },
+          }
+        : null,
+  );
+  if (!updated) {
+    return notFound(reply, "person");
+  }
 
-  return updated ? reply.send(updated) : notFound(reply, "person");
+  return reply.send(updated);
 };
 
 export const deleteBeneficialOwnerHandler: RouteHandler = async (
   request,
   reply,
 ) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const tenant = await requireTenant(request, reply, "business.manage");
+  if (!tenant) {
     return reply;
   }
 
-  if (await isComplianceLocked(userId)) {
+  if (await isComplianceLocked(tenant.orgId)) {
     return locked(reply);
   }
 
   const { id } = request.params as { id: string };
-  const deleted = await deleteBeneficialOwner(userId, id);
+  const deleted = await withAudit(
+    request,
+    tenant,
+    (tx) => deleteBeneficialOwner(tenant.orgId, id, tx),
+    (found) =>
+      found
+        ? {
+            action: "beneficial_owner.removed",
+            targetType: "beneficial_owner",
+            targetId: id,
+          }
+        : null,
+  );
+  if (!deleted) {
+    return notFound(reply, "person");
+  }
 
-  return deleted ? reply.code(204).send() : notFound(reply, "person");
+  return reply.code(204).send();
 };
 
 export const submitComplianceHandler: RouteHandler = async (request, reply) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const tenant = await requireTenant(request, reply, "business.manage");
+  if (!tenant) {
     return reply;
   }
 
-  const state = await getComplianceState(userId);
+  const state = await getComplianceState(tenant.orgId);
 
   if (state.kybStatus === "PENDING" || state.kybStatus === "VERIFIED") {
     return reply.code(409).send({
@@ -193,8 +249,14 @@ export const submitComplianceHandler: RouteHandler = async (request, reply) => {
     });
   }
 
-  const submitted = await submitForReview(userId);
-  appLogger.info("Compliance submitted for review", { userId });
+  await withAudit(request, tenant, (tx) => submitForReview(tenant.orgId, tx), {
+    action: "compliance.submitted",
+    targetType: "compliance",
+    targetId: tenant.orgId,
+  });
+  appLogger.info("Compliance submitted for review", {
+    userId: tenant.userId,
+  });
 
-  return reply.send(submitted);
+  return reply.send(await getComplianceState(tenant.orgId));
 };

@@ -10,7 +10,7 @@ import {
   FormTextInput,
 } from "@/components/form";
 import { PriceField } from "@/components/PriceField";
-import { NETWORK_OPTIONS } from "@/lib/networks";
+import { useNetworkOptions } from "@/hooks/useNetworkOptions";
 import { STATUS_OPTIONS, VISIBILITY_OPTIONS } from "./constants";
 import {
   type AgentValues,
@@ -40,6 +40,7 @@ export function AgentFormFields({
   networkLocked = false,
 }: AgentFormFieldsProps) {
   const { t } = useTranslation();
+  const networkOptions = useNetworkOptions();
   const show = (index: number) => step === undefined || step === index;
   const [walletId, payerWalletId, network] = useWatch<
     AgentValues,
@@ -105,7 +106,7 @@ export function AgentFormFields({
           >
             <FormSelect
               name="network"
-              options={NETWORK_OPTIONS}
+              options={networkOptions}
               disabled={networkLocked}
             />
           </FieldRow>

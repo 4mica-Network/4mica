@@ -25,6 +25,8 @@ export const COLLECTIONS = [
   "compliance",
   "onboarding",
   "checklist",
+  "finance",
+  "security",
 ] as const;
 export type Collection = (typeof COLLECTIONS)[number];
 

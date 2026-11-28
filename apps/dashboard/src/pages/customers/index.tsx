@@ -14,6 +14,8 @@ import {
   setCustomerPage,
 } from "@stores/customer";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
+import { selectProjectCan } from "@stores/project/selector";
+import { PROJECT_PERMISSION } from "@stores/project/type";
 import { Plus, TriangleAlert, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -27,6 +29,9 @@ import { DeleteCustomerDialog } from "./DeleteCustomerDialog";
 export function Customers() {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
+  const canWrite = useAppSelector(
+    selectProjectCan(PROJECT_PERMISSION.RESOURCES_WRITE),
+  );
 
   const customers = useAppSelector(selectCustomers);
   const total = useAppSelector(selectCustomerTotal);
@@ -70,19 +75,21 @@ export function Customers() {
           </p>
         </div>
 
-        <Button
-          type="button"
-          intent="invert"
-          size="sm"
-          className="btn-no-lift shrink-0"
-          onClick={() => setIsCreateOpen(true)}
-          data-testid="customer-create-button"
-        >
-          <span className="flex items-center gap-1.5 text-sm">
-            <Plus className="h-4 w-4" />
-            {t("customer.create.cta")}
-          </span>
-        </Button>
+        {canWrite && (
+          <Button
+            type="button"
+            intent="invert"
+            size="sm"
+            className="btn-no-lift shrink-0"
+            onClick={() => setIsCreateOpen(true)}
+            data-testid="customer-create-button"
+          >
+            <span className="flex items-center gap-1.5 text-sm">
+              <Plus className="h-4 w-4" />
+              {t("customer.create.cta")}
+            </span>
+          </Button>
+        )}
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col gap-4">
@@ -119,7 +126,7 @@ export function Customers() {
                 : t("customer.empty.description")
             }
             action={
-              hasFilters ? undefined : (
+              hasFilters || !canWrite ? undefined : (
                 <Button
                   type="button"
                   intent="invert"

@@ -1,17 +1,20 @@
 import Fastify, { type FastifyInstance } from "fastify";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { revalidatePlayground } = vi.hoisted(() => ({
+const { revalidatePlayground, resolveTenant } = vi.hoisted(() => ({
   revalidatePlayground: vi.fn(async () => true),
+  resolveTenant: vi.fn(),
 }));
 
 vi.mock("@services/playground", () => ({ revalidatePlayground }));
+vi.mock("@auth/tenant", () => ({ resolveTenant }));
 
 const { registerPlaygroundRevalidation, resourcesOf, revalidateOnWrite } =
   await import("./playground-revalidate");
 
 const USER_ID = "019fce62-0000-7000-8000-000000000000";
 const AGENT_ID = "019fce62-1111-7000-8000-000000000000";
+const ORG_ID = "019fce62-2222-7000-8000-000000000000";
 
 const settled = () => new Promise((resolve) => setImmediate(resolve));
 
@@ -74,32 +77,39 @@ describe("revalidateOnWrite", () => {
 
   beforeEach(() => {
     revalidatePlayground.mockClear();
+    resolveTenant.mockReset();
+    resolveTenant.mockResolvedValue({
+      orgId: ORG_ID,
+      userId: USER_ID,
+      role: "OWNER",
+      personal: false,
+    });
   });
 
   afterEach(async () => {
     await app.close();
   });
 
-  it("names the owner and the resource after a successful write", async () => {
+  it("names the acting organization and the resource after a successful write", async () => {
     app = await buildApp();
 
     await app.inject({ method: "PATCH", url: `/me/agents/${AGENT_ID}` });
     await settled();
 
     expect(revalidatePlayground).toHaveBeenCalledExactlyOnceWith({
-      ownerId: USER_ID,
+      organizationId: ORG_ID,
       resources: [{ kind: "agent", id: AGENT_ID }],
     });
   });
 
-  it("sends only the owner when the route has no resource id", async () => {
+  it("sends only the organization when the route has no resource id", async () => {
     app = await buildApp();
 
     await app.inject({ method: "POST", url: "/me/agents" });
     await settled();
 
     expect(revalidatePlayground).toHaveBeenCalledExactlyOnceWith({
-      ownerId: USER_ID,
+      organizationId: ORG_ID,
     });
   });
 
@@ -113,7 +123,7 @@ describe("revalidateOnWrite", () => {
     await settled();
 
     expect(revalidatePlayground).toHaveBeenCalledExactlyOnceWith({
-      ownerId: USER_ID,
+      organizationId: ORG_ID,
       resources: [{ kind: "listing", id: AGENT_ID }],
     });
   });
@@ -125,7 +135,7 @@ describe("revalidateOnWrite", () => {
     await settled();
 
     expect(revalidatePlayground).toHaveBeenCalledExactlyOnceWith({
-      ownerId: USER_ID,
+      organizationId: ORG_ID,
       usernames: ["old-handle"],
     });
   });
@@ -138,6 +148,30 @@ describe("revalidateOnWrite", () => {
     await app.close();
 
     app = await buildApp(false);
+    await app.inject({ method: "PATCH", url: `/me/agents/${AGENT_ID}` });
+    await settled();
+
+    expect(revalidatePlayground).not.toHaveBeenCalled();
+  });
+
+  it("resolves the tenant of the request that made the write", async () => {
+    app = await buildApp();
+
+    await app.inject({ method: "POST", url: "/me/agents" });
+    await settled();
+
+    expect(resolveTenant).toHaveBeenCalledWith(
+      expect.objectContaining({ method: "POST" }),
+      USER_ID,
+    );
+  });
+
+  it("stays silent when the request has no organization", async () => {
+    app = await buildApp();
+    resolveTenant.mockResolvedValue(null);
+    await app.inject({ method: "POST", url: "/me/agents" });
+
+    resolveTenant.mockRejectedValue(new Error("db down"));
     await app.inject({ method: "PATCH", url: `/me/agents/${AGENT_ID}` });
     await settled();
 

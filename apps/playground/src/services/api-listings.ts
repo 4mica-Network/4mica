@@ -3,7 +3,7 @@ import "server-only";
 import { cache } from "react";
 import type { PublicApiListing } from "@/schema/api-listing";
 import type { HttpMethod, PaymentNetwork } from "@/schema/params";
-import { cachedPublic, ownerTag } from "./cache";
+import { cachedPublic, organizationTag } from "./cache";
 import { type Prisma, prisma } from "./db";
 
 export const API_LISTING_PUBLIC_SELECT = {
@@ -78,12 +78,12 @@ export const toPublicApiListing = (row: ApiListingRow): PublicApiListing => ({
 });
 
 const queryApiListings = async (
-  ownerId: string,
+  organizationId: string,
   includeHidden: boolean,
 ): Promise<PublicApiListing[]> => {
   const rows = await prisma.apiListing.findMany({
     where: {
-      ownerId,
+      organizationId,
       deletedAt: null,
       ...(includeHidden ? {} : { visibility: "PUBLIC" }),
     },
@@ -97,25 +97,28 @@ const queryApiListings = async (
 
 const loadPublicApiListings = cachedPublic(
   "api-listings:list",
-  (ownerId: string) => queryApiListings(ownerId, false),
-  (ownerId) => [ownerTag(ownerId)],
+  (organizationId: string) => queryApiListings(organizationId, false),
+  (organizationId) => [organizationTag(organizationId)],
 );
 
 export const listPublicApiListings = cache(
-  (ownerId: string, includeHidden = false): Promise<PublicApiListing[]> =>
+  (
+    organizationId: string,
+    includeHidden = false,
+  ): Promise<PublicApiListing[]> =>
     includeHidden
-      ? queryApiListings(ownerId, true)
-      : loadPublicApiListings(ownerId),
+      ? queryApiListings(organizationId, true)
+      : loadPublicApiListings(organizationId),
 );
 
 const queryApiListing = async (
-  ownerId: string,
+  organizationId: string,
   idOrSlug: string,
   includeHidden: boolean,
 ): Promise<PublicApiListing | null> => {
   const row = await prisma.apiListing.findFirst({
     where: {
-      ownerId,
+      organizationId,
       deletedAt: null,
       ...(includeHidden
         ? {}
@@ -130,18 +133,18 @@ const queryApiListing = async (
 
 const loadPublicApiListing = cachedPublic(
   "api-listings:one",
-  (ownerId: string, idOrSlug: string) =>
-    queryApiListing(ownerId, idOrSlug, false),
-  (ownerId) => [ownerTag(ownerId)],
+  (organizationId: string, idOrSlug: string) =>
+    queryApiListing(organizationId, idOrSlug, false),
+  (organizationId) => [organizationTag(organizationId)],
 );
 
 export const getPublicApiListing = cache(
   (
-    ownerId: string,
+    organizationId: string,
     idOrSlug: string,
     includeHidden = false,
   ): Promise<PublicApiListing | null> =>
     includeHidden
-      ? queryApiListing(ownerId, idOrSlug, true)
-      : loadPublicApiListing(ownerId, idOrSlug),
+      ? queryApiListing(organizationId, idOrSlug, true)
+      : loadPublicApiListing(organizationId, idOrSlug),
 );

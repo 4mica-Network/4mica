@@ -1,6 +1,7 @@
 export {
   AppClient,
   type AppClientOptions,
+  type AppRequestOptions,
   createAppClient,
   DEFAULT_APP_BASE_URL,
 } from "@/app/client";
@@ -15,8 +16,14 @@ export type {
   AppPayment,
   AppPaymentStatus,
   AppPolicy,
+  ApprovalState,
+  ApprovalStatus,
   AppVisibility,
+  AuthorizeSpendInput,
+  ConsumeSpendInput,
   CouponSkippedReason,
+  CreateApprovalInput,
+  CreatedApproval,
   CustomerDeniedReason,
   CustomerResolution,
   ReportedPayment,
@@ -24,6 +31,9 @@ export type {
   ResolveCustomerInput,
   ResourceContext,
   ResourceKind,
+  SpendAuthorization,
+  SpendAuthorizationStatus,
+  SpendDeniedReason,
 } from "@/app/models";
 export { fromAppNetwork, toAppNetwork } from "@/app/networks";
 export {

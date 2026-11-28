@@ -233,12 +233,18 @@ export function* checkUsername(action: {
 
 export function* completeOnboarding(action: {
   type: string;
-  payload: Partial<Business>;
+  payload: Partial<Business> | null;
   meta: UpdateMeta;
+  organizationId?: string | null;
 }): Generator {
+  const { payload, organizationId = null } = action;
   try {
-    const business = yield call(() => upsertBusinessRequest(action.payload));
-    yield put(updateBusinessSucceeded(business as Business, action.meta));
+    if (payload) {
+      const business = yield call(() =>
+        upsertBusinessRequest(payload, organizationId),
+      );
+      yield put(updateBusinessSucceeded(business as Business, action.meta));
+    }
   } catch (error) {
     const message = toMessage(
       error,

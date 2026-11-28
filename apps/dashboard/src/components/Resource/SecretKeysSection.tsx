@@ -14,13 +14,18 @@ import {
   selectResourceKeyIssues,
   selectResourceKeys,
   selectRevealedResourceKey,
+  updateResourceKey,
 } from "@stores/resourceKey";
 import type { ResourceRef } from "@stores/shared/type";
 import { formatDate } from "@utils/format";
+import { invalidAllowlistEntries, parseAllowlist } from "@utils/ipAllowlist";
 import { KeyRound, Plus, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { ApiKeyTags } from "@/components/ApiKey";
 import { ConfirmAction } from "@/components/ConfirmAction";
+import { IpAllowlistField } from "@/components/IpAllowlistField";
+import { IpAllowlistEditor } from "@/components/IpAllowlistField/IpAllowlistEditor";
 import { SettingsSection } from "@/components/layout";
 import { SecretRevealCard } from "@/components/RevealedSecret";
 import { Spinner } from "@/components/Spinner";
@@ -59,6 +64,7 @@ function SecretKeyRow({
         <p className="mt-0.5 font-mono text-ink-muted text-xs">
           {apiKey.prefix}…{apiKey.last4}
         </p>
+        <ApiKeyTags apiKey={apiKey} />
         <p className="mt-0.5 text-ink-subtle text-xs">
           {t("developer.keys.created")} {formatDate(apiKey.createdAt)} ·{" "}
           {t("developer.keys.lastUsed")} {formatDate(apiKey.lastUsedAt)}
@@ -67,6 +73,17 @@ function SecretKeyRow({
 
       <div className="flex shrink-0 items-center gap-2">
         {isPending && <Spinner size="sm" className="text-ink-subtle" />}
+        {!isRevoked && (
+          <IpAllowlistEditor
+            id={`secret-key-ip-${apiKey.id}`}
+            keyName={apiKey.name}
+            value={apiKey.ipAllowlist}
+            disabled={isPending}
+            onSave={(ipAllowlist) =>
+              dispatch(updateResourceKey(resource, apiKey.id, ipAllowlist))
+            }
+          />
+        )}
         {!isRevoked && (
           <ConfirmAction
             title={t("developer.keys.revokeConfirm", { name: apiKey.name })}
@@ -118,6 +135,9 @@ export function SecretKeysSection({ resource }: { resource: ResourceRef }) {
     selectIsResourceKeyPending("createResourceKey"),
   );
   const [name, setName] = useState("");
+  const [ipAllowlist, setIpAllowlist] = useState("");
+  const allowlist = parseAllowlist(ipAllowlist);
+  const allowlistValid = invalidAllowlistEntries(allowlist).length === 0;
 
   useEffect(() => {
     if (!resource.id) {
@@ -131,14 +151,23 @@ export function SecretKeysSection({ resource }: { resource: ResourceRef }) {
     };
   }, [dispatch, resource.kind, resource.id]);
 
-  useOnSuccess(isCreating, error !== null, () => setName(""));
+  useOnSuccess(isCreating, error !== null, () => {
+    setName("");
+    setIpAllowlist("");
+  });
 
   const create = () => {
     const trimmed = name.trim();
-    if (!trimmed || isCreating) {
+    if (!trimmed || isCreating || !allowlistValid) {
       return;
     }
-    dispatch(createResourceKey(resource, trimmed));
+    dispatch(
+      createResourceKey(
+        resource,
+        trimmed,
+        allowlist.length > 0 ? allowlist : undefined,
+      ),
+    );
   };
 
   return (
@@ -202,13 +231,18 @@ export function SecretKeysSection({ resource }: { resource: ResourceRef }) {
               intent="invert"
               className="btn-no-lift shrink-0 whitespace-nowrap border border-transparent py-2.5 text-sm leading-5"
               loading={isCreating}
-              disabled={!name.trim()}
+              disabled={!name.trim() || !allowlistValid}
               data-testid="secret-key-create"
               icon={<Plus className="h-4 w-4" />}
             >
               {t("appDetail.keys.create")}
             </Button>
           </form>
+          <IpAllowlistField
+            id="secret-key-ip"
+            value={ipAllowlist}
+            onChange={setIpAllowlist}
+          />
         </div>
       </Card>
     </SettingsSection>

@@ -1,6 +1,6 @@
 import { cn, InputField, type Option, Select } from "@4mica/ui";
 import { useDebounceEffect } from "ahooks";
-import { Search as SearchIcon, Trash2 } from "lucide-react";
+import { FolderInput, Search as SearchIcon, Trash2 } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Spinner } from "@/components/Spinner";
@@ -129,6 +129,7 @@ function SelectionBar({
   isDeleting,
   onToggleAll,
   onBatchDelete,
+  onMove,
   testIdPrefix,
 }: {
   ns: string;
@@ -137,6 +138,7 @@ function SelectionBar({
   isDeleting: boolean;
   onToggleAll: () => void;
   onBatchDelete: () => void;
+  onMove?: () => void;
   testIdPrefix: string;
 }) {
   const { t } = useTranslation();
@@ -161,21 +163,34 @@ function SelectionBar({
         </button>
       </div>
 
-      <button
-        type="button"
-        className="flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1.5 text-ink-muted text-xs transition-colors hover:bg-danger/10 hover:text-danger disabled:pointer-events-none disabled:opacity-50"
-        disabled={isDeleting}
-        aria-busy={isDeleting}
-        onClick={onBatchDelete}
-        data-testid={`${testIdPrefix}-batch-delete`}
-      >
-        {isDeleting ? (
-          <Spinner size="sm" />
-        ) : (
-          <Trash2 aria-hidden="true" className="h-3.5 w-3.5" />
+      <div className="flex shrink-0 items-center gap-1">
+        {onMove && (
+          <button
+            type="button"
+            className="flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1.5 text-ink-muted text-xs transition-colors hover:bg-overlay/10 hover:text-ink-body"
+            onClick={onMove}
+            data-testid={`${testIdPrefix}-batch-move`}
+          >
+            <FolderInput aria-hidden="true" className="h-3.5 w-3.5" />
+            {t("project.move.cta")}
+          </button>
         )}
-        {t(`${ns}.toolbar.deleteSelected`)}
-      </button>
+        <button
+          type="button"
+          className="flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1.5 text-ink-muted text-xs transition-colors hover:bg-danger/10 hover:text-danger disabled:pointer-events-none disabled:opacity-50"
+          disabled={isDeleting}
+          aria-busy={isDeleting}
+          onClick={onBatchDelete}
+          data-testid={`${testIdPrefix}-batch-delete`}
+        >
+          {isDeleting ? (
+            <Spinner size="sm" />
+          ) : (
+            <Trash2 aria-hidden="true" className="h-3.5 w-3.5" />
+          )}
+          {t(`${ns}.toolbar.deleteSelected`)}
+        </button>
+      </div>
     </div>
   );
 }

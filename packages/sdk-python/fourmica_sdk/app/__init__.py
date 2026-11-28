@@ -16,6 +16,9 @@ from .models import (
     ReportedPayment,
     ResourceContext,
     ResourceKind,
+    SpendAuthorization,
+    SpendAuthorizationStatus,
+    SpendDeniedReason,
 )
 from .networks import from_app_network, to_app_network
 from .payment import (
@@ -48,6 +51,9 @@ __all__ = [
     "ResourceContext",
     "ResourceKind",
     "SettledPayment",
+    "SpendAuthorization",
+    "SpendAuthorizationStatus",
+    "SpendDeniedReason",
     "from_app_network",
     "parse_payment_header",
     "parse_settlement",

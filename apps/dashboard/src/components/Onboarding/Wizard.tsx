@@ -1,6 +1,10 @@
 import { Button, Modal } from "@4mica/ui";
 import { useClerk } from "@clerk/clerk-react";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
+import {
+  selectActiveOrganization,
+  selectPersonalOrganization,
+} from "@stores/organization/selector";
 import { completeOnboarding, updateProfile } from "@stores/user/actions";
 import {
   selectBusiness,
@@ -23,12 +27,14 @@ import { NameStep } from "./NameStep";
 import { StepIndicator } from "./StepIndicator";
 import { UsernameStep } from "./UsernameStep";
 
-const STEPS = ["name", "username", "business"] as const;
+const PERSONAL_STEPS = ["name", "username", "business"] as const;
+const TEAM_STEPS = ["name", "username"] as const;
 
 const SECTIONS = {
   name: "onboarding.name",
   username: "onboarding.username",
   business: "onboarding.business",
+  complete: "onboarding.complete",
 } as const;
 
 export function Wizard() {
@@ -41,6 +47,12 @@ export function Wizard() {
   const issues = useAppSelector(selectValidationIssues);
   const usernameCheck = useAppSelector(selectUsernameCheck);
   const error = useAppSelector((state) => state.user.error);
+  const activeOrganization = useAppSelector(selectActiveOrganization);
+  const personalOrganization = useAppSelector(selectPersonalOrganization);
+  const joinedTeam = Boolean(
+    activeOrganization && !activeOrganization.personal,
+  );
+  const STEPS: readonly string[] = joinedTeam ? TEAM_STEPS : PERSONAL_STEPS;
 
   const [step, setStep] = useState(0);
   const [failedStep, setFailedStep] = useState<number | null>(null);
@@ -79,10 +91,19 @@ export function Wizard() {
 
     sawSaving.current = false;
     setPending(null);
-    if (!error && Object.keys(issues).length === 0) {
-      setStep((current) => current + 1);
+    if (error || Object.keys(issues).length > 0) {
+      return;
     }
-  }, [pending, isSaving, error, issues]);
+    if (pending === SECTIONS.complete) {
+      return;
+    }
+    if (joinedTeam && pending === SECTIONS.username) {
+      setPending(SECTIONS.complete);
+      dispatch(completeOnboarding(null, SECTIONS.complete));
+      return;
+    }
+    setStep((current) => current + 1);
+  }, [pending, isSaving, error, issues, joinedTeam, dispatch]);
 
   if (!user) {
     return null;
@@ -135,6 +156,11 @@ export function Wizard() {
 
       case "username":
         if (username.trim().toLowerCase() === savedUsername) {
+          if (joinedTeam) {
+            setPending(SECTIONS.complete);
+            dispatch(completeOnboarding(null, SECTIONS.complete));
+            return;
+          }
           setStep((current) => current + 1);
           return;
         }
@@ -160,6 +186,7 @@ export function Wizard() {
               ["legalName"],
             ),
             SECTIONS.business,
+            personalOrganization?.id ?? null,
           ),
         );
         break;

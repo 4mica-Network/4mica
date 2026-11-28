@@ -72,10 +72,10 @@ export const userResponseSchema = {
 export const businessResponseSchema = {
   type: "object",
   nullable: true,
-  required: ["id", "ownerId"],
+  required: ["id", "organizationId"],
   properties: {
     id: str,
-    ownerId: str,
+    organizationId: str,
     legalName: str,
     tradingName: nullStr,
     businessType: {
@@ -133,6 +133,22 @@ export const apiKeyResponseSchema = {
     name: str,
     prefix: str,
     last4: str,
+    environment: { type: "string", enum: ["SANDBOX", "PRODUCTION"] },
+    scopes: {
+      type: "array",
+      items: {
+        type: "string",
+        enum: [
+          "PAYMENTS_WRITE",
+          "CUSTOMERS_READ",
+          "RESOURCE_READ",
+          "SPEND_AUTHORIZE",
+          "APPROVALS_WRITE",
+        ],
+      },
+    },
+    serviceAccountId: nullStr,
+    ipAllowlist: { type: "array", items: str },
     lastUsedAt: nullDate,
     expiresAt: nullDate,
     revokedAt: nullDate,
@@ -238,13 +254,22 @@ const paymentNetworkEnum = {
 
 export const walletResponseSchema = {
   type: "object",
-  required: ["id", "label", "address", "network", "role", "status"],
+  required: [
+    "id",
+    "label",
+    "address",
+    "network",
+    "environment",
+    "role",
+    "status",
+  ],
   properties: {
     id: str,
     label: str,
     description: nullStr,
     address: str,
     network: paymentNetworkEnum,
+    environment: { type: "string", enum: ["SANDBOX", "PRODUCTION"] },
     role: { type: "string", enum: ["PAYER", "RECIPIENT", "BOTH"] },
     status: { type: "string", enum: ["ACTIVE", "PAUSED", "RETIRED"] },
     isDefault: bool,
@@ -561,6 +586,8 @@ export const customerResponseSchema = {
     dailyLimit: nullStr,
     monthlyLimit: nullStr,
     limitCurrency: str,
+    limitNetwork: nullStr,
+    limitAssetAddress: nullStr,
     freeQuotaUnit: {
       type: "string",
       nullable: true,
@@ -804,7 +831,12 @@ export const errorResponseSchema = {
   properties: {
     error: str,
     message: str,
+    permission: str,
+    scope: str,
     requestId: str,
+    domain: str,
+    ip: str,
+    reauthWithinMinutes: int,
     issues: {
       type: "array",
       items: {
@@ -1228,5 +1260,122 @@ export const configResponseSchema = {
     networks: strList,
     supportCategories: strList,
     supportPriorities: strList,
+  },
+} as const;
+
+const cliScopes = { type: "array", items: str } as const;
+
+export const cliSessionResponseSchema = {
+  type: "object",
+  required: ["id", "kind", "name", "scopes", "expiresAt", "createdAt"],
+  properties: {
+    id: str,
+    kind: { type: "string", enum: ["DEVICE", "TOKEN"] },
+    name: str,
+    prefix: str,
+    last4: str,
+    scopes: cliScopes,
+    lastUsedAt: nullDate,
+    expiresAt: date,
+    createdAt: date,
+  },
+} as const;
+
+export const createdCliTokenResponseSchema = {
+  type: "object",
+  required: ["session", "plaintext"],
+  properties: {
+    session: cliSessionResponseSchema,
+    plaintext: str,
+  },
+} as const;
+
+export const cliDeviceCodeResponseSchema = {
+  type: "object",
+  required: [
+    "device_code",
+    "user_code",
+    "verification_uri",
+    "verification_uri_complete",
+    "expires_in",
+    "interval",
+  ],
+  properties: {
+    device_code: str,
+    user_code: str,
+    verification_uri: str,
+    verification_uri_complete: str,
+    expires_in: int,
+    interval: int,
+  },
+} as const;
+
+export const cliDeviceTokenResponseSchema = {
+  type: "object",
+  required: ["access_token", "token_type", "expires_in", "scope"],
+  properties: {
+    access_token: str,
+    token_type: str,
+    expires_in: int,
+    scope: str,
+  },
+} as const;
+
+export const cliDeviceRequestResponseSchema = {
+  type: "object",
+  required: ["userCode", "clientName", "scopes", "createdAt", "expiresAt"],
+  properties: {
+    userCode: str,
+    clientName: str,
+    scopes: cliScopes,
+    requestIp: nullStr,
+    createdAt: date,
+    expiresAt: date,
+  },
+} as const;
+
+export const cliCurrentSessionResponseSchema = {
+  type: "object",
+  required: ["user", "session"],
+  properties: {
+    user: {
+      type: "object",
+      required: ["id"],
+      properties: { id: str, email: nullStr, name: str, username: nullStr },
+    },
+    session: {
+      type: "object",
+      required: ["id", "kind", "name", "scopes", "expiresAt", "createdAt"],
+      properties: {
+        id: str,
+        kind: { type: "string", enum: ["DEVICE", "TOKEN"] },
+        name: str,
+        scopes: cliScopes,
+        expiresAt: date,
+        createdAt: date,
+      },
+    },
+  },
+} as const;
+
+export const approvalRequiredResponseSchema = {
+  type: "object",
+  required: ["status", "message", "approvalRequest"],
+  properties: {
+    status: { type: "string", enum: ["approval_required"] },
+    message: str,
+    approvalRequest: {
+      type: "object",
+      properties: {
+        id: str,
+        kind: str,
+        action: str,
+        summary: str,
+        status: str,
+        requiredApprovals: int,
+        expiresAt: date,
+        createdAt: date,
+      },
+    },
   },
 } as const;

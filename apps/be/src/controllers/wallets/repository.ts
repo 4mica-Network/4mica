@@ -1,4 +1,9 @@
 import { type PaymentNetwork, type Prisma, prisma } from "@4mica/db";
+import {
+  type EnvironmentKind,
+  environmentForNetwork,
+  networksForEnvironment,
+} from "@4mica/rules";
 import type { ValidationIssue } from "@controllers/shared";
 import { generateWalletNonce } from "@utils/secrets";
 import {
@@ -12,6 +17,8 @@ import type {
   ListWalletsQuery,
   UpdateWalletInput,
 } from "./schema";
+
+type Tx = Prisma.TransactionClient;
 
 export const WALLET_SELECT = {
   id: true,
@@ -29,9 +36,16 @@ export const WALLET_SELECT = {
   updatedAt: true,
 } as const;
 
-export type WalletRow = Prisma.WalletGetPayload<{
+type WalletRecord = Prisma.WalletGetPayload<{
   select: typeof WALLET_SELECT;
 }>;
+
+export type WalletRow = WalletRecord & { environment: EnvironmentKind };
+
+const withEnvironment = (row: WalletRecord): WalletRow => ({
+  ...row,
+  environment: environmentForNetwork(row.network),
+});
 
 const escapeLike = (value: string): string =>
   value.replace(/[\\%_]/g, (match) => `\\${match}`);
@@ -52,16 +66,20 @@ const orderFor = (
 };
 
 const whereFor = (
-  ownerId: string,
+  orgId: string,
+  environment: EnvironmentKind,
   query: ListWalletsQuery,
 ): Prisma.WalletWhereInput => {
-  const where: Prisma.WalletWhereInput = { ownerId };
+  const networks = networksForEnvironment(environment);
+  const where: Prisma.WalletWhereInput = {
+    organizationId: orgId,
+    network: query.network
+      ? { in: networks.filter((network) => network === query.network) }
+      : { in: networks },
+  };
 
   if (query.status) {
     where.status = query.status;
-  }
-  if (query.network) {
-    where.network = query.network;
   }
   if (query.role) {
     where.role = query.role;
@@ -80,7 +98,8 @@ const whereFor = (
 };
 
 export const listWallets = async (
-  ownerId: string,
+  orgId: string,
+  environment: EnvironmentKind,
   query: ListWalletsQuery,
 ): Promise<{
   items: WalletRow[];
@@ -88,10 +107,10 @@ export const listWallets = async (
   page: number;
   limit: number;
 }> => {
-  const where = whereFor(ownerId, query);
+  const where = whereFor(orgId, environment, query);
   const skip = (query.page - 1) * query.limit;
 
-  const [items, total] = await prisma.$transaction([
+  const [rows, total] = await prisma.$transaction([
     prisma.wallet.findMany({
       where,
       orderBy: orderFor(query.sort),
@@ -102,14 +121,24 @@ export const listWallets = async (
     prisma.wallet.count({ where }),
   ]);
 
-  return { items, total, page: query.page, limit: query.limit };
+  return {
+    items: rows.map(withEnvironment),
+    total,
+    page: query.page,
+    limit: query.limit,
+  };
 };
 
-export const getWallet = (ownerId: string, id: string) =>
-  prisma.wallet.findFirst({
-    where: { id, ownerId },
+export const getWallet = async (
+  orgId: string,
+  id: string,
+): Promise<WalletRow | null> => {
+  const row = await prisma.wallet.findFirst({
+    where: { id, organizationId: orgId },
     select: WALLET_SELECT,
   });
+  return row ? withEnvironment(row) : null;
+};
 
 export const createWalletNonce = async (
   userId: string,
@@ -171,101 +200,106 @@ export const recordNonceAttempt = (id: string) =>
   });
 
 export const consumeNonceAndCreateWallet = async (
-  ownerId: string,
+  orgId: string,
+  userId: string,
   nonceId: string,
   data: CreateWalletInput,
   chainId: number,
-): Promise<WalletRow | null> =>
-  prisma.$transaction(async (tx) => {
-    const { count } = await tx.walletNonce.updateMany({
-      where: { id: nonceId, consumedAt: null, expiresAt: { gt: new Date() } },
-      data: { consumedAt: new Date() },
-    });
-
-    if (count === 0) {
-      return null;
-    }
-
-    return tx.wallet.create({
-      data: {
-        ownerId,
-        label: data.label,
-        description: data.description ?? null,
-        address: data.address,
-        network: data.network,
-        role: data.role,
-        verifiedAt: new Date(),
-        verificationMethod: "EOA_SIGNATURE",
-        verifiedChainId: chainId,
-      },
-      select: WALLET_SELECT,
-    });
+  tx: Tx,
+): Promise<WalletRow | null> => {
+  const { count } = await tx.walletNonce.updateMany({
+    where: { id: nonceId, consumedAt: null, expiresAt: { gt: new Date() } },
+    data: { consumedAt: new Date() },
   });
 
+  if (count === 0) {
+    return null;
+  }
+
+  const row = await tx.wallet.create({
+    data: {
+      organizationId: orgId,
+      createdById: userId,
+      label: data.label,
+      description: data.description ?? null,
+      address: data.address,
+      network: data.network,
+      role: data.role,
+      verifiedAt: new Date(),
+      verificationMethod: "EOA_SIGNATURE",
+      verifiedChainId: chainId,
+    },
+    select: WALLET_SELECT,
+  });
+  return withEnvironment(row);
+};
+
 export const updateWallet = async (
-  ownerId: string,
+  orgId: string,
   id: string,
   data: UpdateWalletInput,
+  tx: Tx,
 ): Promise<WalletRow | null> => {
   const { isDefault, ...rest } = data;
 
-  return prisma.$transaction(async (tx) => {
-    const current = await tx.wallet.findFirst({
-      where: { id, ownerId },
-      select: { id: true, network: true, role: true, status: true },
-    });
-
-    if (!current) {
-      return null;
-    }
-
-    if (isDefault === true) {
-      await tx.wallet.updateMany({
-        where: { ownerId, network: current.network, isDefault: true },
-        data: { isDefault: false },
-      });
-    }
-
-    await tx.wallet.update({
-      where: { id: current.id },
-      data: { ...rest, ...(isDefault === undefined ? {} : { isDefault }) },
-    });
-
-    const canReceive =
-      (rest.status ?? current.status) === "ACTIVE" &&
-      (rest.role ?? current.role) !== "PAYER";
-
-    if (!canReceive) {
-      const receiving = {
-        ownerId,
-        walletId: current.id,
-        visibility: "PUBLIC" as const,
-      };
-      await tx.apiListing.updateMany({
-        where: receiving,
-        data: { visibility: "PRIVATE" },
-      });
-      await tx.agent.updateMany({
-        where: receiving,
-        data: { visibility: "PRIVATE" },
-      });
-    }
-
-    return tx.wallet.findUnique({
-      where: { id: current.id },
-      select: WALLET_SELECT,
-    });
+  const current = await tx.wallet.findFirst({
+    where: { id, organizationId: orgId },
+    select: { id: true, network: true, role: true, status: true },
   });
-};
 
-type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
+  if (!current) {
+    return null;
+  }
+
+  if (isDefault === true) {
+    await tx.wallet.updateMany({
+      where: {
+        organizationId: orgId,
+        network: current.network,
+        isDefault: true,
+      },
+      data: { isDefault: false },
+    });
+  }
+
+  await tx.wallet.update({
+    where: { id: current.id },
+    data: { ...rest, ...(isDefault === undefined ? {} : { isDefault }) },
+  });
+
+  const canReceive =
+    (rest.status ?? current.status) === "ACTIVE" &&
+    (rest.role ?? current.role) !== "PAYER";
+
+  if (!canReceive) {
+    const receiving = {
+      organizationId: orgId,
+      walletId: current.id,
+      visibility: "PUBLIC" as const,
+    };
+    await tx.apiListing.updateMany({
+      where: receiving,
+      data: { visibility: "PRIVATE" },
+    });
+    await tx.agent.updateMany({
+      where: receiving,
+      data: { visibility: "PRIVATE" },
+    });
+  }
+
+  const row = await tx.wallet.findUnique({
+    where: { id: current.id },
+    select: WALLET_SELECT,
+  });
+  return row ? withEnvironment(row) : null;
+};
 
 const removeWallets = async (
   tx: Tx,
-  ownerId: string,
+  orgId: string,
   ids: string[],
 ): Promise<number> => {
-  const receiving = { ownerId, walletId: { in: ids } };
+  const receiving = { organizationId: orgId, walletId: { in: ids } };
 
   await tx.apiListing.updateMany({
     where: receiving,
@@ -276,44 +310,43 @@ const removeWallets = async (
     data: { payToAddress: null, visibility: "PRIVATE" },
   });
   await tx.agent.updateMany({
-    where: { ownerId, payerWalletId: { in: ids } },
+    where: { organizationId: orgId, payerWalletId: { in: ids } },
     data: { walletAddress: null },
   });
 
   const { count } = await tx.wallet.deleteMany({
-    where: { id: { in: ids }, ownerId },
+    where: { id: { in: ids }, organizationId: orgId },
   });
   return count;
 };
 
-export const deleteWallet = async (ownerId: string, id: string) => {
-  const owned = await prisma.wallet.findFirst({
-    where: { id, ownerId },
+export const deleteWallet = async (orgId: string, id: string, tx: Tx) => {
+  const owned = await tx.wallet.findFirst({
+    where: { id, organizationId: orgId },
     select: { id: true },
   });
   if (!owned) {
     return false;
   }
 
-  const count = await prisma.$transaction((tx) =>
-    removeWallets(tx, ownerId, [owned.id]),
-  );
+  const count = await removeWallets(tx, orgId, [owned.id]);
   return count > 0;
 };
 
 export const batchDeleteWallets = async (
-  ownerId: string,
+  orgId: string,
   ids: string[],
+  tx: Tx,
 ): Promise<{ deleted: string[]; notFound: string[] }> => {
-  const owned = await prisma.wallet.findMany({
-    where: { id: { in: ids }, ownerId },
+  const owned = await tx.wallet.findMany({
+    where: { id: { in: ids }, organizationId: orgId },
     select: { id: true },
   });
 
   const deleted = owned.map((wallet) => wallet.id);
 
   if (deleted.length > 0) {
-    await prisma.$transaction((tx) => removeWallets(tx, ownerId, deleted));
+    await removeWallets(tx, orgId, deleted);
   }
 
   const deletedSet = new Set(deleted);
@@ -357,13 +390,13 @@ const fail = (
 });
 
 export const resolveSellerWallet = async (
-  ownerId: string,
+  orgId: string,
   walletId: string,
   requiredNetwork?: PaymentNetwork,
   field = "walletId",
 ): Promise<SellerWalletResult> => {
   const wallet = await prisma.wallet.findFirst({
-    where: { id: walletId, ownerId },
+    where: { id: walletId, organizationId: orgId },
     select: {
       id: true,
       address: true,
@@ -416,13 +449,13 @@ export const resolveSellerWallet = async (
 };
 
 export const resolvePayerWallet = async (
-  ownerId: string,
+  orgId: string,
   walletId: string,
   requiredNetwork?: PaymentNetwork,
   field = "payerWalletId",
 ): Promise<SellerWalletResult> => {
   const wallet = await prisma.wallet.findFirst({
-    where: { id: walletId, ownerId },
+    where: { id: walletId, organizationId: orgId },
     select: {
       id: true,
       address: true,

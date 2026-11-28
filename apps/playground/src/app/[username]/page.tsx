@@ -40,13 +40,13 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
     notFound();
   }
 
-  const { ownerId, profile } = result;
+  const { organizationId, profile } = result;
 
   const includeHidden = profile.isOwner;
 
   const [agents, listings] = await Promise.all([
-    listPublicAgents(ownerId, includeHidden),
-    listPublicApiListings(ownerId, includeHidden),
+    listPublicAgents(organizationId, includeHidden),
+    listPublicApiListings(organizationId, includeHidden),
   ]);
 
   return (

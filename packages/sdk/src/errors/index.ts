@@ -814,3 +814,62 @@ export class SpendLimitError extends PaymentError {
     this.url = url;
   }
 }
+
+export class SpendAuthorizationError extends PaymentError {
+  readonly reason: "denied" | "approval_timeout";
+  readonly deniedReason: string | null;
+  readonly authorizationId: string;
+  readonly approvalRequestId: string | null;
+  readonly url: string;
+
+  constructor(
+    reason: "denied" | "approval_timeout",
+    url: string,
+    authorization: {
+      id: string;
+      deniedReason: string | null;
+      approvalRequestId: string | null;
+    },
+  ) {
+    super(
+      reason === "denied"
+        ? `payment for ${url} refused by your organization's spending ` +
+            `policies (${authorization.deniedReason ?? "denied"})`
+        : `payment for ${url} timed out waiting for approval` +
+            (authorization.approvalRequestId
+              ? ` ${authorization.approvalRequestId}`
+              : ""),
+    );
+    this.reason = reason;
+    this.deniedReason = authorization.deniedReason;
+    this.authorizationId = authorization.id;
+    this.approvalRequestId = authorization.approvalRequestId;
+    this.url = url;
+  }
+}
+
+export class SpendAccountingError extends PaymentError {
+  readonly transition: "consume" | "release";
+  readonly authorizationId: string;
+  readonly reqId: string | null;
+  readonly accounting: "pending" | "failed";
+
+  constructor(
+    transition: "consume" | "release",
+    authorizationId: string,
+    accounting: "pending" | "failed",
+    cause: unknown,
+    reqId?: string,
+  ) {
+    super(
+      `could not ${transition} spend authorization ${authorizationId}` +
+        (accounting === "pending" ? " before the request was aborted" : "") +
+        `: ${cause instanceof Error ? cause.message : String(cause)}`,
+    );
+    this.transition = transition;
+    this.authorizationId = authorizationId;
+    this.reqId = reqId ?? null;
+    this.accounting = accounting;
+    this.cause = cause;
+  }
+}

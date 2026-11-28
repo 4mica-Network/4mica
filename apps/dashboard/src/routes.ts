@@ -35,11 +35,17 @@ const Apis = lazyPage("pages/apis", () =>
 const BusinessSettings = lazyPage("pages/business", () =>
   import("@/pages/business").then((page) => page.BusinessSettings),
 );
+const CliAuthorize = lazyPage("pages/cli-authorize", () =>
+  import("@/pages/cli-authorize").then((page) => page.CliAuthorize),
+);
 const ComplianceSettings = lazyPage("pages/compliance", () =>
   import("@/pages/compliance").then((page) => page.ComplianceSettings),
 );
 const CustomerDetail = lazyPage("pages/customer-detail", () =>
   import("@/pages/customer-detail").then((page) => page.CustomerDetail),
+);
+const AuditLogSettings = lazyPage("pages/audit-log", () =>
+  import("@/pages/audit-log").then((page) => page.AuditLogSettings),
 );
 const Customers = lazyPage("pages/customers", () =>
   import("@/pages/customers").then((page) => page.Customers),
@@ -50,11 +56,34 @@ const DeveloperSettings = lazyPage("pages/developer", () =>
 const Disputes = lazyPage("pages/disputes", () =>
   import("@/pages/disputes").then((page) => page.Disputes),
 );
+const SpendingPolicies = lazyPage("pages/spending-policies", () =>
+  import("@/pages/spending-policies").then((page) => page.SpendingPolicies),
+);
+const Approvals = lazyPage("pages/approvals", () =>
+  import("@/pages/approvals").then((page) => page.Approvals),
+);
+const FinanceAlerts = lazyPage("pages/finance-alerts", () =>
+  import("@/pages/finance-alerts").then((page) => page.FinanceAlerts),
+);
+const FinanceReports = lazyPage("pages/finance-reports", () =>
+  import("@/pages/finance-reports").then((page) => page.FinanceReports),
+);
+const SpendAuthorizations = lazyPage("pages/spend-authorizations", () =>
+  import("@/pages/spend-authorizations").then(
+    (page) => page.SpendAuthorizations,
+  ),
+);
+const GovernanceSettings = lazyPage("pages/governance", () =>
+  import("@/pages/governance").then((page) => page.GovernanceSettings),
+);
 const Help = lazyPage("pages/help", () =>
   import("@/pages/help").then((page) => page.Help),
 );
 const HelpRequestDetail = lazyPage("pages/help-request", () =>
   import("@/pages/help-request").then((page) => page.HelpRequestDetail),
+);
+export const InvitationPage = lazyPage("pages/invitation", () =>
+  import("@/pages/invitation").then((page) => page.InvitationPage),
 );
 const NotificationSettings = lazyPage("pages/notification", () =>
   import("@/pages/notification").then((page) => page.NotificationSettings),
@@ -65,6 +94,14 @@ const Overview = lazyPage("pages/overview", () =>
 const Payments = lazyPage("pages/payments", () =>
   import("@/pages/payments").then((page) => page.Payments),
 );
+const ProjectsSettings = lazyPage("pages/projects", () =>
+  import("@/pages/projects").then((page) => page.ProjectsSettings),
+);
+const ServiceAccountsSettings = lazyPage("pages/service-accounts", () =>
+  import("@/pages/service-accounts").then(
+    (page) => page.ServiceAccountsSettings,
+  ),
+);
 const PlansSettings = lazyPage("pages/plans", () =>
   import("@/pages/plans").then((page) => page.PlansSettings),
 );
@@ -73,6 +110,26 @@ const ProfileSettings = lazyPage("pages/profile", () =>
 );
 const TeamSettings = lazyPage("pages/team", () =>
   import("@/pages/team").then((page) => page.TeamSettings),
+);
+const RolesSettings = lazyPage("pages/roles", () =>
+  import("@/pages/roles").then((page) => page.RolesSettings),
+);
+const SecuritySettingsPage = lazyPage("pages/security", () =>
+  import("@/pages/security").then((page) => page.SecuritySettingsPage),
+);
+const DomainsSsoSettings = lazyPage("pages/security", () =>
+  import("@/pages/security").then((page) => page.DomainsSsoSettings),
+);
+const ScimSettings = lazyPage("pages/scim", () =>
+  import("@/pages/scim").then((page) => page.ScimSettings),
+);
+const AuditStreamsSettings = lazyPage("pages/audit-streams", () =>
+  import("@/pages/audit-streams").then((page) => page.AuditStreamsSettings),
+);
+const ComplianceReportSettings = lazyPage("pages/compliance-report", () =>
+  import("@/pages/compliance-report").then(
+    (page) => page.ComplianceReportSettings,
+  ),
 );
 const Wallet = lazyPage("pages/wallet", () =>
   import("@/pages/wallet").then((page) => page.Wallet),
@@ -100,8 +157,23 @@ export const APP_PAGES: RouteMeta[] = [
   { path: "agents/:id/advanced", component: AgentAdvanced },
   { path: "apis", component: Apis },
   { path: "apis/:id", component: ApiDetail },
+  {
+    path: "finance",
+    component: () =>
+      createElement(Navigate, { to: "/finance/policies", replace: true }),
+  },
+  { path: "finance/policies", component: SpendingPolicies },
+  { path: "finance/approvals", component: Approvals },
+  { path: "finance/alerts", component: FinanceAlerts },
+  { path: "finance/reports", component: FinanceReports },
+  { path: "finance/authorizations", component: SpendAuthorizations },
   { path: "help", component: Help },
   { path: "help/requests/:id", component: HelpRequestDetail },
+];
+
+export const STANDALONE_PAGES: RouteMeta[] = [
+  { path: "cli/authorize", component: CliAuthorize },
+  { path: "invitations/:token", component: InvitationPage },
 ];
 
 export interface SettingsRouteMeta {
@@ -114,10 +186,20 @@ export const SETTINGS_PAGES: SettingsRouteMeta[] = [
   { path: "general", component: AccountSettings },
   { path: "business", component: BusinessSettings },
   { path: "team", component: TeamSettings },
+  { path: "roles", component: RolesSettings },
+  { path: "projects", component: ProjectsSettings },
   { path: "notifications", component: NotificationSettings },
   { path: "plans", component: PlansSettings },
   { path: "compliance", component: ComplianceSettings },
   { path: "developer", component: DeveloperSettings },
+  { path: "service-accounts", component: ServiceAccountsSettings },
+  { path: "governance", component: GovernanceSettings },
+  { path: "audit-log", component: AuditLogSettings },
+  { path: "audit-streams", component: AuditStreamsSettings },
+  { path: "security", component: SecuritySettingsPage },
+  { path: "sso", component: DomainsSsoSettings },
+  { path: "scim", component: ScimSettings },
+  { path: "compliance-report", component: ComplianceReportSettings },
 ];
 
 export const pageAt = (to: string): ComponentType | undefined => {

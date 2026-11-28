@@ -72,3 +72,22 @@ export const shortenAddress = (address: string): string =>
   address.length <= 12
     ? address
     : `${address.slice(0, 6)}…${address.slice(-4)}`;
+
+export type EnvironmentKind = "SANDBOX" | "PRODUCTION";
+
+export const ENVIRONMENT_KINDS: readonly EnvironmentKind[] = [
+  "SANDBOX",
+  "PRODUCTION",
+];
+
+export const environmentForNetwork = (
+  network: PaymentNetwork,
+): EnvironmentKind =>
+  PAYMENT_NETWORKS[network].isTestnet ? "SANDBOX" : "PRODUCTION";
+
+export const networksForEnvironment = (
+  kind: EnvironmentKind,
+): PaymentNetwork[] =>
+  PAYMENT_NETWORK_IDS.filter(
+    (network) => environmentForNetwork(network) === kind,
+  );

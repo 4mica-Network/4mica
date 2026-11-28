@@ -12,6 +12,14 @@ import { zeroAddress } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { initApp } from "@/server";
+import {
+  actAs,
+  ORG_ID,
+  OTHER_ORG_ID,
+  OTHER_PROJECT_ID,
+  PROJECT_ID,
+  SANDBOX_ENV_ID,
+} from "@/test-support/tenancy";
 
 const {
   authenticateRequest,
@@ -24,12 +32,20 @@ const {
   apiListing,
   agent,
   redeemPaymentBenefits,
+  reconcileReportedPayment,
   getCoreClient,
   verifyGuarantee,
   getSupportedTokens,
+  tenancy,
 } = vi.hoisted(() => ({
+  tenancy: {
+    membership: { findFirst: vi.fn(), create: vi.fn() },
+    auditLog: { create: vi.fn() },
+    project: { findFirst: vi.fn() },
+  },
   getSupportedTokens: vi.fn(),
   redeemPaymentBenefits: vi.fn(),
+  reconcileReportedPayment: vi.fn(),
   getCoreClient: vi.fn(),
   verifyGuarantee: vi.fn(),
   authenticateRequest: vi.fn(),
@@ -56,6 +72,8 @@ vi.mock("@controllers/customers/repository", async (importOriginal) => ({
   redeemPaymentBenefits,
 }));
 
+vi.mock("@controllers/spend/decide", () => ({ reconcileReportedPayment }));
+
 vi.mock("@services/core", () => ({
   getCoreClient,
   closeCoreClient: vi.fn(async () => {}),
@@ -71,6 +89,7 @@ vi.mock("@4mica/db", () => ({
     sql: (strings: TemplateStringsArray) => ({ strings }),
   },
   prisma: {
+    ...tenancy,
     payment,
     wallet,
     apiKey,
@@ -133,12 +152,19 @@ const KEY_AUTH = { authorization: `Bearer ${API_KEY}` };
 
 const storedKey = (over: Record<string, unknown> = {}) => ({
   id: "key_1",
-  ownerId: OWNER_ID,
+  organizationId: OWNER_ID,
+  projectId: PROJECT_ID,
+  environmentId: SANDBOX_ENV_ID,
+  environment: { kind: "SANDBOX" },
+  project: { deletedAt: null, archivedAt: null },
+  serviceAccountId: null,
+  serviceAccount: null,
+  scopes: ["PAYMENTS_WRITE", "CUSTOMERS_READ", "RESOURCE_READ"],
   listingId: null,
   agentId: null,
   revokedAt: null,
   expiresAt: null,
-  owner: { banned: false, locked: false, deletedAt: null },
+  organization: { deletedAt: null },
   listing: null,
   agent: null,
   ...over,
@@ -213,6 +239,7 @@ describe("payment routes", () => {
       }
     }
     clearUserCache();
+    actAs(tenancy);
 
     authenticateRequest.mockResolvedValue(signedIn());
     upsert.mockResolvedValue(AUTH_USER);
@@ -232,6 +259,8 @@ describe("payment routes", () => {
 
     redeemPaymentBenefits.mockReset();
     redeemPaymentBenefits.mockResolvedValue(null);
+    reconcileReportedPayment.mockReset();
+    reconcileReportedPayment.mockResolvedValue(undefined);
 
     getCoreClient.mockReset();
     getCoreClient.mockResolvedValue(null);
@@ -255,6 +284,41 @@ describe("payment routes", () => {
       await instance.close();
     });
 
+    it("404s and reads nothing for an organization the caller is not in", async () => {
+      const instance = await app();
+
+      const res = await instance.inject({
+        method: "GET",
+        url: "/me/payments",
+        headers: { ...AUTH, "x-org-id": OTHER_ORG_ID },
+      });
+
+      expect(res.statusCode).toBe(404);
+      expect(wallet.findMany).not.toHaveBeenCalled();
+      expect(payment.findMany).not.toHaveBeenCalled();
+
+      await instance.close();
+    });
+
+    it("lets a member read the organization's payments", async () => {
+      actAs(tenancy, "VIEWER");
+      const instance = await app();
+
+      const res = await instance.inject({
+        method: "GET",
+        url: "/me/payments",
+        headers: AUTH,
+      });
+
+      expect(res.statusCode).toBe(200);
+      expect(wallet.findMany.mock.calls[0][0].where).toEqual({
+        organizationId: ORG_ID,
+        network: { in: ["BASE_SEPOLIA", "ETHEREUM_SEPOLIA"] },
+      });
+
+      await instance.close();
+    });
+
     it("scopes the list to addresses the caller has proved they control", async () => {
       const instance = await app();
 
@@ -265,13 +329,119 @@ describe("payment routes", () => {
       });
 
       expect(wallet.findMany.mock.calls[0][0].where).toEqual({
-        ownerId: USER_ID,
+        organizationId: ORG_ID,
+        network: { in: ["BASE_SEPOLIA", "ETHEREUM_SEPOLIA"] },
       });
       const where = payment.findMany.mock.calls[0][0].where;
       expect(where.OR).toEqual([
         { payerAddress: { in: [MY_ADDRESS] } },
         { recipientAddress: { in: [MY_ADDRESS] } },
       ]);
+
+      await instance.close();
+    });
+
+    it("filters to the active environment's networks", async () => {
+      const instance = await app();
+
+      await instance.inject({
+        method: "GET",
+        url: "/me/payments",
+        headers: { ...AUTH, "x-environment": "production" },
+      });
+      expect(wallet.findMany.mock.calls[0][0].where.network).toEqual({
+        in: ["BASE"],
+      });
+      expect(payment.findMany.mock.calls[0][0].where.network).toEqual({
+        in: ["BASE"],
+      });
+
+      await instance.inject({
+        method: "GET",
+        url: "/me/payments?network=BASE",
+        headers: AUTH,
+      });
+      expect(payment.findMany.mock.calls[1][0].where.network).toEqual({
+        in: [],
+      });
+
+      await instance.inject({
+        method: "GET",
+        url: "/me/payments/summary",
+        headers: AUTH,
+      });
+      expect(payment.count.mock.calls.at(-1)?.[0].where.network).toEqual({
+        in: ["BASE_SEPOLIA", "ETHEREUM_SEPOLIA"],
+      });
+
+      await instance.inject({
+        method: "GET",
+        url: `/me/payments/${PAYMENT_ID}`,
+        headers: { ...AUTH, "x-environment": "production" },
+      });
+      expect(payment.findFirst.mock.calls[0][0].where.network).toEqual({
+        in: ["BASE"],
+      });
+
+      await instance.close();
+    });
+
+    it("404s on an unknown environment", async () => {
+      const instance = await app();
+
+      for (const url of [
+        "/me/payments",
+        "/me/payments/summary",
+        "/me/payments/stats",
+        `/me/payments/${PAYMENT_ID}`,
+      ]) {
+        const res = await instance.inject({
+          method: "GET",
+          url,
+          headers: { ...AUTH, "x-environment": "staging" },
+        });
+        expect(res.statusCode, url).toBe(404);
+      }
+      expect(wallet.findMany).not.toHaveBeenCalled();
+
+      await instance.close();
+    });
+
+    it("narrows the list to one project's payments", async () => {
+      const instance = await app();
+
+      const res = await instance.inject({
+        method: "GET",
+        url: `/me/payments?projectId=${PROJECT_ID}`,
+        headers: AUTH,
+      });
+
+      expect(res.statusCode).toBe(200);
+      expect(payment.findMany.mock.calls[0][0].where.projectId).toBe(
+        PROJECT_ID,
+      );
+
+      await instance.close();
+    });
+
+    it("404s a project filter the caller cannot see", async () => {
+      const instance = await app();
+
+      const foreign = await instance.inject({
+        method: "GET",
+        url: `/me/payments?projectId=${OTHER_PROJECT_ID}`,
+        headers: AUTH,
+      });
+      expect(foreign.statusCode).toBe(404);
+
+      actAs(tenancy, "DEVELOPER", ORG_ID, { restricted: true });
+      const restricted = await instance.inject({
+        method: "GET",
+        url: `/me/payments?projectId=${PROJECT_ID}`,
+        headers: AUTH,
+      });
+      expect(restricted.statusCode).toBe(404);
+      expect(payment.findMany).not.toHaveBeenCalled();
 
       await instance.close();
     });
@@ -613,17 +783,13 @@ describe("payment routes", () => {
       await instance.close();
     });
 
-    it("rejects a revoked, expired, banned or locked key", async () => {
+    it("rejects a revoked or expired key, or one whose organization is gone", async () => {
       const instance = await app();
 
       for (const key of [
         storedKey({ revokedAt: new Date() }),
         storedKey({ expiresAt: new Date(Date.now() - 1000) }),
-        storedKey({ owner: { banned: true, locked: false, deletedAt: null } }),
-        storedKey({ owner: { banned: false, locked: true, deletedAt: null } }),
-        storedKey({
-          owner: { banned: false, locked: false, deletedAt: new Date() },
-        }),
+        storedKey({ organization: { deletedAt: new Date() } }),
         null,
       ]) {
         apiKey.findUnique.mockResolvedValue(key);
@@ -639,7 +805,7 @@ describe("payment routes", () => {
       await instance.close();
     });
 
-    it("files the payment against the key's owner, not a body field", async () => {
+    it("files the payment against the key's organization, not a body field", async () => {
       const instance = await app();
 
       await instance.inject({
@@ -647,14 +813,54 @@ describe("payment routes", () => {
         url: "/v1/payments",
         headers: KEY_AUTH,
         payload: validReport({
-          ownerId: "019fce62-dead-7000-8000-000000000000",
+          organizationId: "019fce62-dead-7000-8000-000000000000",
         }),
       });
 
       expect(
-        payment.findUnique.mock.calls[0][0].where.ownerId_reqId.ownerId,
+        payment.findUnique.mock.calls[0][0].where.organizationId_reqId
+          .organizationId,
       ).toBe(OWNER_ID);
-      expect(payment.create.mock.calls[0][0].data.ownerId).toBe(OWNER_ID);
+      expect(payment.create.mock.calls[0][0].data.organizationId).toBe(
+        OWNER_ID,
+      );
+
+      await instance.close();
+    });
+
+    it("records the reporting key and reconciles the payer's authorization", async () => {
+      const instance = await app();
+
+      const res = await instance.inject({
+        method: "POST",
+        url: "/v1/payments",
+        headers: KEY_AUTH,
+        payload: validReport(),
+      });
+
+      expect(res.statusCode).toBe(201);
+      expect(payment.create.mock.calls[0][0].data.apiKeyId).toBe("key_1");
+      expect(reconcileReportedPayment.mock.calls[0][0]).toMatchObject({
+        id: PAYMENT_ID,
+        network: "BASE_SEPOLIA",
+        recipientAddress: validReport().recipientAddress.toLowerCase(),
+      });
+
+      await instance.close();
+    });
+
+    it("still answers when reconciliation fails", async () => {
+      reconcileReportedPayment.mockRejectedValue(new Error("db down"));
+      const instance = await app();
+
+      const res = await instance.inject({
+        method: "POST",
+        url: "/v1/payments",
+        headers: KEY_AUTH,
+        payload: validReport(),
+      });
+
+      expect(res.statusCode).toBe(201);
 
       await instance.close();
     });
@@ -905,8 +1111,12 @@ describe("payment routes", () => {
       expect(call[0].data).toMatchObject({
         status: "SETTLED",
         txHash: "0xfeed",
+        reconciliationState: "PENDING",
+        reconcileAttempts: 0,
+        reconcileError: null,
       });
       expect(call[0].data.settledAt).toBeInstanceOf(Date);
+      expect(call[0].data.reconcileAfter).toBeInstanceOf(Date);
 
       await instance.close();
     });
@@ -1080,7 +1290,7 @@ describe("payment routes", () => {
       expect(res.statusCode).toBe(400);
       expect(res.json().issues[0].path).toBe("recipientAddress");
       expect(wallet.findFirst.mock.calls[0][0].where).toEqual({
-        ownerId: OWNER_ID,
+        organizationId: OWNER_ID,
         address: MY_ADDRESS,
         network: "BASE_SEPOLIA",
       });
@@ -1118,7 +1328,9 @@ describe("payment routes", () => {
       });
 
       expect(apiListing.findFirst.mock.calls[0][0].where).toMatchObject({
-        ownerId: OWNER_ID,
+        organizationId: OWNER_ID,
+        projectId: PROJECT_ID,
+        environmentId: SANDBOX_ENV_ID,
         slug: "credit-limits",
         deletedAt: null,
       });
@@ -1200,6 +1412,65 @@ describe("payment routes", () => {
       expect(apiKey.update).toHaveBeenCalledWith(
         expect.objectContaining({ where: { id: "key_1" } }),
       );
+
+      await instance.close();
+    });
+
+    it("tags the payment with the key's project", async () => {
+      const instance = await app();
+
+      const res = await instance.inject({
+        method: "POST",
+        url: "/v1/payments",
+        headers: KEY_AUTH,
+        payload: validReport(),
+      });
+
+      expect(res.statusCode).toBe(201);
+      expect(payment.create.mock.calls[0][0].data).toMatchObject({
+        organizationId: OWNER_ID,
+        projectId: PROJECT_ID,
+      });
+
+      await instance.close();
+    });
+
+    it("refuses a payment on a network outside the key's environment", async () => {
+      const instance = await app();
+
+      const res = await instance.inject({
+        method: "POST",
+        url: "/v1/payments",
+        headers: KEY_AUTH,
+        payload: validReport({ network: "BASE" }),
+      });
+
+      expect(res.statusCode).toBe(403);
+      expect(res.json().error).toBe("environment_mismatch");
+      expect(payment.create).not.toHaveBeenCalled();
+
+      await instance.close();
+    });
+
+    it("refuses a key without the PAYMENTS_WRITE scope", async () => {
+      apiKey.findUnique.mockResolvedValue(
+        storedKey({ scopes: ["CUSTOMERS_READ"] }),
+      );
+      const instance = await app();
+
+      const res = await instance.inject({
+        method: "POST",
+        url: "/v1/payments",
+        headers: KEY_AUTH,
+        payload: validReport(),
+      });
+
+      expect(res.statusCode).toBe(403);
+      expect(res.json()).toMatchObject({
+        error: "insufficient_scope",
+        scope: "PAYMENTS_WRITE",
+      });
+      expect(payment.create).not.toHaveBeenCalled();
 
       await instance.close();
     });

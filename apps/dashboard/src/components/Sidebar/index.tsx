@@ -1,7 +1,13 @@
-import { Avatar, cn, Dropdown, Tooltip } from "@4mica/ui";
+import { cn, Dropdown, Tooltip } from "@4mica/ui";
 import { useCopyToClipboard } from "@4mica/ui/hooks";
-import { useClerk, useUser } from "@clerk/clerk-react";
-import { useAppSelector } from "@stores/hooks";
+import { fetchFinanceBadges } from "@stores/financeBadge/actions";
+import { selectFinanceBadges } from "@stores/financeBadge/selector";
+import { useAppDispatch, useAppSelector } from "@stores/hooks";
+import {
+  allows,
+  selectActiveOrganization,
+} from "@stores/organization/selector";
+import { PERMISSION, type Permission } from "@stores/organization/type";
 import { selectUser } from "@stores/user/selector";
 import { m } from "framer-motion";
 import {
@@ -9,18 +15,32 @@ import {
   Check,
   ChevronDown,
   Copy,
+  DoorOpen,
   Eye,
-  LogOut,
   type LucideIcon,
-  UserCog,
+  Settings,
+  UserPlus,
 } from "lucide-react";
 import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
+import { EnvironmentToggle } from "@/components/Project/EnvironmentToggle";
+import { ProjectSwitcher } from "@/components/Project/ProjectSwitcher";
 import { SidebarBanners } from "@/components/SidebarBanners";
+import { showsProjects, useWorkspaceMode } from "@/hooks/useWorkspaceMode";
 import { links } from "@/lib/links";
-import { FOOTER_ITEMS, NAV_SECTIONS, type NavItem, SETTINGS_NAV } from "@/nav";
+import {
+  FOOTER_ITEMS,
+  firstSettingsPath,
+  INVITE_TEAM_PATH,
+  NAV_SECTIONS,
+  type NavItem,
+  type NavSection,
+  resolveNav,
+  SETTINGS_SECTIONS,
+} from "@/nav";
 import { preloadPage } from "@/routes";
+import { OrganizationAvatar, UserAvatar, useDisplayName } from "./identity";
 
 const EXPANDED_WIDTH = 256;
 export const COLLAPSED_WIDTH = 60;
@@ -64,40 +84,63 @@ function Label({
   );
 }
 
-const firstNonBlank = (
-  ...values: (string | null | undefined)[]
-): string | undefined => values.find((value) => value?.trim())?.trim();
+const BADGE_REFRESH_MS = 60_000;
 
-function useDisplayName(): string {
-  const { t } = useTranslation();
-  const { user } = useUser();
-  const currentUser = useAppSelector(selectUser);
+function useFinanceBadgeRefresh() {
+  const dispatch = useAppDispatch();
+  const organization = useAppSelector(selectActiveOrganization);
+  const enabled =
+    organization !== null &&
+    !organization.personal &&
+    allows(organization, PERMISSION.FINANCE_READ);
+  const organizationId = organization?.id;
 
-  return (
-    firstNonBlank(
-      currentUser?.name,
-      user?.fullName,
-      currentUser?.email,
-      user?.primaryEmailAddress?.emailAddress,
-    ) ?? t("sidebar.newUser")
-  );
+  useEffect(() => {
+    if (!enabled || !organizationId) {
+      return;
+    }
+    dispatch(fetchFinanceBadges());
+    const timer = setInterval(() => {
+      if (document.visibilityState !== "hidden") {
+        dispatch(fetchFinanceBadges());
+      }
+    }, BADGE_REFRESH_MS);
+    return () => clearInterval(timer);
+  }, [dispatch, enabled, organizationId]);
 }
 
-function AvatarCircle() {
+function NavBadge({
+  kind,
+  collapsed,
+}: {
+  kind: NonNullable<NavItem["badge"]>;
+  collapsed: boolean;
+}) {
   const { t } = useTranslation();
-  const { user } = useUser();
-  const imageUrl = user?.imageUrl;
-  const [failedUrl, setFailedUrl] = useState<string | null>(null);
-
+  const badges = useAppSelector(selectFinanceBadges);
+  const count =
+    kind === "approvals"
+      ? badges.pendingApprovals
+      : badges.unacknowledgedAlerts;
+  const more =
+    kind === "approvals" ? badges.more.approvals : badges.more.alerts;
+  if (count === 0) {
+    return null;
+  }
+  const label = more ? `${count}+` : String(count);
   return (
-    <Avatar
-      src={imageUrl && imageUrl !== failedUrl ? imageUrl : null}
-      onError={() => setFailedUrl(imageUrl ?? null)}
-      name={t("monogram")}
-      alt=""
-      size="xs"
-      className="border-0 bg-overlay/15 text-ink-strong"
-    />
+    <span
+      className={cn(
+        "grid min-w-5 place-items-center rounded-full bg-brand px-1.5 font-semibold text-2xs text-surface-deep tabular-nums",
+        collapsed
+          ? "absolute top-0.5 left-6 h-3.5 min-w-3.5 px-1"
+          : "mr-2 ml-auto h-5",
+      )}
+      data-testid={`nav-badge-${kind}`}
+    >
+      <span aria-hidden="true">{label}</span>
+      <span className="sr-only">{t(`nav.badge.${kind}`, { count })}</span>
+    </span>
   );
 }
 
@@ -111,7 +154,11 @@ function NavRow({
   end?: boolean;
 }) {
   const { t } = useTranslation();
+  const { pathname } = useLocation();
   const label = t(item.labelKey);
+  const childActive = Boolean(
+    item.children?.some((child) => child.to === pathname),
+  );
   return (
     <Tooltip title={label} placement="right" disabled={!collapsed} delay={80}>
       <span className="block w-full">
@@ -120,15 +167,52 @@ function NavRow({
           end={end}
           onMouseEnter={() => preloadPage(item.to)}
           onFocus={() => preloadPage(item.to)}
-          className={({ isActive }) => rowClass(isActive)}
+          className={({ isActive }) =>
+            cn(rowClass(isActive || childActive), "relative")
+          }
         >
           <RowIcon icon={item.icon} />
           <Label collapsed={collapsed} className="pr-2.5">
             {label}
           </Label>
+          {item.badge && <NavBadge kind={item.badge} collapsed={collapsed} />}
         </NavLink>
       </span>
     </Tooltip>
+  );
+}
+
+function NavGroup({
+  section,
+  collapsed,
+  titled,
+}: {
+  section: NavSection;
+  collapsed: boolean;
+  titled: boolean;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div className="mb-1">
+      {titled && section.titleKey && (
+        <Label
+          collapsed={collapsed}
+          className="block px-2.5 pt-2 pb-0.5 text-2xs text-ink-subtle uppercase tracking-wide"
+        >
+          {t(section.titleKey)}
+        </Label>
+      )}
+      <div className="flex flex-col gap-0.5">
+        {section.items.map((item) => (
+          <NavRow
+            key={`${item.to}:${item.labelKey}`}
+            item={item}
+            collapsed={collapsed}
+            end={item.end}
+          />
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -164,14 +248,71 @@ function ActionRow({
   );
 }
 
-function AvatarMenu({ collapsed }: { collapsed: boolean }) {
+const MENU_ITEM =
+  "flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-ink-body text-sm outline-none hover:bg-overlay/10 focus-visible:bg-overlay/10 focus-visible:ring-1 focus-visible:ring-overlay/60 focus-visible:ring-inset";
+
+function useWorkspaceIdentity() {
   const { t } = useTranslation();
-  const { signOut } = useClerk();
+  const displayName = useDisplayName();
+  const organization = useAppSelector(selectActiveOrganization);
+  const team = organization && !organization.personal ? organization : null;
+  return {
+    organization,
+    team,
+    title: team ? team.name : t("sidebar.personal"),
+    subtitle: team ? t(`organization.role.${team.role}`) : displayName,
+    avatar: team ? <OrganizationAvatar organization={team} /> : <UserAvatar />,
+  };
+}
+
+function WorkspaceIdentity({
+  collapsed,
+  trailing,
+}: {
+  collapsed: boolean;
+  trailing?: ReactNode;
+}) {
+  const { title, subtitle, avatar } = useWorkspaceIdentity();
+  return (
+    <>
+      <span className="mr-1 grid h-11 w-9 shrink-0 place-items-center">
+        {avatar}
+      </span>
+      <span
+        className={cn(
+          "flex min-w-0 flex-1 items-center gap-1 pr-2 transition-opacity duration-200",
+          collapsed ? "opacity-0" : "opacity-100",
+        )}
+      >
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span
+            className="min-w-0 truncate font-medium text-ink-strong text-sm"
+            data-testid="active-organization"
+          >
+            {title}
+          </span>
+          <span className="min-w-0 truncate text-2xs text-ink-subtle">
+            {subtitle}
+          </span>
+        </span>
+        {trailing}
+      </span>
+    </>
+  );
+}
+
+function WorkspaceMenu({ collapsed }: { collapsed: boolean }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const anchorRef = useRef<HTMLButtonElement>(null);
   const menuId = useId();
-
-  const displayName = useDisplayName();
+  const { organization, team, title } = useWorkspaceIdentity();
+  const mode = useWorkspaceMode();
+  const settingsPath = firstSettingsPath(mode, (permission: Permission) =>
+    allows(organization, permission),
+  );
+  const canInvite = Boolean(team) && allows(team, PERMISSION.MEMBERS_MANAGE);
+  const close = () => setOpen(false);
 
   return (
     <>
@@ -181,33 +322,26 @@ function AvatarMenu({ collapsed }: { collapsed: boolean }) {
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
-        aria-label={collapsed ? displayName : undefined}
+        aria-label={t("sidebar.workspaceMenu", { name: title })}
         onClick={() => setOpen((v) => !v)}
+        data-testid="workspace-menu"
         className={cn(
           "flex h-11 w-full items-center overflow-hidden rounded-lg text-left transition-[background-color,padding] duration-200 hover:bg-overlay/5",
           collapsed ? "pl-0" : "pl-1.5",
         )}
       >
-        <span className="mr-1 grid h-11 w-9 shrink-0 place-items-center">
-          <AvatarCircle />
-        </span>
-        <span
-          className={cn(
-            "flex min-w-0 flex-1 items-center gap-1 pr-2 transition-opacity duration-200",
-            collapsed ? "opacity-0" : "opacity-100",
-          )}
-        >
-          <span className="min-w-0 truncate font-medium text-ink-strong text-sm">
-            {displayName}
-          </span>
-          <m.span
-            animate={{ rotate: open ? 180 : 0 }}
-            transition={{ duration: 0.18 }}
-            className="shrink-0 text-ink-subtle"
-          >
-            <ChevronDown aria-hidden="true" className="h-4 w-4" />
-          </m.span>
-        </span>
+        <WorkspaceIdentity
+          collapsed={collapsed}
+          trailing={
+            <m.span
+              animate={{ rotate: open ? 180 : 0 }}
+              transition={{ duration: 0.18 }}
+              className="shrink-0 text-ink-subtle"
+            >
+              <ChevronDown aria-hidden="true" className="h-4 w-4" />
+            </m.span>
+          }
+        />
       </button>
 
       <Dropdown
@@ -215,56 +349,64 @@ function AvatarMenu({ collapsed }: { collapsed: boolean }) {
         anchorRef={anchorRef}
         placement="bottom"
         matchAnchorWidth={!collapsed}
-        onClickOutside={() => setOpen(false)}
+        onClickOutside={close}
+        onDismiss={close}
         autoFocus
         className="min-w-50 bg-surface-deep p-1"
       >
-        <div id={menuId} role="menu" aria-label={displayName}>
+        <div id={menuId} role="menu" aria-label={title}>
           <NavLink
-            to="/settings/profile"
+            to={settingsPath}
             role="menuitem"
-            onClick={() => setOpen(false)}
-            className="flex items-center gap-2 rounded-md px-2.5 py-2 text-ink-body text-sm outline-none hover:bg-overlay/10 focus-visible:bg-overlay/10 focus-visible:ring-1 focus-visible:ring-overlay/60 focus-visible:ring-inset"
+            onClick={close}
+            className={MENU_ITEM}
+            data-testid="workspace-settings"
           >
-            <UserCog aria-hidden="true" className="h-4 w-4" />
-            {t("sidebar.preferences")}
+            <Settings aria-hidden="true" className="h-4 w-4" />
+            {team
+              ? t("sidebar.organizationSettings")
+              : t("sidebar.workspaceSettings")}
           </NavLink>
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() => {
-              setOpen(false);
-              void signOut({ redirectUrl: "/sign-in" });
-            }}
-            className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-ink-body text-sm outline-none hover:bg-overlay/10 focus-visible:bg-overlay/10 focus-visible:ring-1 focus-visible:ring-overlay/60 focus-visible:ring-inset"
-          >
-            <LogOut aria-hidden="true" className="h-4 w-4" />
-            {t("sidebar.signOut")}
-          </button>
+          {canInvite && (
+            <NavLink
+              to={INVITE_TEAM_PATH}
+              role="menuitem"
+              onClick={close}
+              className={MENU_ITEM}
+              data-testid="workspace-invite"
+            >
+              <UserPlus aria-hidden="true" className="h-4 w-4" />
+              {t("sidebar.invitePeople")}
+            </NavLink>
+          )}
+          {team && (
+            <NavLink
+              to="/settings/general"
+              role="menuitem"
+              onClick={close}
+              className={MENU_ITEM}
+              data-testid="workspace-leave"
+            >
+              <DoorOpen aria-hidden="true" className="h-4 w-4" />
+              {t("sidebar.leaveOrganization")}
+            </NavLink>
+          )}
         </div>
       </Dropdown>
     </>
   );
 }
 
-function StaticBrand({ collapsed }: { collapsed: boolean }) {
-  const displayName = useDisplayName();
+function SettingsWorkspace({ collapsed }: { collapsed: boolean }) {
   return (
     <div
       className={cn(
         "flex h-11 w-full items-center overflow-hidden rounded-lg transition-[padding] duration-200",
         collapsed ? "pl-0" : "pl-1.5",
       )}
+      data-testid="settings-workspace"
     >
-      <span className="mr-1 grid h-11 w-9 shrink-0 place-items-center">
-        <AvatarCircle />
-      </span>
-      <Label
-        collapsed={collapsed}
-        className="pr-2 font-medium text-ink-strong text-sm"
-      >
-        {displayName}
-      </Label>
+      <WorkspaceIdentity collapsed={collapsed} />
     </div>
   );
 }
@@ -296,6 +438,17 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
   };
 
   const [settled, setSettled] = useState(!collapsed);
+  const organization = useAppSelector(selectActiveOrganization);
+  const mode = useWorkspaceMode();
+  const permitted = (permission: Permission) =>
+    allows(organization, permission);
+  const sections = resolveNav(
+    inSettings ? SETTINGS_SECTIONS : NAV_SECTIONS,
+    mode,
+    permitted,
+  );
+  const showProjects = showsProjects(mode);
+  useFinanceBadgeRefresh();
 
   useEffect(() => {
     if (collapsed) {
@@ -313,7 +466,7 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
       animate={{ width: collapsed ? COLLAPSED_WIDTH : EXPANDED_WIDTH }}
       transition={WIDTH_TRANSITION}
       onAnimationComplete={() => setSettled(!collapsed)}
-      className="flex h-dvh shrink-0 flex-col overflow-hidden border-overlay/10 border-r bg-surface-deep"
+      className="flex h-full shrink-0 flex-col overflow-hidden border-overlay/10 border-r bg-surface-deep"
     >
       <div className="flex flex-col gap-0.5 p-3">
         {inSettings ? (
@@ -326,40 +479,26 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
                 collapsed={collapsed}
               />
             </div>
-            <StaticBrand collapsed={collapsed} />
+            <SettingsWorkspace collapsed={collapsed} />
           </>
         ) : (
-          <AvatarMenu collapsed={collapsed} />
+          <WorkspaceMenu collapsed={collapsed} />
         )}
+        <div className="mt-1 flex flex-col gap-1.5">
+          {showProjects && <ProjectSwitcher collapsed={collapsed} />}
+          <EnvironmentToggle collapsed={collapsed} />
+        </div>
       </div>
 
       <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto overflow-x-hidden px-3 pb-3">
-        {inSettings
-          ? SETTINGS_NAV.map((item) => (
-              <NavRow key={item.to} item={item} collapsed={collapsed} />
-            ))
-          : NAV_SECTIONS.map((section, i) => (
-              <div key={section.titleKey ?? `section-${i}`} className="mb-1">
-                {section.titleKey && (
-                  <Label
-                    collapsed={collapsed}
-                    className="block px-2.5 pt-2 pb-0.5 text-2xs text-ink-subtle uppercase tracking-wide"
-                  >
-                    {t(section.titleKey)}
-                  </Label>
-                )}
-                <div className="flex flex-col gap-0.5">
-                  {section.items.map((item) => (
-                    <NavRow
-                      key={item.to}
-                      item={item}
-                      collapsed={collapsed}
-                      end={item.end}
-                    />
-                  ))}
-                </div>
-              </div>
-            ))}
+        {sections.map((section, i) => (
+          <NavGroup
+            key={section.titleKey ?? `section-${i}`}
+            section={section}
+            collapsed={collapsed}
+            titled={!inSettings || sections.length > 1}
+          />
+        ))}
       </nav>
 
       <div className="p-3">

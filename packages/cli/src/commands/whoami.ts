@@ -1,5 +1,7 @@
+import { readContext } from "../core/config-file.js";
 import { walletAddress } from "../core/session.js";
 import { networkName, origin, type Resolved } from "../core/settings.js";
+import { contextFields, offlineContext } from "../core/workspace.js";
 import { NetworkCommand } from "../network-command.js";
 import { fields } from "../ui/output.js";
 
@@ -9,7 +11,9 @@ export default class Whoami extends NetworkCommand {
     "Makes no network call. The address is derived from the wallet key, " +
     "which is never printed. The key is taken from --key-file, then " +
     "FOURMICA_WALLET_PRIVATE_KEY in the environment or in ./.env, then the " +
-    "key file named in the config file.";
+    "key file named in the config file. The organization, project and " +
+    "environment are the ones saved or set in the environment; " +
+    "`4mica auth status` checks them with the platform.";
   static examples = [
     "<%= config.bin %> <%= command.id %>",
     "<%= config.bin %> <%= command.id %> --key-file ~/.4mica/key",
@@ -19,6 +23,7 @@ export default class Whoami extends NetworkCommand {
     const { flags } = await this.parse(Whoami);
     const settings = await this.settings(flags);
     const address = await walletAddress(settings);
+    const context = offlineContext(await readContext(this.config.configDir));
     const from = (resolved: Resolved) =>
       ` (from ${origin(settings, resolved)})`;
     this.log(
@@ -37,6 +42,7 @@ export default class Whoami extends NetworkCommand {
           settings.facilitatorUrl &&
             settings.facilitatorUrl.value + from(settings.facilitatorUrl),
         ],
+        ...contextFields(context),
       ]),
     );
     return {
@@ -45,6 +51,7 @@ export default class Whoami extends NetworkCommand {
       network: settings.network,
       rpcUrl: settings.rpcUrl,
       facilitatorUrl: settings.facilitatorUrl,
+      context,
     };
   }
 }

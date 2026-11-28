@@ -5,6 +5,11 @@ export {
   HttpMethod,
   type HttpRequestConfig,
 } from "./client";
+export {
+  type RequestHeadersProvider,
+  resolveRequestHeaders,
+  setRequestHeadersProvider,
+} from "./headers";
 export { normalizeUrl } from "./normalize-url";
 export {
   DEFAULT_RETRY,

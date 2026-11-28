@@ -1,89 +1,210 @@
-import { Button, Card, Tag } from "@4mica/ui";
-import { useAppSelector } from "@stores/hooks";
+import { Button, EmptyState } from "@4mica/ui";
+import { useAppDispatch, useAppSelector } from "@stores/hooks";
+import {
+  selectActiveOrganization,
+  selectCan,
+} from "@stores/organization/selector";
+import { PERMISSION } from "@stores/organization/type";
+import { fetchSecurity, selectSecurityCollection } from "@stores/security";
+import {
+  fetchInvitations,
+  fetchMembers,
+  selectInvitations,
+  selectMembers,
+  selectMembersError,
+  selectMembersStatus,
+} from "@stores/team";
 import { selectUser } from "@stores/user/selector";
-import { UserPlus } from "lucide-react";
+import { TriangleAlert, UserPlus, Users } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ComingSoon, Placeholder } from "@/components/ComingSoon";
-import { SettingsPanel } from "@/components/SettingsPanel";
+import { useSearchParams } from "react-router-dom";
+import { SettingsSection } from "@/components/layout";
+import { CreateOrganizationModal } from "@/components/Organization/CreateOrganizationModal";
+import { RoleRestrictedNotice } from "@/components/Organization/RoleRestricted";
+import { PageSpinner } from "@/components/PageSpinner";
+import { SettingsPage } from "@/components/SettingsPage";
+import { InvitationRow } from "./InvitationRow";
+import { InviteMembersModal } from "./InviteMembersModal";
+import { MemberRow } from "./MemberRow";
 
-function MemberRow({
-  name,
-  role,
-  you,
-}: {
-  name?: string;
-  role: string;
-  you?: boolean;
-}) {
+function PersonalWorkspace() {
   const { t } = useTranslation();
+  const [creating, setCreating] = useState(false);
   return (
-    <div className="flex items-center gap-3 px-6 py-4">
-      <span className="h-8 w-8 shrink-0 rounded-full bg-overlay/10" />
-      <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-        {name ? (
-          <span className="truncate font-medium text-ink-strong text-sm">
-            {name}
-            {you && (
-              <span className="ml-1.5 font-normal text-ink-subtle">
-                {t("team.preview.you")}
-              </span>
-            )}
-          </span>
+    <>
+      <EmptyState
+        icon={<Users className="h-5 w-5" />}
+        title={t("team.personal.title")}
+        description={t("team.personal.description")}
+        action={{
+          label: t("organization.switcher.create"),
+          onClick: () => setCreating(true),
+        }}
+        data-testid="team-personal"
+      />
+      <CreateOrganizationModal
+        isOpen={creating}
+        onClose={() => setCreating(false)}
+      />
+    </>
+  );
+}
+
+function Members() {
+  const { t } = useTranslation();
+  const dispatch = useAppDispatch();
+  const organization = useAppSelector(selectActiveOrganization);
+  const user = useAppSelector(selectUser);
+  const canManage = useAppSelector(selectCan(PERMISSION.MEMBERS_MANAGE));
+  const members = useAppSelector(selectMembers);
+  const status = useAppSelector(selectMembersStatus);
+  const error = useAppSelector(selectMembersError);
+  const invitations = useAppSelector(selectInvitations);
+  const roles = useAppSelector(selectSecurityCollection("roles"));
+  const domains = useAppSelector(selectSecurityCollection("domains"));
+  const [inviting, setInviting] = useState(false);
+  const [params, setParams] = useSearchParams();
+  const inviteRequested = params.has("invite");
+
+  useEffect(() => {
+    if (!inviteRequested) {
+      return;
+    }
+    if (canManage) {
+      setInviting(true);
+    }
+    setParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        next.delete("invite");
+        return next;
+      },
+      { replace: true },
+    );
+  }, [inviteRequested, canManage, setParams]);
+
+  useEffect(() => {
+    dispatch(fetchMembers());
+    if (canManage) {
+      dispatch(fetchInvitations());
+      dispatch(fetchSecurity("roles"));
+      dispatch(fetchSecurity("domains"));
+    }
+  }, [dispatch, canManage]);
+
+  const verifiedDomains = useMemo(
+    () =>
+      domains.status === "loaded"
+        ? domains.items
+            .filter((domain) => domain.verified)
+            .map((domain) => domain.domain)
+        : null,
+    [domains],
+  );
+
+  return (
+    <>
+      {!canManage && <RoleRestrictedNotice />}
+
+      <SettingsSection
+        title={t("team.members.title")}
+        description={t("team.members.description", {
+          name: organization?.name ?? "",
+        })}
+        action={
+          canManage && (
+            <Button
+              type="button"
+              intent="invert"
+              size="sm"
+              className="btn-no-lift"
+              icon={<UserPlus aria-hidden="true" className="h-4 w-4" />}
+              onClick={() => setInviting(true)}
+              data-testid="team-invite"
+            >
+              {t("team.members.invite")}
+            </Button>
+          )
+        }
+      >
+        {status === "loading" || status === "idle" ? (
+          <PageSpinner />
+        ) : status === "failed" ? (
+          <EmptyState
+            icon={<TriangleAlert className="h-5 w-5" />}
+            title={t("team.members.loadFailed")}
+            description={error ?? undefined}
+            action={{
+              label: t("team.retry"),
+              onClick: () => dispatch(fetchMembers()),
+            }}
+            data-testid="team-members-error"
+          />
         ) : (
-          <Placeholder className="w-32" />
+          <div
+            className="divide-y divide-overlay/10 overflow-hidden rounded-lg border border-overlay/10"
+            data-testid="team-members"
+          >
+            {members.map((member) => (
+              <MemberRow
+                key={member.userId}
+                member={member}
+                isSelf={member.userId === user?.id}
+                viewerRole={organization?.role}
+                canManage={canManage}
+                customRoles={roles.items}
+                verifiedDomains={verifiedDomains}
+              />
+            ))}
+          </div>
         )}
-        <Placeholder className="w-44" />
-      </div>
-      <Tag size="sm" variant="neutral">
-        {role}
-      </Tag>
-    </div>
+      </SettingsSection>
+
+      {canManage && (
+        <SettingsSection
+          title={t("team.invitations.title")}
+          description={t("team.invitations.description")}
+        >
+          {invitations.length === 0 ? (
+            <EmptyState
+              variant="dashed"
+              size="sm"
+              title={t("team.invitations.empty")}
+              data-testid="team-invitations-empty"
+            />
+          ) : (
+            <div
+              className="divide-y divide-overlay/10 overflow-hidden rounded-lg border border-overlay/10"
+              data-testid="team-invitations"
+            >
+              {invitations.map((invitation) => (
+                <InvitationRow key={invitation.id} invitation={invitation} />
+              ))}
+            </div>
+          )}
+        </SettingsSection>
+      )}
+
+      <InviteMembersModal
+        isOpen={inviting}
+        organizationName={organization?.name ?? ""}
+        viewerRole={organization?.role}
+        onClose={() => setInviting(false)}
+      />
+    </>
   );
 }
 
 export function TeamSettings() {
-  const { t } = useTranslation();
-  const user = useAppSelector(selectUser);
+  const organization = useAppSelector(selectActiveOrganization);
 
   return (
-    <>
-      <SettingsPanel
-        titleKey="page.settings.team.title"
-        descriptionKey="page.settings.team.description"
-      />
-      <ComingSoon
-        title={t("team.comingSoon.title")}
-        description={t("team.comingSoon.description")}
-        data-testid="team-coming-soon"
-      >
-        <Card className="flex flex-col gap-5">
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex flex-col gap-1">
-              <span className="font-semibold text-base text-ink-strong">
-                {t("team.preview.members")}
-              </span>
-              <Placeholder className="w-56" />
-            </div>
-            <Button
-              size="sm"
-              intent="invert"
-              icon={<UserPlus className="h-4 w-4" />}
-              tabIndex={-1}
-            >
-              {t("team.preview.invite")}
-            </Button>
-          </div>
-          <div className="-mx-6 divide-y divide-overlay/10 border-overlay/10 border-y">
-            <MemberRow
-              name={user?.name || user?.email || undefined}
-              role={t("team.preview.owner")}
-              you
-            />
-            <MemberRow role={t("team.preview.admin")} />
-            <MemberRow role={t("team.preview.member")} />
-          </div>
-        </Card>
-      </ComingSoon>
-    </>
+    <SettingsPage
+      titleKey="page.settings.team.title"
+      descriptionKey="page.settings.team.description"
+    >
+      {organization?.personal ? <PersonalWorkspace /> : <Members />}
+    </SettingsPage>
   );
 }

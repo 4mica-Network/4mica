@@ -1,4 +1,5 @@
 import {
+  environmentForNetwork,
   explorerAddressUrl,
   PAYMENT_NETWORKS,
   shortenAddress,
@@ -6,6 +7,8 @@ import {
 import { Button, Checkbox, cn, Tag, Tooltip } from "@4mica/ui";
 import { useCopyToClipboard } from "@4mica/ui/hooks";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
+import { selectCan } from "@stores/organization/selector";
+import { PERMISSION } from "@stores/organization/type";
 import {
   selectIsWalletPending,
   selectIsWalletSelected,
@@ -48,10 +51,14 @@ export function WalletRow({
     selectIsWalletPending(walletPendingKeys.row(wallet.id)),
   );
   const isSelected = useAppSelector(selectIsWalletSelected(wallet.id));
+  const canManage = useAppSelector(selectCan(PERMISSION.WALLETS_MANAGE));
 
   const { copied, copy } = useCopyToClipboard();
 
   const network = PAYMENT_NETWORKS[wallet.network];
+  const isProduction =
+    (wallet.environment ?? environmentForNetwork(wallet.network)) ===
+    "PRODUCTION";
 
   const handleCopy = () => copy(wallet.address);
 
@@ -115,6 +122,14 @@ export function WalletRow({
           <Tag size="sm" variant="neutral">
             {network.label}
           </Tag>
+
+          <Tag
+            size="sm"
+            variant={isProduction ? "warning" : "neutral"}
+            data-testid={`wallet-environment-${wallet.id}`}
+          >
+            {t(isProduction ? "environment.production" : "environment.sandbox")}
+          </Tag>
         </div>
       </div>
 
@@ -147,6 +162,7 @@ export function WalletRow({
         >
           <RowActionsMenu.Item
             icon={Pencil}
+            disabled={!canManage}
             onSelect={() => onEdit(wallet)}
             data-testid={`wallet-edit-${wallet.id}`}
           >
@@ -160,7 +176,7 @@ export function WalletRow({
             {t("wallet.row.viewOnExplorer")}
           </RowActionsMenu.ExternalItem>
 
-          {!wallet.isDefault && wallet.status === "ACTIVE" && (
+          {canManage && !wallet.isDefault && wallet.status === "ACTIVE" && (
             <RowActionsMenu.Item
               icon={Check}
               onSelect={() =>
@@ -174,7 +190,7 @@ export function WalletRow({
             </RowActionsMenu.Item>
           )}
 
-          {wallet.status !== "RETIRED" && (
+          {canManage && wallet.status !== "RETIRED" && (
             <RowActionsMenu.Item
               icon={wallet.status === "ACTIVE" ? Pause : Play}
               onSelect={() =>
@@ -198,6 +214,7 @@ export function WalletRow({
           <RowActionsMenu.Item
             icon={Trash2}
             tone="danger"
+            disabled={!canManage}
             onSelect={() => onDelete(wallet)}
             data-testid={`wallet-delete-${wallet.id}`}
           >

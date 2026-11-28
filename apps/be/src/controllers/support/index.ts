@@ -1,8 +1,9 @@
 import {
+  audit,
   invalidBody,
   notFound,
   parseBody,
-  requireUserId,
+  requireTenant,
 } from "@controllers/shared";
 import { appLogger } from "@logger/index";
 import type { FastifyReply, RouteHandler } from "fastify";
@@ -39,8 +40,8 @@ export const listSupportRequestsHandler: RouteHandler = async (
   request,
   reply,
 ) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const tenant = await requireTenant(request, reply, "resources.read");
+  if (!tenant) {
     return reply;
   }
 
@@ -55,29 +56,29 @@ export const listSupportRequestsHandler: RouteHandler = async (
     ]);
   }
 
-  return reply.send(await listSupportRequests(userId, parsed.data));
+  return reply.send(await listSupportRequests(tenant.orgId, parsed.data));
 };
 
 export const getSupportStatsHandler: RouteHandler = async (request, reply) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const tenant = await requireTenant(request, reply, "resources.read");
+  if (!tenant) {
     return reply;
   }
 
-  return reply.send(await getSupportStats(userId));
+  return reply.send(await getSupportStats(tenant.orgId));
 };
 
 export const getSupportRequestHandler: RouteHandler = async (
   request,
   reply,
 ) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const tenant = await requireTenant(request, reply, "resources.read");
+  if (!tenant) {
     return reply;
   }
 
   const { id } = request.params as { id: string };
-  const found = await getSupportRequest(userId, id);
+  const found = await getSupportRequest(tenant.orgId, id);
 
   return found ? reply.send(found) : notFound(reply, "support request");
 };
@@ -86,8 +87,8 @@ export const createSupportRequestHandler: RouteHandler = async (
   request,
   reply,
 ) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const tenant = await requireTenant(request, reply, "resources.write");
+  if (!tenant) {
     return reply;
   }
 
@@ -96,9 +97,18 @@ export const createSupportRequestHandler: RouteHandler = async (
     return invalidBody(reply, parsed.issues);
   }
 
-  const created = await createSupportRequest(userId, parsed.data);
+  const created = await createSupportRequest(
+    tenant.orgId,
+    tenant.userId,
+    parsed.data,
+  );
+  await audit(request, tenant, {
+    action: "support_request.created",
+    targetType: "support_request",
+    targetId: created.id,
+  });
   appLogger.info("Support request opened", {
-    userId,
+    userId: tenant.userId,
     requestId: created.id,
     number: created.number,
     category: created.category,
@@ -112,8 +122,8 @@ export const updateSupportRequestHandler: RouteHandler = async (
   request,
   reply,
 ) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const tenant = await requireTenant(request, reply, "resources.write");
+  if (!tenant) {
     return reply;
   }
 
@@ -123,7 +133,7 @@ export const updateSupportRequestHandler: RouteHandler = async (
   }
 
   const { id } = request.params as { id: string };
-  const current = await getSupportRequest(userId, id);
+  const current = await getSupportRequest(tenant.orgId, id);
   if (!current) {
     return notFound(reply, "support request");
   }
@@ -143,6 +153,20 @@ export const updateSupportRequestHandler: RouteHandler = async (
     ...(status === "CLOSED" || reopening ? { status } : {}),
   });
 
+  if (status === "CLOSED" && current.status !== "CLOSED") {
+    await audit(request, tenant, {
+      action: "support_request.closed",
+      targetType: "support_request",
+      targetId: id,
+    });
+  } else if (reopening) {
+    await audit(request, tenant, {
+      action: "support_request.reopened",
+      targetType: "support_request",
+      targetId: id,
+    });
+  }
+
   return reply.send(updated);
 };
 
@@ -150,8 +174,8 @@ export const createSupportMessageHandler: RouteHandler = async (
   request,
   reply,
 ) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const tenant = await requireTenant(request, reply, "resources.write");
+  if (!tenant) {
     return reply;
   }
 
@@ -161,7 +185,7 @@ export const createSupportMessageHandler: RouteHandler = async (
   }
 
   const { id } = request.params as { id: string };
-  const current = await getSupportRequest(userId, id);
+  const current = await getSupportRequest(tenant.orgId, id);
   if (!current) {
     return notFound(reply, "support request");
   }
@@ -183,16 +207,24 @@ export const deleteSupportRequestHandler: RouteHandler = async (
   request,
   reply,
 ) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const tenant = await requireTenant(request, reply, "resources.write");
+  if (!tenant) {
     return reply;
   }
 
   const { id } = request.params as { id: string };
-  const deleted = await deleteSupportRequest(userId, id);
+  const deleted = await deleteSupportRequest(tenant.orgId, id);
 
   if (deleted) {
-    appLogger.info("Support request removed", { userId, requestId: id });
+    await audit(request, tenant, {
+      action: "support_request.deleted",
+      targetType: "support_request",
+      targetId: id,
+    });
+    appLogger.info("Support request removed", {
+      userId: tenant.userId,
+      requestId: id,
+    });
     return reply.code(204).send();
   }
 
@@ -203,8 +235,8 @@ export const batchDeleteSupportRequestsHandler: RouteHandler = async (
   request,
   reply,
 ) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const tenant = await requireTenant(request, reply, "resources.write");
+  if (!tenant) {
     return reply;
   }
 
@@ -213,9 +245,19 @@ export const batchDeleteSupportRequestsHandler: RouteHandler = async (
     return invalidBody(reply, parsed.issues);
   }
 
-  const result = await batchDeleteSupportRequests(userId, parsed.data.ids);
+  const result = await batchDeleteSupportRequests(
+    tenant.orgId,
+    parsed.data.ids,
+  );
+  if (result.deleted.length > 0) {
+    await audit(request, tenant, {
+      action: "support_request.deleted",
+      targetType: "support_request",
+      metadata: { ids: result.deleted },
+    });
+  }
   appLogger.info("Support requests removed", {
-    userId,
+    userId: tenant.userId,
     count: result.deleted.length,
   });
 

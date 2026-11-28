@@ -14,6 +14,19 @@ import type {
   UpdateCustomerIdentityInput,
 } from "./schema";
 
+type Db = Prisma.TransactionClient;
+
+export interface CustomerScope {
+  orgId: string;
+  projectId: string;
+}
+
+const customerWhere = (scope: CustomerScope) => ({
+  organizationId: scope.orgId,
+  projectId: scope.projectId,
+  deletedAt: null,
+});
+
 export const CUSTOMER_IDENTITY_SELECT = {
   id: true,
   type: true,
@@ -50,6 +63,8 @@ export const CUSTOMER_SELECT = {
   dailyLimit: true,
   monthlyLimit: true,
   limitCurrency: true,
+  limitNetwork: true,
+  limitAssetAddress: true,
   createdAt: true,
   updatedAt: true,
   identities: {
@@ -173,7 +188,7 @@ const recentSince = (): Date =>
   new Date(Date.now() - RECENT_WINDOW_DAYS * 24 * 60 * 60 * 1000);
 
 const matchedPayments = (
-  ownerId: string,
+  orgId: string,
   owned: Prisma.Sql,
   customerIds: Prisma.Sql,
 ): Prisma.Sql => Prisma.sql`
@@ -189,11 +204,11 @@ const matchedPayments = (
      AND p.network       = i.network
      AND (i.valid_from  IS NULL OR p.created_at >= i.valid_from)
      AND (i.valid_until IS NULL OR p.created_at <  i.valid_until)
-   WHERE i.owner_id = ${ownerId}
+   WHERE i.organization_id = ${orgId}
      AND i.type = 'WALLET'
      AND i.customer_id IN (${customerIds})
      AND p.recipient_address IN (${owned})
-     AND p.owner_id = ${ownerId}
+     AND p.organization_id = ${orgId}
 `;
 
 interface ScalarRow {
@@ -213,14 +228,15 @@ interface SpendRow {
 }
 
 const filterFor = (
-  ownerId: string,
+  scope: CustomerScope,
   query: Pick<
     ListCustomersQuery,
     "q" | "type" | "status" | "network" | "source"
   >,
 ): Prisma.Sql => {
   const clauses: Prisma.Sql[] = [
-    Prisma.sql`c.owner_id = ${ownerId}`,
+    Prisma.sql`c.organization_id = ${scope.orgId}`,
+    Prisma.sql`c.project_id = ${scope.projectId}`,
     Prisma.sql`c.deleted_at IS NULL`,
   ];
 
@@ -291,7 +307,7 @@ const orderFor = (sort: ListCustomersQuery["sort"]): Prisma.Sql => {
 };
 
 const spendFor = async (
-  ownerId: string,
+  orgId: string,
   customerIds: string[],
   addresses: string[],
 ): Promise<Map<string, CustomerSpend>> => {
@@ -306,7 +322,7 @@ const spendFor = async (
   const owned = Prisma.join(addresses);
   const ids = Prisma.join(customerIds);
   const since = recentSince();
-  const matched = matchedPayments(ownerId, owned, ids);
+  const matched = matchedPayments(orgId, owned, ids);
 
   const [scalars, buckets] = await Promise.all([
     prisma.$queryRaw<ScalarRow[]>`
@@ -397,7 +413,7 @@ export const quotaWindowStart = (
 };
 
 const quotaUsageFor = async (
-  ownerId: string,
+  orgId: string,
   customerId: string,
   customer: Pick<
     RawCustomer,
@@ -419,7 +435,7 @@ const quotaUsageFor = async (
     customer.quotaResetAt,
   );
   const owned = Prisma.join(addresses);
-  const matched = matchedPayments(ownerId, owned, Prisma.join([customerId]));
+  const matched = matchedPayments(orgId, owned, Prisma.join([customerId]));
   const window = since
     ? Prisma.sql`AND m.created_at >= ${since}`
     : Prisma.empty;
@@ -445,7 +461,7 @@ const quotaUsageFor = async (
 };
 
 export const listCustomers = async (
-  ownerId: string,
+  scope: CustomerScope,
   query: ListCustomersQuery,
 ): Promise<{
   items: CustomerRow[];
@@ -453,8 +469,9 @@ export const listCustomers = async (
   page: number;
   limit: number;
 }> => {
-  const addresses = await walletAddressesFor(ownerId);
-  const filter = filterFor(ownerId, query);
+  const { orgId } = scope;
+  const addresses = await walletAddressesFor(orgId);
+  const filter = filterFor(scope, query);
   const skip = (query.page - 1) * query.limit;
 
   const owned =
@@ -474,10 +491,10 @@ export const listCustomers = async (
            AND p.network       = i.network
            AND (i.valid_from  IS NULL OR p.created_at >= i.valid_from)
            AND (i.valid_until IS NULL OR p.created_at <  i.valid_until)
-         WHERE i.owner_id = ${ownerId}
+         WHERE i.organization_id = ${orgId}
            AND i.type = 'WALLET'
            AND p.recipient_address IN (${owned})
-           AND p.owner_id = ${ownerId}
+           AND p.organization_id = ${orgId}
       )
       SELECT c.id,
              COUNT(m.customer_id) AS txn_count,
@@ -508,10 +525,14 @@ export const listCustomers = async (
 
   const [rows, spend] = await Promise.all([
     prisma.customer.findMany({
-      where: { id: { in: pageIds }, ownerId },
+      where: {
+        id: { in: pageIds },
+        organizationId: orgId,
+        projectId: scope.projectId,
+      },
       select: CUSTOMER_SELECT,
     }),
-    spendFor(ownerId, pageIds, addresses),
+    spendFor(orgId, pageIds, addresses),
   ]);
 
   const byId = new Map(rows.map((row) => [row.id, row]));
@@ -524,11 +545,11 @@ export const listCustomers = async (
 };
 
 export const getCustomer = async (
-  ownerId: string,
+  scope: CustomerScope,
   id: string,
 ): Promise<CustomerRow | null> => {
   const row = await prisma.customer.findFirst({
-    where: { id, ownerId, deletedAt: null },
+    where: { id, ...customerWhere(scope) },
     select: CUSTOMER_SELECT,
   });
 
@@ -536,21 +557,22 @@ export const getCustomer = async (
     return null;
   }
 
-  const addresses = await walletAddressesFor(ownerId);
+  const { orgId } = scope;
+  const addresses = await walletAddressesFor(orgId);
   const [spend, quota] = await Promise.all([
-    spendFor(ownerId, [row.id], addresses),
-    quotaUsageFor(ownerId, row.id, row, addresses),
+    spendFor(orgId, [row.id], addresses),
+    quotaUsageFor(orgId, row.id, row, addresses),
   ]);
 
   return toRow(row, spend.get(row.id) ?? emptySpend(), quota);
 };
 
 export const ownsCustomer = async (
-  ownerId: string,
+  scope: CustomerScope,
   id: string,
 ): Promise<boolean> => {
   const row = await prisma.customer.findFirst({
-    where: { id, ownerId, deletedAt: null },
+    where: { id, ...customerWhere(scope) },
     select: { id: true },
   });
 
@@ -579,12 +601,16 @@ const toIdentityData = (input: CustomerIdentityInput) =>
       };
 
 export const createCustomer = async (
-  ownerId: string,
+  scope: CustomerScope,
+  userId: string,
   data: CreateCustomerInput,
 ): Promise<CustomerRow> => {
+  const { orgId } = scope;
   const row = await prisma.customer.create({
     data: {
-      ownerId,
+      organizationId: orgId,
+      projectId: scope.projectId,
+      createdById: userId,
       name: data.name,
       email: data.email ?? null,
       type: data.type,
@@ -595,7 +621,7 @@ export const createCustomer = async (
       limitCurrency: data.limitCurrency,
       identities: {
         create: data.identities.map((identity) => ({
-          ownerId,
+          organizationId: orgId,
           ...toIdentityData(identity),
         })),
       },
@@ -603,42 +629,112 @@ export const createCustomer = async (
     select: CUSTOMER_SELECT,
   });
 
-  const addresses = await walletAddressesFor(ownerId);
-  const spend = await spendFor(ownerId, [row.id], addresses);
+  const addresses = await walletAddressesFor(orgId);
+  const spend = await spendFor(orgId, [row.id], addresses);
 
   return toRow(row, spend.get(row.id) ?? emptySpend());
 };
 
-export const updateCustomer = async (
-  ownerId: string,
+export const LIMIT_FIELDS = [
+  "dailyLimit",
+  "monthlyLimit",
+  "limitCurrency",
+  "limitNetwork",
+  "limitAssetAddress",
+  "freeQuotaUnit",
+  "freeQuota",
+  "freeQuotaPeriod",
+  "discountPercent",
+  "discountFixed",
+  "minPaymentAmount",
+  "approvalThreshold",
+] as const;
+
+type LimitField = (typeof LIMIT_FIELDS)[number];
+
+const LIMIT_SELECT = Object.fromEntries(
+  LIMIT_FIELDS.map((field) => [field, true]),
+) as Record<LimitField, true>;
+
+export interface CustomerChange {
+  limitFields: LimitField[];
+  before: Record<string, string | null>;
+  after: Record<string, string | null>;
+}
+
+const limitValues = (
+  row: Partial<Record<LimitField, unknown>>,
+  fields: readonly LimitField[],
+): Record<string, string | null> =>
+  Object.fromEntries(
+    fields.map((field) => {
+      const value = row[field];
+      return [
+        field,
+        value === null || value === undefined ? null : String(value),
+      ];
+    }),
+  );
+
+const changeCustomer = async (
+  scope: CustomerScope,
   id: string,
   data: Prisma.CustomerUpdateManyMutationInput,
-): Promise<CustomerRow | null> => {
-  const { count } = await prisma.customer.updateMany({
-    where: { id, ownerId, deletedAt: null },
-    data,
-  });
+  db: Db,
+): Promise<CustomerChange | null> => {
+  await db.$executeRaw`SELECT 1 FROM customers WHERE id = ${id} FOR UPDATE`;
+  const where = { id, ...customerWhere(scope) };
+  const before = await db.customer.findFirst({ where, select: LIMIT_SELECT });
+  if (!before) {
+    return null;
+  }
 
-  return count > 0 ? getCustomer(ownerId, id) : null;
+  await db.customer.updateMany({ where, data });
+
+  const limitFields = LIMIT_FIELDS.filter((field) => field in data);
+  const after =
+    limitFields.length > 0
+      ? await db.customer.findFirst({ where, select: LIMIT_SELECT })
+      : before;
+
+  return {
+    limitFields,
+    before: limitValues(before, limitFields),
+    after: limitValues(after ?? before, limitFields),
+  };
 };
 
+export const updateCustomer = (
+  scope: CustomerScope,
+  id: string,
+  data: Prisma.CustomerUpdateManyMutationInput,
+  db: Db,
+): Promise<CustomerChange | null> => changeCustomer(scope, id, data, db);
+
 export const addIdentity = async (
-  ownerId: string,
+  scope: CustomerScope,
   customerId: string,
   input: CustomerIdentityInput,
-): Promise<CustomerRow | null> => {
-  await prisma.customerPaymentIdentity.create({
-    data: { ownerId, customerId, ...toIdentityData(input) },
+  db: Db,
+): Promise<string> => {
+  const identity = await db.customerPaymentIdentity.create({
+    data: {
+      organizationId: scope.orgId,
+      customerId,
+      ...toIdentityData(input),
+    },
+    select: { id: true },
   });
 
-  return getCustomer(ownerId, customerId);
+  return identity.id;
 };
 
 export const setCustomerStatus = async (
-  ownerId: string,
+  scope: CustomerScope,
   id: string,
   input: SetCustomerStatusInput,
-): Promise<CustomerRow | null> => {
+  db: Db,
+): Promise<boolean> => {
   const data: Prisma.CustomerUpdateManyMutationInput =
     input.status === "ACTIVE"
       ? { status: "ACTIVE", suspendedUntil: null, statusReason: null }
@@ -654,43 +750,53 @@ export const setCustomerStatus = async (
             statusReason: input.reason ?? null,
           };
 
-  const { count } = await prisma.customer.updateMany({
-    where: { id, ownerId, deletedAt: null },
+  const { count } = await db.customer.updateMany({
+    where: { id, ...customerWhere(scope) },
     data,
   });
 
-  return count > 0 ? getCustomer(ownerId, id) : null;
+  return count > 0;
 };
 
 export const setCustomerPolicy = async (
-  ownerId: string,
+  scope: CustomerScope,
   id: string,
   input: SetCustomerPolicyInput,
-): Promise<CustomerRow | null> => {
+  db: Db,
+): Promise<CustomerChange | null> => {
   const data: Prisma.CustomerUpdateManyMutationInput = { ...input };
+
+  if (input.limitNetwork === null) {
+    data.limitAssetAddress = null;
+  }
 
   if (input.freeQuotaUnit !== undefined) {
     data.quotaResetAt = input.freeQuotaUnit === null ? null : new Date();
   }
 
-  const { count } = await prisma.customer.updateMany({
-    where: { id, ownerId, deletedAt: null },
-    data,
-  });
-
-  return count > 0 ? getCustomer(ownerId, id) : null;
+  return changeCustomer(scope, id, data, db);
 };
 
-export const resetCustomerUsage = async (
-  ownerId: string,
+export const customerLimitNetwork = async (
+  scope: CustomerScope,
   id: string,
-): Promise<CustomerRow | null> => {
-  const { count } = await prisma.customer.updateMany({
-    where: { id, ownerId, deletedAt: null },
+): Promise<{ limitNetwork: string | null } | null> =>
+  prisma.customer.findFirst({
+    where: { id, ...customerWhere(scope) },
+    select: { limitNetwork: true },
+  });
+
+export const resetCustomerUsage = async (
+  scope: CustomerScope,
+  id: string,
+  db: Db,
+): Promise<boolean> => {
+  const { count } = await db.customer.updateMany({
+    where: { id, ...customerWhere(scope) },
     data: { quotaResetAt: new Date() },
   });
 
-  return count > 0 ? getCustomer(ownerId, id) : null;
+  return count > 0;
 };
 
 export interface CreditBalance {
@@ -710,13 +816,13 @@ export interface CustomerCreditRow {
 const ZERO = "0";
 
 export const creditBalance = async (
-  ownerId: string,
+  orgId: string,
   customerId: string,
   db: Prisma.TransactionClient = prisma,
 ): Promise<CreditBalance> => {
   const rows = await db.customerCreditEntry.groupBy({
     by: ["kind"],
-    where: { ownerId, customerId },
+    where: { organizationId: orgId, customerId },
     _sum: { amount: true },
   });
 
@@ -737,12 +843,12 @@ export const creditBalance = async (
 };
 
 export const listCreditEntries = async (
-  ownerId: string,
+  orgId: string,
   customerId: string,
   limit = 50,
 ): Promise<CustomerCreditRow[]> => {
   const rows = await prisma.customerCreditEntry.findMany({
-    where: { ownerId, customerId },
+    where: { organizationId: orgId, customerId },
     orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     take: limit,
     select: {
@@ -764,47 +870,39 @@ export const listCreditEntries = async (
 };
 
 export const grantCredit = async (
-  ownerId: string,
+  orgId: string,
   customerId: string,
   input: GrantCustomerCreditInput,
+  tx: Db,
 ): Promise<CustomerCreditRow | null> => {
-  const row = await prisma.$transaction(
-    async (tx) => {
-      if (input.amount.startsWith("-")) {
-        const { _sum } = await tx.customerCreditEntry.aggregate({
-          where: { ownerId, customerId },
-          _sum: { amount: true },
-        });
-        const after = (_sum.amount ?? new Prisma.Decimal(0)).plus(input.amount);
+  if (input.amount.startsWith("-")) {
+    const { _sum } = await tx.customerCreditEntry.aggregate({
+      where: { organizationId: orgId, customerId },
+      _sum: { amount: true },
+    });
+    const after = (_sum.amount ?? new Prisma.Decimal(0)).plus(input.amount);
 
-        if (after.isNegative()) {
-          return null;
-        }
-      }
-
-      return tx.customerCreditEntry.create({
-        data: {
-          ownerId,
-          customerId,
-          kind: input.kind,
-          amount: input.amount,
-          reason: input.reason ?? null,
-        },
-        select: {
-          id: true,
-          kind: true,
-          amount: true,
-          reason: true,
-          createdAt: true,
-        },
-      });
-    },
-    { isolationLevel: "Serializable" },
-  );
-
-  if (!row) {
-    return null;
+    if (after.isNegative()) {
+      return null;
+    }
   }
+
+  const row = await tx.customerCreditEntry.create({
+    data: {
+      organizationId: orgId,
+      customerId,
+      kind: input.kind,
+      amount: input.amount,
+      reason: input.reason ?? null,
+    },
+    select: {
+      id: true,
+      kind: true,
+      amount: true,
+      reason: true,
+      createdAt: true,
+    },
+  });
 
   return {
     id: row.id,
@@ -816,30 +914,26 @@ export const grantCredit = async (
 };
 
 export const zeroCredit = async (
-  ownerId: string,
+  orgId: string,
   customerId: string,
   reason: string | null,
+  tx: Db,
 ): Promise<CreditBalance> => {
-  await prisma.$transaction(
-    async (tx) => {
-      const balance = await creditBalance(ownerId, customerId, tx);
+  const balance = await creditBalance(orgId, customerId, tx);
 
-      if (Number(balance.total) !== 0) {
-        await tx.customerCreditEntry.create({
-          data: {
-            ownerId,
-            customerId,
-            kind: "ADJUSTMENT",
-            amount: new Prisma.Decimal(balance.total).negated(),
-            reason,
-          },
-        });
-      }
-    },
-    { isolationLevel: "Serializable" },
-  );
+  if (Number(balance.total) !== 0) {
+    await tx.customerCreditEntry.create({
+      data: {
+        organizationId: orgId,
+        customerId,
+        kind: "ADJUSTMENT",
+        amount: new Prisma.Decimal(balance.total).negated(),
+        reason,
+      },
+    });
+  }
 
-  return creditBalance(ownerId, customerId);
+  return creditBalance(orgId, customerId, tx);
 };
 
 export const CUSTOMER_COUPON_SELECT = {
@@ -898,11 +992,11 @@ const toCouponRow = (row: RawCoupon): CustomerCouponRow => ({
 });
 
 export const listCoupons = async (
-  ownerId: string,
+  orgId: string,
   customerId: string,
 ): Promise<CustomerCouponRow[]> => {
   const rows = await prisma.customerCoupon.findMany({
-    where: { ownerId, customerId },
+    where: { organizationId: orgId, customerId },
     orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     select: CUSTOMER_COUPON_SELECT,
   });
@@ -911,13 +1005,14 @@ export const listCoupons = async (
 };
 
 export const createCoupon = async (
-  ownerId: string,
+  orgId: string,
   customerId: string,
   input: CreateCustomerCouponInput,
+  db: Db = prisma,
 ): Promise<CustomerCouponRow> => {
-  const row = await prisma.customerCoupon.create({
+  const row = await db.customerCoupon.create({
     data: {
-      ownerId,
+      organizationId: orgId,
       customerId,
       code: input.code,
       kind: input.kind,
@@ -932,10 +1027,11 @@ export const createCoupon = async (
 };
 
 export const updateCoupon = async (
-  ownerId: string,
+  orgId: string,
   customerId: string,
   couponId: string,
   input: UpdateCustomerCouponInput,
+  db: Db = prisma,
 ): Promise<CustomerCouponRow | null> => {
   const data: Prisma.CustomerCouponUpdateManyMutationInput = {};
 
@@ -949,8 +1045,8 @@ export const updateCoupon = async (
     data.revokedAt = input.revoked ? new Date() : null;
   }
 
-  const { count } = await prisma.customerCoupon.updateMany({
-    where: { id: couponId, customerId, ownerId },
+  const { count } = await db.customerCoupon.updateMany({
+    where: { id: couponId, customerId, organizationId: orgId },
     data,
   });
 
@@ -958,8 +1054,8 @@ export const updateCoupon = async (
     return null;
   }
 
-  const row = await prisma.customerCoupon.findFirst({
-    where: { id: couponId, customerId, ownerId },
+  const row = await db.customerCoupon.findFirst({
+    where: { id: couponId, customerId, organizationId: orgId },
     select: CUSTOMER_COUPON_SELECT,
   });
 
@@ -967,12 +1063,13 @@ export const updateCoupon = async (
 };
 
 export const deleteCoupon = async (
-  ownerId: string,
+  orgId: string,
   customerId: string,
   couponId: string,
+  db: Db = prisma,
 ): Promise<boolean> => {
-  const { count } = await prisma.customerCoupon.deleteMany({
-    where: { id: couponId, customerId, ownerId },
+  const { count } = await db.customerCoupon.deleteMany({
+    where: { id: couponId, customerId, organizationId: orgId },
   });
 
   return count > 0;
@@ -984,7 +1081,7 @@ export interface ResolvedPayer {
 }
 
 export const resolveCustomerForPayer = async (
-  ownerId: string,
+  scope: CustomerScope,
   network: string,
   address: string,
   at = new Date(),
@@ -992,11 +1089,11 @@ export const resolveCustomerForPayer = async (
 ): Promise<ResolvedPayer | null> => {
   const identity = await db.customerPaymentIdentity.findFirst({
     where: {
-      ownerId,
+      organizationId: scope.orgId,
       type: "WALLET",
       address,
       network: network as never,
-      customer: { deletedAt: null },
+      customer: { deletedAt: null, projectId: scope.projectId },
       AND: [
         { OR: [{ validFrom: null }, { validFrom: { lte: at } }] },
         { OR: [{ validUntil: null }, { validUntil: { gt: at } }] },
@@ -1028,7 +1125,7 @@ export interface Redemption {
 }
 
 export const redeemPaymentBenefits = async (
-  ownerId: string,
+  orgId: string,
   paymentId: string,
   now = new Date(),
 ): Promise<Redemption | null> =>
@@ -1037,7 +1134,7 @@ export const redeemPaymentBenefits = async (
       const { count } = await tx.payment.updateMany({
         where: {
           id: paymentId,
-          ownerId,
+          organizationId: orgId,
           status: "SETTLED",
           redeemedAt: null,
           OR: [{ couponCode: { not: null } }, { creditApplied: { not: null } }],
@@ -1053,6 +1150,7 @@ export const redeemPaymentBenefits = async (
         where: { id: paymentId },
         select: {
           reqId: true,
+          projectId: true,
           payerAddress: true,
           network: true,
           couponCode: true,
@@ -1070,8 +1168,12 @@ export const redeemPaymentBenefits = async (
         creditDrawn: "0",
       };
 
+      if (!payment.projectId) {
+        return redemption;
+      }
+
       const resolved = await resolveCustomerForPayer(
-        ownerId,
+        { orgId, projectId: payment.projectId },
         payment.network,
         payment.payerAddress,
         payment.createdAt,
@@ -1088,7 +1190,7 @@ export const redeemPaymentBenefits = async (
       if (payment.couponCode) {
         const redeemed = await tx.customerCoupon.updateMany({
           where: {
-            ownerId,
+            organizationId: orgId,
             customerId,
             code: payment.couponCode,
             revokedAt: null,
@@ -1113,7 +1215,7 @@ export const redeemPaymentBenefits = async (
 
       if (payment.creditApplied?.greaterThan(0)) {
         const { _sum } = await tx.customerCreditEntry.aggregate({
-          where: { ownerId, customerId },
+          where: { organizationId: orgId, customerId },
           _sum: { amount: true },
         });
         const balance = _sum.amount ?? new Prisma.Decimal(0);
@@ -1122,7 +1224,7 @@ export const redeemPaymentBenefits = async (
         if (drawn.greaterThan(0)) {
           await tx.customerCreditEntry.create({
             data: {
-              ownerId,
+              organizationId: orgId,
               customerId,
               kind: "ADJUSTMENT",
               amount: drawn.negated(),
@@ -1139,12 +1241,12 @@ export const redeemPaymentBenefits = async (
   );
 
 export const findCouponByCode = async (
-  ownerId: string,
+  orgId: string,
   customerId: string,
   code: string,
 ): Promise<CustomerCouponRow | null> => {
   const row = await prisma.customerCoupon.findFirst({
-    where: { ownerId, customerId, code },
+    where: { organizationId: orgId, customerId, code },
     select: CUSTOMER_COUPON_SELECT,
   });
 
@@ -1152,32 +1254,61 @@ export const findCouponByCode = async (
 };
 
 export interface SpendLimitUsage {
+  applies: boolean;
   dailySpent: string | null;
   monthlySpent: string | null;
 }
 
+export interface LimitedPayment {
+  network: string;
+  assetAddress?: string | null;
+}
+
+export const limitAppliesTo = (
+  customer: Pick<RawCustomer, "limitNetwork" | "limitAssetAddress">,
+  payment?: LimitedPayment,
+): boolean =>
+  customer.limitNetwork === null ||
+  payment === undefined ||
+  (payment.network === customer.limitNetwork &&
+    (payment.assetAddress === undefined ||
+      (payment.assetAddress ?? null) === customer.limitAssetAddress));
+
 export const spendLimitUsageFor = async (
-  ownerId: string,
-  customer: Pick<RawCustomer, "dailyLimit" | "monthlyLimit"> & { id: string },
+  orgId: string,
+  customer: Pick<
+    RawCustomer,
+    "dailyLimit" | "monthlyLimit" | "limitNetwork" | "limitAssetAddress"
+  > & { id: string },
+  payment?: LimitedPayment,
   now = new Date(),
 ): Promise<SpendLimitUsage> => {
   if (!customer.dailyLimit && !customer.monthlyLimit) {
-    return { dailySpent: null, monthlySpent: null };
+    return { applies: false, dailySpent: null, monthlySpent: null };
   }
 
-  const addresses = await walletAddressesFor(ownerId);
+  if (!limitAppliesTo(customer, payment)) {
+    return { applies: false, dailySpent: null, monthlySpent: null };
+  }
+
+  const addresses = await walletAddressesFor(orgId);
 
   if (addresses.length === 0) {
-    return { dailySpent: "0", monthlySpent: "0" };
+    return { applies: true, dailySpent: "0", monthlySpent: "0" };
   }
 
   const dayStart = quotaWindowStart("DAY", null, now) as Date;
   const monthStart = quotaWindowStart("MONTH", null, now) as Date;
   const matched = matchedPayments(
-    ownerId,
+    orgId,
     Prisma.join(addresses),
     Prisma.join([customer.id]),
   );
+  const asset =
+    customer.limitNetwork === null
+      ? Prisma.empty
+      : Prisma.sql`AND m.network = ${customer.limitNetwork}
+         AND m.asset_address IS NOT DISTINCT FROM ${customer.limitAssetAddress}`;
 
   const rows = await prisma.$queryRaw<
     {
@@ -1189,31 +1320,33 @@ export const spendLimitUsageFor = async (
     SELECT COALESCE(SUM(m.amount) FILTER (WHERE m.created_at >= ${dayStart}), 0) AS daily_spent,
            COALESCE(SUM(m.amount) FILTER (WHERE m.created_at >= ${monthStart}), 0) AS monthly_spent
       FROM matched m
-     WHERE m.status <> 'FAILED'
+     WHERE m.status <> 'FAILED' ${asset}
   `;
 
   return {
+    applies: true,
     dailySpent: amountText(rows[0]?.daily_spent ?? 0),
     monthlySpent: amountText(rows[0]?.monthly_spent ?? 0),
   };
 };
 
 export const quotaRemainingFor = async (
-  ownerId: string,
+  orgId: string,
   customer: RawCustomer & { id: string },
 ): Promise<string | null> => {
-  const addresses = await walletAddressesFor(ownerId);
-  const usage = await quotaUsageFor(ownerId, customer.id, customer, addresses);
+  const addresses = await walletAddressesFor(orgId);
+  const usage = await quotaUsageFor(orgId, customer.id, customer, addresses);
 
   return usage.remaining;
 };
 
 export const updateIdentity = async (
-  ownerId: string,
+  scope: CustomerScope,
   customerId: string,
   identityId: string,
   input: UpdateCustomerIdentityInput,
-): Promise<CustomerRow | null> => {
+  db: Db,
+): Promise<boolean> => {
   const data: Prisma.CustomerPaymentIdentityUpdateManyMutationInput = {};
 
   if (input.source !== undefined) {
@@ -1229,32 +1362,34 @@ export const updateIdentity = async (
     data.blockedAt = input.blocked ? new Date() : null;
   }
 
-  const { count } = await prisma.customerPaymentIdentity.updateMany({
-    where: { id: identityId, customerId, ownerId },
+  const { count } = await db.customerPaymentIdentity.updateMany({
+    where: { id: identityId, customerId, organizationId: scope.orgId },
     data,
   });
 
-  return count > 0 ? getCustomer(ownerId, customerId) : null;
+  return count > 0;
 };
 
 export const removeIdentity = async (
-  ownerId: string,
+  orgId: string,
   customerId: string,
   identityId: string,
+  db: Db,
 ): Promise<boolean> => {
-  const { count } = await prisma.customerPaymentIdentity.deleteMany({
-    where: { id: identityId, customerId, ownerId },
+  const { count } = await db.customerPaymentIdentity.deleteMany({
+    where: { id: identityId, customerId, organizationId: orgId },
   });
 
   return count > 0;
 };
 
 export const softDeleteCustomer = async (
-  ownerId: string,
+  scope: CustomerScope,
   id: string,
+  db: Db,
 ): Promise<boolean> => {
-  const row = await prisma.customer.findFirst({
-    where: { id, ownerId, deletedAt: null },
+  const row = await db.customer.findFirst({
+    where: { id, ...customerWhere(scope) },
     select: { id: true },
   });
 
@@ -1262,40 +1397,37 @@ export const softDeleteCustomer = async (
     return false;
   }
 
-  await prisma.$transaction([
-    prisma.customerPaymentIdentity.deleteMany({
-      where: { customerId: row.id },
-    }),
-    prisma.customer.update({
-      where: { id: row.id },
-      data: { deletedAt: new Date() },
-    }),
-  ]);
+  await db.customerPaymentIdentity.deleteMany({
+    where: { customerId: row.id },
+  });
+  await db.customer.update({
+    where: { id: row.id },
+    data: { deletedAt: new Date() },
+  });
 
   return true;
 };
 
 export const batchSoftDeleteCustomers = async (
-  ownerId: string,
+  scope: CustomerScope,
   ids: string[],
+  db: Db,
 ): Promise<{ deleted: string[]; notFound: string[] }> => {
-  const owned = await prisma.customer.findMany({
-    where: { id: { in: ids }, ownerId, deletedAt: null },
+  const owned = await db.customer.findMany({
+    where: { id: { in: ids }, ...customerWhere(scope) },
     select: { id: true },
   });
 
   const deleted = owned.map((row) => row.id);
 
   if (deleted.length > 0) {
-    await prisma.$transaction([
-      prisma.customerPaymentIdentity.deleteMany({
-        where: { customerId: { in: deleted } },
-      }),
-      prisma.customer.updateMany({
-        where: { id: { in: deleted } },
-        data: { deletedAt: new Date() },
-      }),
-    ]);
+    await db.customerPaymentIdentity.deleteMany({
+      where: { customerId: { in: deleted } },
+    });
+    await db.customer.updateMany({
+      where: { id: { in: deleted } },
+      data: { deletedAt: new Date() },
+    });
   }
 
   const deletedSet = new Set(deleted);
@@ -1304,11 +1436,11 @@ export const batchSoftDeleteCustomers = async (
 };
 
 export const customerOverview = async (
-  ownerId: string,
+  orgId: string,
   customerId: string,
 ): Promise<CustomerSpend & { firstSeenAt: string | null }> => {
-  const addresses = await walletAddressesFor(ownerId);
-  const spend = await spendFor(ownerId, [customerId], addresses);
+  const addresses = await walletAddressesFor(orgId);
+  const spend = await spendFor(orgId, [customerId], addresses);
   const base = spend.get(customerId) ?? emptySpend();
 
   if (addresses.length === 0 || base.txnCount === 0) {
@@ -1317,7 +1449,7 @@ export const customerOverview = async (
 
   const rows = await prisma.$queryRaw<{ first_seen_at: Date | null }[]>`
     WITH matched AS (${matchedPayments(
-      ownerId,
+      orgId,
       Prisma.join(addresses),
       Prisma.join([customerId]),
     )})
@@ -1353,10 +1485,10 @@ interface BreakdownRow {
 }
 
 export const customerBreakdown = async (
-  ownerId: string,
+  orgId: string,
   customerId: string,
 ): Promise<BreakdownEntry[]> => {
-  const addresses = await walletAddressesFor(ownerId);
+  const addresses = await walletAddressesFor(orgId);
 
   if (addresses.length === 0) {
     return [];
@@ -1383,11 +1515,11 @@ export const customerBreakdown = async (
        AND (i.valid_until IS NULL OR p.created_at <  i.valid_until)
       LEFT JOIN api_listings l ON l.id = p.listing_id
       LEFT JOIN agents a ON a.id = p.agent_id
-     WHERE i.owner_id = ${ownerId}
+     WHERE i.organization_id = ${orgId}
        AND i.type = 'WALLET'
        AND i.customer_id = ${customerId}
        AND p.recipient_address IN (${owned})
-       AND p.owner_id = ${ownerId}
+       AND p.organization_id = ${orgId}
      GROUP BY 1, 2, 3, 4, 5, 6, 7, 8
      ORDER BY 7 ASC, 8 ASC
   `;
@@ -1493,7 +1625,7 @@ interface RawActivityRow {
 }
 
 export const customerActivity = async (
-  ownerId: string,
+  orgId: string,
   customerId: string,
   query: CustomerActivityQuery,
 ): Promise<{
@@ -1502,7 +1634,7 @@ export const customerActivity = async (
   page: number;
   limit: number;
 }> => {
-  const addresses = await walletAddressesFor(ownerId);
+  const addresses = await walletAddressesFor(orgId);
 
   if (addresses.length === 0) {
     return { items: [], total: 0, page: query.page, limit: query.limit };
@@ -1512,11 +1644,11 @@ export const customerActivity = async (
   const skip = (query.page - 1) * query.limit;
 
   const clauses: Prisma.Sql[] = [
-    Prisma.sql`i.owner_id = ${ownerId}`,
+    Prisma.sql`i.organization_id = ${orgId}`,
     Prisma.sql`i.type = 'WALLET'`,
     Prisma.sql`i.customer_id = ${customerId}`,
     Prisma.sql`p.recipient_address IN (${owned})`,
-    Prisma.sql`p.owner_id = ${ownerId}`,
+    Prisma.sql`p.organization_id = ${orgId}`,
   ];
 
   if (query.status) {

@@ -14,7 +14,7 @@ vi.mock("@logger/index", () => ({
 
 const { revalidatePlayground } = await import("./playground");
 
-const OWNER_ID = "019fce62-0000-7000-8000-000000000000";
+const ORGANIZATION_ID = "019fce62-0000-7000-8000-000000000000";
 const TARGET = {
   url: "http://4mica-playground:3100",
   secret: "s".repeat(32),
@@ -37,7 +37,9 @@ describe("revalidatePlayground", () => {
   it("does nothing when the playground is not configured", async () => {
     settings.playground = undefined;
 
-    expect(await revalidatePlayground({ ownerId: OWNER_ID })).toBe(false);
+    expect(
+      await revalidatePlayground({ organizationId: ORGANIZATION_ID }),
+    ).toBe(false);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -45,9 +47,9 @@ describe("revalidatePlayground", () => {
     fetchMock.mockResolvedValue(new Response("{}", { status: 200 }));
 
     const payload = {
-      ownerId: OWNER_ID,
+      organizationId: ORGANIZATION_ID,
       usernames: ["ada"],
-      resources: [{ kind: "agent" as const, id: OWNER_ID }],
+      resources: [{ kind: "agent" as const, id: ORGANIZATION_ID }],
     };
 
     expect(await revalidatePlayground(payload)).toBe(true);
@@ -63,10 +65,12 @@ describe("revalidatePlayground", () => {
   it("reports a refusal without throwing", async () => {
     fetchMock.mockResolvedValue(new Response("{}", { status: 401 }));
 
-    expect(await revalidatePlayground({ ownerId: OWNER_ID })).toBe(false);
+    expect(
+      await revalidatePlayground({ organizationId: ORGANIZATION_ID }),
+    ).toBe(false);
     expect(warn).toHaveBeenCalledWith(
       expect.stringContaining("refused"),
-      expect.objectContaining({ status: 401, ownerId: OWNER_ID }),
+      expect.objectContaining({ status: 401, organizationId: ORGANIZATION_ID }),
     );
   });
 
@@ -77,12 +81,14 @@ describe("revalidatePlayground", () => {
       }),
     );
 
-    expect(await revalidatePlayground({ ownerId: OWNER_ID })).toBe(false);
+    expect(
+      await revalidatePlayground({ organizationId: ORGANIZATION_ID }),
+    ).toBe(false);
     expect(warn).toHaveBeenCalledWith(
       expect.stringContaining("Could not reach"),
       {
         reason: "fetch failed: connect ECONNREFUSED 127.0.0.1:3100",
-        ownerId: OWNER_ID,
+        organizationId: ORGANIZATION_ID,
       },
     );
   });

@@ -6,13 +6,15 @@ from fractions import Fraction
 from http import HTTPStatus
 from typing import (
     Any,
+    Literal,
 )
 
 import httpx
 
 from ..amounts import format_units, parse_amount, to_base_units
-from ..errors import SpendLimitError
-from .models import AssetRef, PaymentRecord, SpendLimits
+from ..errors import SpendAuthorizationError, SpendLimitError
+from .governance import SpendGovernor
+from .models import AssetRef, GovernanceOutcome, PaymentRecord, SpendLimits
 from .protocols import PaymentProtocol, PaymentTerms
 from .session import NetworkSession, asset_ref
 
@@ -152,6 +154,60 @@ class FetchContext:
     session_for: Callable[[str], NetworkSession | None]
     limiter: SpendLimiter
     record: Callable[[httpx.Response, PaymentRecord], None]
+    governor: SpendGovernor | None = None
+
+
+PaymentOutcome = Literal["settled", "rejected", "unknown"]
+
+
+def _outcome(protocol: PaymentProtocol, paid: httpx.Response) -> PaymentOutcome:
+    if paid.status_code == HTTPStatus.PAYMENT_REQUIRED:
+        return "rejected"
+    # A seller that says nothing is taken to charge for what it delivered.
+    settled = protocol.settled(paid)
+    return "settled" if (paid.is_success if settled is None else settled) else "unknown"
+
+
+async def _authorize(
+    ctx: FetchContext,
+    session: NetworkSession,
+    terms: PaymentTerms,
+    reservation: Reservation,
+    url: str,
+) -> str | None:
+    if ctx.governor is None:
+        return None
+    try:
+        authorization = await ctx.governor.authorize(
+            terms=terms,
+            asset=reservation.asset,
+            payer_address=session.client.signer_address,
+            url=url,
+        )
+    except BaseException:
+        ctx.limiter.release(reservation)
+        raise
+    return authorization["id"]
+
+
+async def _conclude(
+    ctx: FetchContext,
+    authorization_id: str | None,
+    outcome: PaymentOutcome,
+    protocol: PaymentProtocol,
+    signed: dict[str, str],
+    paid: httpx.Response | None = None,
+) -> None:
+    if ctx.governor is None or authorization_id is None:
+        return
+    if outcome == "rejected":
+        accounting = await ctx.governor.release(authorization_id)
+    else:
+        accounting = await ctx.governor.consume(
+            authorization_id, protocol.req_id(signed)
+        )
+    if paid is not None:
+        ctx.governor.record(paid, GovernanceOutcome(authorization_id, accounting))
 
 
 async def paying_fetch(
@@ -184,30 +240,15 @@ async def paying_fetch(
         return response
 
     body = await challenged.aread()
+    url_asked = str(challenged.url)
 
-    async def pay_and_send(
-        protocol: PaymentProtocol,
-        terms: PaymentTerms,
-        session: NetworkSession,
-        reservation: Reservation | None = None,
-    ) -> tuple[httpx.Response, Reservation]:
-        """*reservation* is the one a payment for the same *terms* holds: paying
-        them again signs the same payment, so the seller can redeem one."""
-        again = reservation is not None
-        if reservation is None:
-            reservation = await ctx.limiter.reserve(session, terms, str(challenged.url))
+    async def send(signed: dict[str, str]) -> httpx.Response:
         headers = challenged.headers.copy()
         headers.pop("transfer-encoding", None)
-        try:
-            headers.update(await protocol.pay(terms, session.client, ctx.http))
-        except BaseException:
-            # Nothing has left this process, unless this is the second time.
-            if not again:
-                ctx.limiter.release(reservation)
-            raise
+        headers.update(signed)
         # No redirects: they would hand the payment to wherever they point.
         # Stays reserved whatever comes back: the seller holds a signed payment.
-        paid = await ctx.http.send(
+        return await ctx.http.send(
             httpx.Request(
                 challenged.method,
                 challenged.url,
@@ -217,27 +258,39 @@ async def paying_fetch(
             ),
             **{**send_options, "follow_redirects": False},
         )
-        return paid, reservation
 
-    refusals: list[SpendLimitError] = []
+    refusals: list[SpendLimitError | SpendAuthorizationError] = []
     for protocol, terms, session in options:
         try:
-            paid, reservation = await pay_and_send(protocol, terms, session)
-        except SpendLimitError as refusal:
+            reservation = await ctx.limiter.reserve(session, terms, url_asked)
+            authorization_id = await _authorize(
+                ctx, session, terms, reservation, url_asked
+            )
+        except (SpendLimitError, SpendAuthorizationError) as refusal:
             refusals.append(refusal)
             continue
-        if paid.status_code == HTTPStatus.PAYMENT_REQUIRED and await protocol.recover(
-            paid, terms, session.client
-        ):
-            # Once: a seller refusing again is not something paying fixes.
-            paid, reservation = await pay_and_send(
-                protocol, terms, session, reservation
-            )
-        if paid.status_code == HTTPStatus.PAYMENT_REQUIRED:
-            return paid
-        # A seller that says nothing is taken to charge for what it delivered.
-        settled = protocol.settled(paid)
-        if paid.is_success if settled is None else settled:
+        try:
+            signed = await protocol.pay(terms, session.client, ctx.http)
+        except BaseException:
+            # Nothing has left this process.
+            ctx.limiter.release(reservation)
+            await _conclude(ctx, authorization_id, "rejected", protocol, {})
+            raise
+        try:
+            paid = await send(signed)
+            if (
+                paid.status_code == HTTPStatus.PAYMENT_REQUIRED
+                and await protocol.recover(paid, terms, session.client)
+            ):
+                # Once: a seller refusing again is not something paying fixes.
+                signed = await protocol.pay(terms, session.client, ctx.http)
+                paid = await send(signed)
+        except BaseException:
+            await _conclude(ctx, authorization_id, "unknown", protocol, signed)
+            raise
+        outcome = _outcome(protocol, paid)
+        await _conclude(ctx, authorization_id, outcome, protocol, signed, paid)
+        if outcome == "settled":
             ctx.record(
                 paid,
                 PaymentRecord(

@@ -19,6 +19,7 @@ import { useTranslation } from "react-i18next";
 import { ConfirmAction } from "@/components/ConfirmAction";
 import { ComboBox, FieldRow, TextInput } from "@/components/form";
 import { SettingsSection } from "@/components/layout";
+import { ProjectRestricted } from "@/components/Project/ProjectRestricted";
 import { Spinner } from "@/components/Spinner";
 import { useOnSuccess } from "@/hooks/useOnSuccess";
 
@@ -223,87 +224,93 @@ export function WebhooksCard({ onReveal }: { onReveal: RevealSecret }) {
       title={t("developer.webhooks.title")}
       description={t("developer.webhooks.description")}
     >
-      <Card>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            create();
-          }}
-        >
-          <FieldRow
-            title={t("developer.webhooks.url")}
-            description={t("developer.webhooks.urlHint")}
-            htmlFor="webhook-url"
+      <ProjectRestricted>
+        <Card>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              create();
+            }}
           >
-            <TextInput
-              type="url"
-              inputMode="url"
-              value={url}
-              placeholder="https://api.example.com/4mica/webhooks"
-              error={urlError ?? issues.url}
-              maxLength={2048}
-              onChange={setUrl}
-            />
-          </FieldRow>
-
-          <FieldRow
-            title={t("developer.webhooks.descriptionLabel")}
-            description={t("developer.webhooks.descriptionHint")}
-            htmlFor="webhook-description"
-          >
-            <TextInput
-              value={description}
-              error={issues.description}
-              maxLength={255}
-              onChange={setDescription}
-            />
-          </FieldRow>
-
-          <FieldRow
-            title={t("developer.webhooks.events")}
-            description={t("developer.webhooks.eventsHint")}
-          >
-            <ComboBox
-              data-testid="webhook-new-events"
-              options={options}
-              selectedValues={selected}
-              placeholder={t("developer.webhooks.selectEvents")}
-              onChange={setSelected}
-            />
-            {issues.events && (
-              <p className="mt-2 text-danger text-xs" role="alert">
-                {issues.events}
-              </p>
-            )}
-          </FieldRow>
-
-          <div className="-mx-6 mt-5 flex items-center justify-end gap-2 border-overlay/10 border-t px-6 pt-4">
-            <Button
-              type="submit"
-              size="sm"
-              intent="invert"
-              className="btn-no-lift min-w-28 shrink-0 whitespace-nowrap border border-transparent py-2.5 text-sm leading-5"
-              loading={isCreating}
-              disabled={!canSubmit}
+            <FieldRow
+              title={t("developer.webhooks.url")}
+              description={t("developer.webhooks.urlHint")}
+              htmlFor="webhook-url"
             >
-              {t("developer.webhooks.create")}
-            </Button>
-          </div>
-        </form>
-      </Card>
+              <TextInput
+                type="url"
+                inputMode="url"
+                value={url}
+                placeholder="https://api.example.com/4mica/webhooks"
+                error={urlError ?? issues.url}
+                maxLength={2048}
+                onChange={setUrl}
+              />
+            </FieldRow>
 
-      {webhooks.length === 0 ? (
-        <EmptyState
-          icon={<WebhookIcon size={20} />}
-          title={t("developer.webhooks.emptyTitle")}
-          description={t("developer.webhooks.emptyDescription")}
-          data-testid="webhooks"
-        />
-      ) : (
-        webhooks.map((webhook) => (
-          <WebhookRow key={webhook.id} webhook={webhook} onReveal={onReveal} />
-        ))
-      )}
+            <FieldRow
+              title={t("developer.webhooks.descriptionLabel")}
+              description={t("developer.webhooks.descriptionHint")}
+              htmlFor="webhook-description"
+            >
+              <TextInput
+                value={description}
+                error={issues.description}
+                maxLength={255}
+                onChange={setDescription}
+              />
+            </FieldRow>
+
+            <FieldRow
+              title={t("developer.webhooks.events")}
+              description={t("developer.webhooks.eventsHint")}
+            >
+              <ComboBox
+                data-testid="webhook-new-events"
+                options={options}
+                selectedValues={selected}
+                placeholder={t("developer.webhooks.selectEvents")}
+                onChange={setSelected}
+              />
+              {issues.events && (
+                <p className="mt-2 text-danger text-xs" role="alert">
+                  {issues.events}
+                </p>
+              )}
+            </FieldRow>
+
+            <div className="-mx-6 mt-5 flex items-center justify-end gap-2 border-overlay/10 border-t px-6 pt-4">
+              <Button
+                type="submit"
+                size="sm"
+                intent="invert"
+                className="btn-no-lift min-w-28 shrink-0 whitespace-nowrap border border-transparent py-2.5 text-sm leading-5"
+                loading={isCreating}
+                disabled={!canSubmit}
+              >
+                {t("developer.webhooks.create")}
+              </Button>
+            </div>
+          </form>
+        </Card>
+
+        {webhooks.length === 0 ? (
+          <EmptyState
+            icon={<WebhookIcon size={20} />}
+            title={t("developer.webhooks.emptyTitle")}
+            description={t("developer.webhooks.emptyDescription")}
+            data-testid="webhooks"
+          />
+        ) : (
+          webhooks.map((webhook) => (
+            <WebhookRow
+              key={webhook.id}
+              webhook={webhook}
+              onReveal={onReveal}
+            />
+          ))
+        )}
+      </ProjectRestricted>
     </SettingsSection>
   );
 }

@@ -1,3 +1,4 @@
+pub mod app;
 pub mod auth;
 pub mod client;
 pub mod config;
@@ -26,6 +27,10 @@ pub use rpc::{
     SignedCheckpoint, StaleTimestampDetails, TimestampNotPastCutoffDetails, ValidationRequirement,
 };
 
+pub use app::{
+    AppClient, AppError, ApprovalState, ApprovalStatus, AuthorizeSpend, ConsumeSpend,
+    CreateApproval, CreatedApproval, SpendAuthorization, SpendAuthorizationStatus,
+};
 pub use auth::{AuthClient, AuthSession, AuthTokens};
 pub use client::model::{
     Asset, AssetBalanceInfo, AssetPosition, ClaimReceipt, DepositReceipt, PayReceipt,

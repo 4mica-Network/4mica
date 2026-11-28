@@ -7,7 +7,7 @@ export interface PlaygroundResource {
 }
 
 export interface PlaygroundRevalidation {
-  ownerId: string;
+  organizationId: string;
   usernames?: string[];
   resources?: PlaygroundResource[];
 }
@@ -49,7 +49,7 @@ export const revalidatePlayground = async (
     if (!response.ok) {
       logger.warn("Playground refused the cache revalidation", {
         status: response.status,
-        ownerId: payload.ownerId,
+        organizationId: payload.organizationId,
       });
       return false;
     }
@@ -58,7 +58,7 @@ export const revalidatePlayground = async (
   } catch (error) {
     logger.warn("Could not reach the playground to revalidate its cache", {
       reason: failureReason(error),
-      ownerId: payload.ownerId,
+      organizationId: payload.organizationId,
     });
     return false;
   }

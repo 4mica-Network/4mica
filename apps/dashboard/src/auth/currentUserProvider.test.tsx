@@ -30,8 +30,20 @@ vi.mock("@api/client", () => ({
 vi.mock("@clerk/clerk-react", () => ({
   useAuth,
   useClerk: () => ({ signOut }),
+  useReverification: () => vi.fn(),
 }));
-vi.mock("@stores/hooks", () => ({ useAppDispatch: () => dispatch }));
+vi.mock("@stores/hooks", () => ({
+  useAppDispatch: () => dispatch,
+  useAppSelector: (selector: (state: unknown) => unknown) =>
+    selector({
+      organization: { status: "loaded", activeId: "org_1", items: [] },
+      project: {
+        status: "loaded",
+        activeId: "project_1",
+        environment: "sandbox",
+      },
+    }),
+}));
 vi.mock("@stores/user/actions", () => ({
   fetchUser: () => ({ type: "FETCH_USER_REQUESTED" }),
 }));
@@ -109,6 +121,25 @@ describe("CurrentUserProvider", () => {
     expect(signOut).toHaveBeenCalledTimes(1);
     expect(signOut).toHaveBeenCalledWith({
       redirectUrl: `/sign-in?redirect_url=${encodeURIComponent("/payments?page=2")}`,
+    });
+  });
+
+  it("explains a sign-out forced by the organization's session age limit", () => {
+    window.history.replaceState(null, "", "/payments");
+
+    render(
+      <CurrentUserProvider>
+        <div />
+      </CurrentUserProvider>,
+    );
+
+    const handler = setUnauthorizedHandler.mock.calls.at(-1)?.[0] as (
+      body: unknown,
+    ) => void;
+    handler({ error: "session_too_old", message: "Sign in again." });
+
+    expect(signOut).toHaveBeenCalledWith({
+      redirectUrl: `/sign-in?reason=session_too_old&redirect_url=${encodeURIComponent("/payments")}`,
     });
   });
 });

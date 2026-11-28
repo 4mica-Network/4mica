@@ -3,6 +3,22 @@
 exports[`a key-file in the config that no longer exists > is not read when a key comes from a .env or --key-file > json shape: whoami 1`] = `
 {
   "address": "string",
+  "context": {
+    "environment": {
+      "name": "string",
+      "source": "string",
+    },
+    "organization": {
+      "id": "null",
+      "name": "null",
+      "source": "string",
+    },
+    "project": {
+      "id": "null",
+      "name": "null",
+      "source": "string",
+    },
+  },
   "facilitatorUrl": {
     "source": "string",
     "value": "string",

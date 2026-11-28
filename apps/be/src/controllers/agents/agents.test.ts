@@ -2,23 +2,44 @@ import { clearUserCache } from "@auth/user-store";
 import { agentRoutes } from "@routes/agents";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { initApp } from "@/server";
+import {
+  actAs,
+  ORG_ID,
+  OTHER_ORG_ID,
+  OTHER_PROJECT_ID,
+  PRODUCTION_ENV_ID,
+  PROJECT_ID,
+  SANDBOX_ENV_ID,
+} from "@/test-support/tenancy";
 
-const { authenticateRequest, getUser, findUnique, upsert, agent, wallet } =
-  vi.hoisted(() => ({
-    authenticateRequest: vi.fn(),
-    getUser: vi.fn(),
-    findUnique: vi.fn(),
-    upsert: vi.fn(),
-    agent: {
-      findMany: vi.fn(),
-      findFirst: vi.fn(),
-      count: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
-      updateMany: vi.fn(),
-    },
-    wallet: { findFirst: vi.fn() },
-  }));
+const {
+  authenticateRequest,
+  getUser,
+  findUnique,
+  upsert,
+  agent,
+  wallet,
+  tenancy,
+} = vi.hoisted(() => ({
+  tenancy: {
+    membership: { findFirst: vi.fn(), create: vi.fn() },
+    auditLog: { create: vi.fn() },
+    project: { findFirst: vi.fn() },
+  },
+  authenticateRequest: vi.fn(),
+  getUser: vi.fn(),
+  findUnique: vi.fn(),
+  upsert: vi.fn(),
+  agent: {
+    findMany: vi.fn(),
+    findFirst: vi.fn(),
+    count: vi.fn(),
+    create: vi.fn(),
+    update: vi.fn(),
+    updateMany: vi.fn(),
+  },
+  wallet: { findFirst: vi.fn() },
+}));
 
 vi.mock("@clerk/backend", () => ({
   createClerkClient: vi.fn(() => ({ authenticateRequest, users: { getUser } })),
@@ -26,6 +47,7 @@ vi.mock("@clerk/backend", () => ({
 
 vi.mock("@4mica/db", () => ({
   prisma: {
+    ...tenancy,
     agent,
     user: { findUnique, upsert, update: vi.fn() },
     business: { findUnique: vi.fn(), upsert: vi.fn() },
@@ -146,6 +168,7 @@ describe("agent routes", () => {
       }
     }
     clearUserCache();
+    actAs(tenancy);
 
     authenticateRequest.mockResolvedValue(signedIn());
     upsert.mockResolvedValue(AUTH_USER);
@@ -323,7 +346,7 @@ describe("agent routes", () => {
         method: "PATCH",
         url: `/me/agents/${AGENT_ID}`,
         headers: AUTH,
-        payload: { network: "BASE" },
+        payload: { network: "ETHEREUM_SEPOLIA" },
       });
 
       expect(res.statusCode).toBe(409);
@@ -348,11 +371,13 @@ describe("agent routes", () => {
         method: "PATCH",
         url: `/me/agents/${AGENT_ID}`,
         headers: AUTH,
-        payload: { network: "BASE" },
+        payload: { network: "ETHEREUM_SEPOLIA" },
       });
 
       expect(res.statusCode).toBe(200);
-      expect(agent.updateMany.mock.calls[0][0].data.network).toBe("BASE");
+      expect(agent.updateMany.mock.calls[0][0].data.network).toBe(
+        "ETHEREUM_SEPOLIA",
+      );
 
       await instance.close();
     });
@@ -364,7 +389,11 @@ describe("agent routes", () => {
         method: "PATCH",
         url: `/me/agents/${AGENT_ID}`,
         headers: AUTH,
-        payload: { network: "BASE", walletId: null, payerWalletId: null },
+        payload: {
+          network: "ETHEREUM_SEPOLIA",
+          walletId: null,
+          payerWalletId: null,
+        },
       });
 
       expect(res.statusCode).toBe(200);
@@ -702,7 +731,9 @@ describe("agent routes", () => {
 
     await instance.inject({ method: "GET", url: "/me/agents", headers: AUTH });
     expect(agent.findMany.mock.calls[0][0].where).toMatchObject({
-      ownerId: USER_ID,
+      organizationId: ORG_ID,
+      projectId: PROJECT_ID,
+      environmentId: SANDBOX_ENV_ID,
       deletedAt: null,
     });
 
@@ -713,11 +744,225 @@ describe("agent routes", () => {
     });
     expect(agent.findFirst.mock.calls[0][0].where).toMatchObject({
       id: AGENT_ID,
-      ownerId: USER_ID,
+      organizationId: ORG_ID,
+      projectId: PROJECT_ID,
+      environmentId: SANDBOX_ENV_ID,
       deletedAt: null,
     });
 
     await instance.close();
+  });
+
+  it("acts in the organization named by X-Org-Id when the caller belongs to it", async () => {
+    actAs(tenancy, "DEVELOPER", OTHER_ORG_ID);
+    const instance = await app();
+
+    const res = await instance.inject({
+      method: "GET",
+      url: "/me/agents",
+      headers: { ...AUTH, "x-org-id": OTHER_ORG_ID },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(agent.findMany.mock.calls[0][0].where).toMatchObject({
+      organizationId: OTHER_ORG_ID,
+    });
+
+    await instance.close();
+  });
+
+  it("404s and reads nothing for an organization the caller is not in", async () => {
+    const instance = await app();
+
+    const res = await instance.inject({
+      method: "GET",
+      url: "/me/agents",
+      headers: { ...AUTH, "x-org-id": OTHER_ORG_ID },
+    });
+
+    expect(res.statusCode).toBe(404);
+    expect(agent.findMany).not.toHaveBeenCalled();
+
+    await instance.close();
+  });
+
+  it("404s on a malformed X-Org-Id without querying", async () => {
+    const instance = await app();
+
+    const res = await instance.inject({
+      method: "GET",
+      url: "/me/agents",
+      headers: { ...AUTH, "x-org-id": "not-a-uuid" },
+    });
+
+    expect(res.statusCode).toBe(404);
+    expect(tenancy.membership.findFirst).not.toHaveBeenCalled();
+
+    await instance.close();
+  });
+
+  it("records the creator and audits the creation", async () => {
+    agent.findMany.mockResolvedValue([]);
+    const instance = await app();
+
+    const res = await instance.inject({
+      method: "POST",
+      url: "/me/agents",
+      headers: AUTH,
+      payload: { name: "Atlas Research Agent", network: "BASE_SEPOLIA" },
+    });
+
+    expect(res.statusCode).toBe(201);
+    expect(agent.create.mock.calls[0][0].data).toMatchObject({
+      organizationId: ORG_ID,
+      projectId: PROJECT_ID,
+      environmentId: SANDBOX_ENV_ID,
+      createdById: USER_ID,
+    });
+    expect(tenancy.auditLog.create.mock.calls[0][0].data).toMatchObject({
+      organizationId: ORG_ID,
+      actorUserId: USER_ID,
+      action: "agent.created",
+      targetId: AGENT_ID,
+    });
+
+    await instance.close();
+  });
+
+  describe("projects and environments", () => {
+    const listAgents = async (headers: Record<string, string> = {}) => {
+      const instance = await app();
+      const res = await instance.inject({
+        method: "GET",
+        url: "/me/agents",
+        headers: { ...AUTH, ...headers },
+      });
+      await instance.close();
+      return res;
+    };
+
+    const createAgent = async (
+      payload: Record<string, unknown>,
+      headers: Record<string, string> = {},
+    ) => {
+      agent.findMany.mockResolvedValue([]);
+      const instance = await app();
+      const res = await instance.inject({
+        method: "POST",
+        url: "/me/agents",
+        headers: { ...AUTH, ...headers },
+        payload,
+      });
+      await instance.close();
+      return res;
+    };
+
+    it("reads production when X-Environment asks for it", async () => {
+      const res = await listAgents({ "x-environment": "production" });
+
+      expect(res.statusCode).toBe(200);
+      expect(agent.findMany.mock.calls[0][0].where).toMatchObject({
+        projectId: PROJECT_ID,
+        environmentId: PRODUCTION_ENV_ID,
+      });
+    });
+
+    it("404s on an unknown environment or project without reading agents", async () => {
+      expect(
+        (await listAgents({ "x-environment": "staging" })).statusCode,
+      ).toBe(404);
+      expect(
+        (await listAgents({ "x-project-id": OTHER_PROJECT_ID })).statusCode,
+      ).toBe(404);
+      expect((await listAgents({ "x-project-id": "nope" })).statusCode).toBe(
+        404,
+      );
+      expect(agent.findMany).not.toHaveBeenCalled();
+    });
+
+    it("hides a restricted project from a developer who is not on it", async () => {
+      actAs(tenancy, "DEVELOPER", ORG_ID, { restricted: true });
+
+      expect((await listAgents()).statusCode).toBe(404);
+      expect(agent.findMany).not.toHaveBeenCalled();
+    });
+
+    it("opens a restricted project to its members", async () => {
+      actAs(tenancy, "VIEWER", ORG_ID, {
+        restricted: true,
+        memberRole: "DEVELOPER",
+      });
+
+      const res = await createAgent({
+        name: "Atlas",
+        network: "BASE_SEPOLIA",
+      });
+
+      expect(res.statusCode).toBe(201);
+    });
+
+    it("lets a viewer read but not create", async () => {
+      actAs(tenancy, "VIEWER");
+
+      expect((await listAgents()).statusCode).toBe(200);
+      const res = await createAgent({ name: "Atlas", network: "BASE_SEPOLIA" });
+      expect(res.statusCode).toBe(403);
+      expect(res.json()).toMatchObject({
+        error: "forbidden",
+        permission: "resources.write",
+      });
+      expect(agent.create).not.toHaveBeenCalled();
+    });
+
+    it("keeps production to project admins when the project says so", async () => {
+      actAs(tenancy, "DEVELOPER", ORG_ID, { restrictProduction: true });
+
+      const res = await createAgent(
+        { name: "Atlas", network: "BASE" },
+        { "x-environment": "production" },
+      );
+      expect(res.statusCode).toBe(403);
+      expect(res.json().error).toBe("production_restricted");
+
+      const sandbox = await createAgent({
+        name: "Atlas",
+        network: "BASE_SEPOLIA",
+      });
+      expect(sandbox.statusCode).toBe(201);
+    });
+
+    it("refuses changes to an archived project", async () => {
+      actAs(tenancy, "OWNER", ORG_ID, { archived: true });
+
+      const res = await createAgent({ name: "Atlas", network: "BASE_SEPOLIA" });
+
+      expect(res.statusCode).toBe(409);
+      expect(res.json().error).toBe("project_archived");
+      expect((await listAgents()).statusCode).toBe(200);
+    });
+
+    it("refuses a mainnet agent in sandbox and a testnet agent in production", async () => {
+      const mainnet = await createAgent({ name: "Atlas", network: "BASE" });
+      expect(mainnet.statusCode).toBe(400);
+      expect(mainnet.json().issues).toEqual([
+        { path: "network", message: "is not available in sandbox" },
+      ]);
+
+      const testnet = await createAgent(
+        { name: "Atlas", network: "BASE_SEPOLIA" },
+        { "x-environment": "production" },
+      );
+      expect(testnet.statusCode).toBe(400);
+      expect(agent.create).not.toHaveBeenCalled();
+    });
+
+    it("tags the audit entry with the project and environment", async () => {
+      await createAgent({ name: "Atlas", network: "BASE_SEPOLIA" });
+
+      expect(
+        tenancy.auditLog.create.mock.calls[0][0].data.metadata,
+      ).toMatchObject({ projectId: PROJECT_ID, environment: "SANDBOX" });
+    });
   });
 
   it("404s for an agent that is not the caller's", async () => {
@@ -770,7 +1015,11 @@ describe("agent routes", () => {
         method: "POST",
         url: "/me/agents",
         headers: AUTH,
-        payload: { name: "Atlas", network: "BASE", assetAddress: USDC },
+        payload: {
+          name: "Atlas",
+          network: "ETHEREUM_SEPOLIA",
+          assetAddress: USDC,
+        },
       });
 
       expect(res.statusCode).toBe(400);

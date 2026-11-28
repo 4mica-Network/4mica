@@ -1,6 +1,7 @@
 import { type Prisma, prisma } from "@4mica/db";
 import { SLUG_MAX_LENGTH } from "@4mica/rules";
 import { amountText, optionalAmountText } from "@utils/amount";
+import { type ResourceScope, scopeData, scopeWhere } from "@utils/scope";
 import type { ListAgentsQuery } from "./schema";
 
 export const AGENT_SELECT = {
@@ -66,10 +67,13 @@ const orderFor = (
 };
 
 const whereFor = (
-  ownerId: string,
+  scope: ResourceScope,
   query: ListAgentsQuery,
 ): Prisma.AgentWhereInput => {
-  const where: Prisma.AgentWhereInput = { ownerId, deletedAt: null };
+  const where: Prisma.AgentWhereInput = {
+    ...scopeWhere(scope),
+    deletedAt: null,
+  };
 
   if (query.status) {
     where.status = query.status;
@@ -94,7 +98,7 @@ const whereFor = (
 };
 
 export const listAgents = async (
-  ownerId: string,
+  scope: ResourceScope,
   query: ListAgentsQuery,
 ): Promise<{
   items: AgentRow[];
@@ -102,7 +106,7 @@ export const listAgents = async (
   page: number;
   limit: number;
 }> => {
-  const where = whereFor(ownerId, query);
+  const where = whereFor(scope, query);
   const skip = (query.page - 1) * query.limit;
 
   const [items, total] = await prisma.$transaction([
@@ -125,20 +129,20 @@ export const listAgents = async (
 };
 
 export const getAgent = async (
-  ownerId: string,
+  scope: ResourceScope,
   id: string,
 ): Promise<AgentRow | null> => {
   const row = await prisma.agent.findFirst({
-    where: { id, ownerId, deletedAt: null },
+    where: { id, ...scopeWhere(scope), deletedAt: null },
     select: AGENT_SELECT,
   });
 
   return row ? toRow(row) : null;
 };
 
-export const takenSlugs = async (ownerId: string): Promise<Set<string>> => {
+export const takenSlugs = async (orgId: string): Promise<Set<string>> => {
   const rows = await prisma.agent.findMany({
-    where: { ownerId },
+    where: { organizationId: orgId },
     select: { slug: true },
   });
 
@@ -146,11 +150,15 @@ export const takenSlugs = async (ownerId: string): Promise<Set<string>> => {
 };
 
 export const createAgent = async (
-  ownerId: string,
-  data: Prisma.AgentUncheckedCreateInput,
+  scope: ResourceScope,
+  userId: string,
+  data: Omit<
+    Prisma.AgentUncheckedCreateInput,
+    "organizationId" | "projectId" | "environmentId" | "createdById"
+  >,
 ): Promise<AgentRow> => {
   const row = await prisma.agent.create({
-    data: { ...data, ownerId },
+    data: { ...data, ...scopeData(scope), createdById: userId },
     select: AGENT_SELECT,
   });
 
@@ -158,24 +166,24 @@ export const createAgent = async (
 };
 
 export const updateAgent = async (
-  ownerId: string,
+  scope: ResourceScope,
   id: string,
   data: Record<string, unknown>,
 ): Promise<AgentRow | null> => {
   const { count } = await prisma.agent.updateMany({
-    where: { id, ownerId, deletedAt: null },
+    where: { id, ...scopeWhere(scope), deletedAt: null },
     data: data as Prisma.AgentUpdateManyMutationInput,
   });
 
-  return count > 0 ? getAgent(ownerId, id) : null;
+  return count > 0 ? getAgent(scope, id) : null;
 };
 
 export const softDeleteAgent = async (
-  ownerId: string,
+  scope: ResourceScope,
   id: string,
 ): Promise<boolean> => {
   const row = await prisma.agent.findFirst({
-    where: { id, ownerId, deletedAt: null },
+    where: { id, ...scopeWhere(scope), deletedAt: null },
     select: { id: true, slug: true },
   });
 
@@ -198,11 +206,11 @@ export const softDeleteAgent = async (
 };
 
 export const batchSoftDeleteAgents = async (
-  ownerId: string,
+  scope: ResourceScope,
   ids: string[],
 ): Promise<{ deleted: string[]; notFound: string[] }> => {
   const owned = await prisma.agent.findMany({
-    where: { id: { in: ids }, ownerId, deletedAt: null },
+    where: { id: { in: ids }, ...scopeWhere(scope), deletedAt: null },
     select: { id: true, slug: true },
   });
 

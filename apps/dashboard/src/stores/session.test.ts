@@ -32,4 +32,13 @@ describe("withSessionReset", () => {
 
     expect(reducer(loaded, { type: "OTHER" })).toEqual(loaded);
   });
+
+  it("keeps the slices a reset names, alongside the config", () => {
+    const loaded = reducer(undefined, { type: "LOAD" });
+
+    const kept = reducer(loaded, resetSession(["user"]));
+
+    expect(kept.user).toEqual({ email: "ada@example.com" });
+    expect(kept.config).toEqual({ version: "v1" });
+  });
 });

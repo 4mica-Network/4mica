@@ -1,4 +1,6 @@
+import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
+import type { Prisma } from "@4mica/db";
 import { config as loadEnv } from "dotenv";
 
 loadEnv({
@@ -393,6 +395,293 @@ const BANNERS = [
   },
 ] as const;
 
+const TEAM = {
+  handle: "4mica-labs",
+  name: "4mica Labs",
+  member: 0,
+} as const;
+
+const TEAM_WALLET = {
+  label: "Labs treasury",
+  description: "Receives payment for the 4mica Labs listings.",
+  address: "0x5b3d9c7e2f0a4b6d8e1c3a5f7b9d0e2c4a6f8b13",
+  network: "BASE_SEPOLIA",
+  role: "RECIPIENT",
+  status: "ACTIVE",
+  isDefault: true,
+  verifiedChainId: 84532,
+} as const;
+
+const TEAM_LISTINGS = [
+  {
+    slug: "agent-reputation",
+    name: "Agent Reputation API",
+    summary: "Settlement history and dispute rate for any payer address.",
+    description:
+      "Score a counterparty before extending it credit: settled volume, late settlements and open disputes, aggregated across every 4Mica tab it has opened.",
+    url: "https://labs.4mica.io/v1/reputation/:address",
+    method: "GET",
+    docsUrl: "https://docs.4mica.io/labs/reputation",
+    category: "Risk",
+    tags: ["reputation", "risk", "agents"],
+    priceLabel: "$0.02 per lookup",
+    visibility: "PUBLIC",
+    network: "BASE_SEPOLIA",
+    payToAddress: TEAM_WALLET.address,
+    assetAddress: USDC_BASE_SEPOLIA,
+    priceAmount: "0.02",
+    priceCurrency: "USDC",
+    x402Endpoint: "https://labs.4mica.io/v1/x402",
+  },
+] as const;
+
+const FINANCE_MEMBER = {
+  clerkUserId: "user_seed_finance_fran",
+  username: "fran-finance",
+  name: "Fran Ilunga",
+  email: "fran@example.com",
+} as const;
+
+const TEAM_GOVERNANCE = {
+  approvalsRequired: 1,
+  governedActions: ["spending_policy.change", "api_key.create_production"],
+} as const;
+
+const TEAM_ENTERPRISE = {
+  domain: "labs.4mica.example",
+  verificationToken: "seed-labs-domain-verification",
+  customRole: {
+    name: "Auditor",
+    description: "Reads payments, finance and compliance; changes nothing.",
+    permissions: [
+      "resources.read",
+      "payments.read",
+      "finance.read",
+      "compliance.read",
+    ],
+  },
+} as const;
+
+const TEAM_APPROVAL = {
+  id: "019a0000-5eed-7000-8000-00000000a001",
+  action: "spending_policy.change",
+  summary:
+    'Create spending policy "Labs monthly cap": 200 USDC a month on Base Sepolia',
+  payload: {
+    op: "create",
+    name: "Labs monthly cap",
+    scope: "ORGANIZATION",
+    mode: "ENFORCE",
+    network: "BASE_SEPOLIA",
+    assetAddress: USDC_BASE_SEPOLIA,
+    monthlyLimit: "200",
+  },
+  ttlHours: 72,
+} as const;
+
+const GUARDRAIL_POLICY = {
+  name: "Workspace guardrail",
+  scope: "ORGANIZATION",
+  mode: "ENFORCE",
+  network: "BASE_SEPOLIA",
+  assetAddress: USDC_BASE_SEPOLIA,
+  perPaymentLimit: "5",
+  dailyLimit: "50",
+  approvalThreshold: "20",
+} as const;
+
+const BUDGET_POLICY = {
+  name: "Monthly budget",
+  scope: "ORGANIZATION",
+  mode: "MONITOR",
+  network: "BASE_SEPOLIA",
+  assetAddress: USDC_BASE_SEPOLIA,
+  monthlyLimit: "500",
+  alertThresholds: [50, 80, 100],
+} as const;
+
+const SPEND_AUTHORIZATION_IDS = {
+  consumed: "019a0000-5eed-7000-8000-00000000b001",
+  reserved: "019a0000-5eed-7000-8000-00000000b002",
+  denied: "019a0000-5eed-7000-8000-00000000b003",
+} as const;
+
+const BLOCKED_SELLER = "0x2c4e6a8c0f2b4d6e8a1c3f5b7d9e0a2c4e6f8b31";
+
+const DEV_INVITATION = {
+  email: "invitee@example.com",
+  role: "DEVELOPER",
+  token: "4mica-labs-dev-invitation",
+} as const;
+
+const RESEARCH_PROJECT = {
+  slug: "research",
+  name: "Research",
+  description: "Experiments the wider team should not see yet.",
+  restricted: true,
+  viewer: 0,
+} as const;
+
+const SERVICE_ACCOUNT = {
+  name: "Payments reporter",
+  description: "Reports settled payments from the billing worker.",
+} as const;
+
+const SERVICE_ACCOUNT_KEY = {
+  name: "Billing worker (sandbox)",
+  namespace: "4mica_sk_test",
+  body: "seedPaymentsReporterDevKey0001",
+  scopes: ["PAYMENTS_WRITE"],
+} as const;
+
+const SERVICE_ACCOUNT_SECRET = `${SERVICE_ACCOUNT_KEY.namespace}_${SERVICE_ACCOUNT_KEY.body}`;
+
+type EnvironmentKind = "SANDBOX" | "PRODUCTION";
+
+interface SeededProject {
+  id: string;
+  environments: Record<EnvironmentKind, string>;
+}
+
+const environmentFor = (network: string | null): EnvironmentKind =>
+  network === "BASE" ? "PRODUCTION" : "SANDBOX";
+
+const scopeFor = (project: SeededProject, network: string | null) => ({
+  projectId: project.id,
+  environmentId: project.environments[environmentFor(network)],
+});
+
+const ensureProject = async (
+  organizationId: string,
+  fields: {
+    slug: string;
+    name: string;
+    description?: string | null;
+    isDefault: boolean;
+    restricted?: boolean;
+  },
+): Promise<SeededProject> => {
+  const data = {
+    name: fields.name,
+    ...(fields.description !== undefined
+      ? { description: fields.description }
+      : {}),
+    isDefault: fields.isDefault,
+    restricted: fields.restricted ?? false,
+    archivedAt: null,
+    deletedAt: null,
+  };
+
+  const project = await prisma.project.upsert({
+    where: { organizationId_slug: { organizationId, slug: fields.slug } },
+    update: data,
+    create: { organizationId, slug: fields.slug, ...data },
+    select: { id: true },
+  });
+
+  const environments = {} as Record<EnvironmentKind, string>;
+  for (const kind of ["SANDBOX", "PRODUCTION"] as const) {
+    const row = await prisma.environment.upsert({
+      where: { projectId_kind: { projectId: project.id, kind } },
+      update: {},
+      create: { projectId: project.id, kind },
+      select: { id: true },
+    });
+    environments[kind] = row.id;
+  }
+
+  return { id: project.id, environments };
+};
+
+const ensureDefaultProject = async (organizationId: string) => {
+  const existing = await prisma.project.findFirst({
+    where: { organizationId, isDefault: true, deletedAt: null },
+    select: { slug: true, name: true },
+  });
+
+  return ensureProject(organizationId, {
+    slug: existing?.slug ?? "default",
+    name: existing?.name ?? "Default",
+    isDefault: true,
+  });
+};
+
+const sha256Hex = (value: string): string =>
+  createHash("sha256").update(value).digest("hex");
+
+const canonical = (value: unknown): unknown => {
+  if (Array.isArray(value)) {
+    return value.map(canonical);
+  }
+  if (value !== null && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .filter(([, entry]) => entry !== undefined)
+        .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+        .map(([key, entry]) => [key, canonical(entry)]),
+    );
+  }
+  return value;
+};
+
+const payloadHash = (action: string, payload: unknown): string =>
+  sha256Hex(JSON.stringify(canonical({ action, payload })));
+
+const TEN_MINUTES_MS = 10 * 60 * 1000;
+
+const inSevenDays = () => new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+const ensurePersonalOrganization = async (user: {
+  id: string;
+  username: string;
+  name: string;
+  avatarUrl: string | null;
+}): Promise<{ id: string; project: SeededProject }> => {
+  const fields = {
+    handle: user.username,
+    name: user.name,
+    avatarUrl: user.avatarUrl,
+    personal: true,
+    deletedAt: null,
+  };
+
+  const existing = await prisma.organization.findFirst({
+    where: {
+      personal: true,
+      memberships: { some: { userId: user.id, role: "OWNER" } },
+    },
+    select: { id: true },
+  });
+
+  const org = existing
+    ? await prisma.organization.update({
+        where: { id: existing.id },
+        data: fields,
+        select: { id: true },
+      })
+    : await prisma.organization.upsert({
+        where: { handle: user.username },
+        update: fields,
+        create: fields,
+        select: { id: true },
+      });
+
+  await prisma.membership.upsert({
+    where: {
+      organizationId_userId: { organizationId: org.id, userId: user.id },
+    },
+    update: { role: "OWNER" },
+    create: { organizationId: org.id, userId: user.id, role: "OWNER" },
+  });
+
+  await prisma.user.updateMany({
+    where: { id: user.id, defaultOrganizationId: null },
+    data: { defaultOrganizationId: org.id },
+  });
+
+  return { id: org.id, project: await ensureDefaultProject(org.id) };
+};
+
 const seed = async (): Promise<void> => {
   const profileFields = {
     username: PROFILE.username,
@@ -419,23 +708,30 @@ const seed = async (): Promise<void> => {
     select: { id: true },
   });
 
+  const org = await ensurePersonalOrganization({
+    id: owner.id,
+    username: PROFILE.username,
+    name: PROFILE.name,
+    avatarUrl: PROFILE.avatarUrl,
+  });
+
   await prisma.agent.deleteMany({
     where: {
-      ownerId: owner.id,
+      organizationId: org.id,
       walletAddress: { notIn: AGENTS.map((agent) => agent.walletAddress) },
     },
   });
 
   await prisma.apiListing.deleteMany({
     where: {
-      ownerId: owner.id,
+      organizationId: org.id,
       slug: { notIn: API_LISTINGS.map((listing) => listing.slug) },
     },
   });
 
   await prisma.wallet.deleteMany({
     where: {
-      ownerId: owner.id,
+      organizationId: org.id,
       address: { notIn: WALLETS.map((wallet) => wallet.address) },
     },
   });
@@ -458,15 +754,16 @@ const seed = async (): Promise<void> => {
 
     const row = await prisma.wallet.upsert({
       where: {
-        ownerId_address_network: {
-          ownerId: owner.id,
+        organizationId_address_network: {
+          organizationId: org.id,
           address: wallet.address,
           network: wallet.network,
         },
       },
       update: fields,
       create: {
-        ownerId: owner.id,
+        organizationId: org.id,
+        createdById: owner.id,
         address: wallet.address,
         network: wallet.network,
         ...fields,
@@ -489,7 +786,8 @@ const seed = async (): Promise<void> => {
 
   for (const agent of AGENTS) {
     const fields = {
-      ownerId: owner.id,
+      organizationId: org.id,
+      ...scopeFor(org.project, agent.network),
       slug: agent.slug,
       name: agent.name,
       headline: agent.headline,
@@ -529,7 +827,11 @@ const seed = async (): Promise<void> => {
         },
       },
       update: fields,
-      create: { walletAddress: agent.walletAddress, ...fields },
+      create: {
+        walletAddress: agent.walletAddress,
+        createdById: owner.id,
+        ...fields,
+      },
     });
   }
 
@@ -547,6 +849,7 @@ const seed = async (): Promise<void> => {
       visibility: listing.visibility,
       publishedAt: new Date(),
       network: listing.network,
+      ...scopeFor(org.project, listing.network),
       walletId: requireWalletId(
         listing.payToAddress,
         listing.network,
@@ -560,9 +863,16 @@ const seed = async (): Promise<void> => {
     };
 
     await prisma.apiListing.upsert({
-      where: { ownerId_slug: { ownerId: owner.id, slug: listing.slug } },
+      where: {
+        organizationId_slug: { organizationId: org.id, slug: listing.slug },
+      },
       update: fields,
-      create: { ownerId: owner.id, slug: listing.slug, ...fields },
+      create: {
+        organizationId: org.id,
+        createdById: owner.id,
+        slug: listing.slug,
+        ...fields,
+      },
       select: { id: true },
     });
   }
@@ -598,12 +908,17 @@ const seed = async (): Promise<void> => {
   const ATLAS_PAYER = "0x7a9f3c4b2e8d5a1f6c0b4e9d2a8c3f5b7e1d6a04";
 
   const listingRow = await prisma.apiListing.findFirst({
-    where: { ownerId: owner.id, slug: API_LISTINGS[0].slug },
-    select: { id: true },
+    where: { organizationId: org.id, slug: API_LISTINGS[0].slug },
+    select: { id: true, projectId: true },
+  });
+
+  const agentRow = await prisma.agent.findFirst({
+    where: { organizationId: org.id, slug: AGENTS[0].slug },
+    select: { id: true, projectId: true },
   });
 
   await prisma.payment.deleteMany({
-    where: { ownerId: owner.id, reqId: { startsWith: "0xseed" } },
+    where: { organizationId: org.id, reqId: { startsWith: "0xseed" } },
   });
 
   const now = new Date();
@@ -620,7 +935,10 @@ const seed = async (): Promise<void> => {
 
     await prisma.payment.create({
       data: {
-        ownerId: owner.id,
+        organizationId: org.id,
+        projectId: incoming
+          ? (listingRow?.projectId ?? null)
+          : (agentRow?.projectId ?? null),
         listingId: incoming ? (listingRow?.id ?? null) : null,
         payerAddress: incoming ? CUSTOMER_ADDRESS : ATLAS_PAYER,
         recipientAddress: incoming ? TREASURY : CUSTOMER_ADDRESS,
@@ -643,12 +961,7 @@ const seed = async (): Promise<void> => {
     });
   }
 
-  const agentRow = await prisma.agent.findFirst({
-    where: { ownerId: owner.id, slug: AGENTS[0].slug },
-    select: { id: true },
-  });
-
-  const reviewers = [];
+  const reviewers: { id: string }[] = [];
   for (const entry of REVIEWERS) {
     const fields = {
       username: entry.username,
@@ -660,14 +973,21 @@ const seed = async (): Promise<void> => {
       isSeeded: true,
     };
 
-    reviewers.push(
-      await prisma.user.upsert({
-        where: { clerkUserId: entry.clerkUserId },
-        update: fields,
-        create: { clerkUserId: entry.clerkUserId, ...fields },
-        select: { id: true },
-      }),
-    );
+    const reviewer = await prisma.user.upsert({
+      where: { clerkUserId: entry.clerkUserId },
+      update: fields,
+      create: { clerkUserId: entry.clerkUserId, ...fields },
+      select: { id: true },
+    });
+
+    await ensurePersonalOrganization({
+      id: reviewer.id,
+      username: entry.username,
+      name: entry.name,
+      avatarUrl: null,
+    });
+
+    reviewers.push(reviewer);
   }
 
   if (listingRow) {
@@ -792,7 +1112,10 @@ const seed = async (): Promise<void> => {
   }
 
   await prisma.customer.deleteMany({
-    where: { ownerId: owner.id, name: { notIn: CUSTOMERS.map((c) => c.name) } },
+    where: {
+      organizationId: org.id,
+      name: { notIn: CUSTOMERS.map((c) => c.name) },
+    },
   });
 
   for (const entry of CUSTOMERS) {
@@ -805,11 +1128,12 @@ const seed = async (): Promise<void> => {
       dailyLimit: entry.dailyLimit,
       monthlyLimit: entry.monthlyLimit,
       limitCurrency: entry.limitCurrency,
+      projectId: org.project.id,
       deletedAt: null,
     };
 
     const existing = await prisma.customer.findFirst({
-      where: { ownerId: owner.id, name: entry.name },
+      where: { organizationId: org.id, name: entry.name },
       select: { id: true },
     });
 
@@ -820,7 +1144,12 @@ const seed = async (): Promise<void> => {
           select: { id: true },
         })
       : await prisma.customer.create({
-          data: { ownerId: owner.id, name: entry.name, ...fields },
+          data: {
+            organizationId: org.id,
+            createdById: owner.id,
+            name: entry.name,
+            ...fields,
+          },
           select: { id: true },
         });
 
@@ -831,7 +1160,7 @@ const seed = async (): Promise<void> => {
     for (const identity of entry.identities) {
       await prisma.customerPaymentIdentity.create({
         data: {
-          ownerId: owner.id,
+          organizationId: org.id,
           customerId: customerRow.id,
           type: identity.type,
           network: "network" in identity ? identity.network : null,
@@ -843,6 +1172,488 @@ const seed = async (): Promise<void> => {
       });
     }
   }
+
+  const teamFields = { name: TEAM.name, personal: false, deletedAt: null };
+  const team = await prisma.organization.upsert({
+    where: { handle: TEAM.handle },
+    update: teamFields,
+    create: { handle: TEAM.handle, ...teamFields },
+    select: { id: true },
+  });
+
+  for (const [userId, role] of [
+    [owner.id, "OWNER"],
+    [reviewers[TEAM.member].id, "DEVELOPER"],
+  ] as const) {
+    await prisma.membership.upsert({
+      where: { organizationId_userId: { organizationId: team.id, userId } },
+      update: { role },
+      create: { organizationId: team.id, userId, role },
+    });
+  }
+
+  const teamProject = await ensureDefaultProject(team.id);
+  const research = await ensureProject(team.id, {
+    slug: RESEARCH_PROJECT.slug,
+    name: RESEARCH_PROJECT.name,
+    description: RESEARCH_PROJECT.description,
+    isDefault: false,
+    restricted: RESEARCH_PROJECT.restricted,
+  });
+
+  const researchViewerId = reviewers[RESEARCH_PROJECT.viewer].id;
+  await prisma.projectMembership.upsert({
+    where: {
+      projectId_userId: { projectId: research.id, userId: researchViewerId },
+    },
+    update: { role: "VIEWER" },
+    create: {
+      projectId: research.id,
+      userId: researchViewerId,
+      role: "VIEWER",
+    },
+  });
+
+  await prisma.apiListing.deleteMany({
+    where: {
+      organizationId: team.id,
+      slug: { notIn: TEAM_LISTINGS.map((listing) => listing.slug) },
+    },
+  });
+
+  await prisma.wallet.deleteMany({
+    where: { organizationId: team.id, address: { not: TEAM_WALLET.address } },
+  });
+
+  const teamWalletFields = {
+    label: TEAM_WALLET.label,
+    description: TEAM_WALLET.description,
+    role: TEAM_WALLET.role,
+    status: TEAM_WALLET.status,
+    isDefault: TEAM_WALLET.isDefault,
+    verifiedAt: new Date(),
+    verificationMethod: "EOA_SIGNATURE" as const,
+    verifiedChainId: TEAM_WALLET.verifiedChainId,
+  };
+
+  const teamWallet = await prisma.wallet.upsert({
+    where: {
+      organizationId_address_network: {
+        organizationId: team.id,
+        address: TEAM_WALLET.address,
+        network: TEAM_WALLET.network,
+      },
+    },
+    update: teamWalletFields,
+    create: {
+      organizationId: team.id,
+      createdById: owner.id,
+      address: TEAM_WALLET.address,
+      network: TEAM_WALLET.network,
+      ...teamWalletFields,
+    },
+    select: { id: true },
+  });
+
+  for (const listing of TEAM_LISTINGS) {
+    const fields = {
+      name: listing.name,
+      summary: listing.summary,
+      description: listing.description,
+      url: listing.url,
+      method: listing.method,
+      docsUrl: listing.docsUrl,
+      category: listing.category,
+      tags: [...listing.tags],
+      priceLabel: listing.priceLabel,
+      visibility: listing.visibility,
+      publishedAt: new Date(),
+      network: listing.network,
+      ...scopeFor(teamProject, listing.network),
+      walletId: teamWallet.id,
+      payToAddress: listing.payToAddress,
+      assetAddress: listing.assetAddress,
+      priceAmount: listing.priceAmount,
+      priceCurrency: listing.priceCurrency,
+      x402Endpoint: listing.x402Endpoint,
+    };
+
+    await prisma.apiListing.upsert({
+      where: {
+        organizationId_slug: { organizationId: team.id, slug: listing.slug },
+      },
+      update: fields,
+      create: {
+        organizationId: team.id,
+        createdById: owner.id,
+        slug: listing.slug,
+        ...fields,
+      },
+      select: { id: true },
+    });
+  }
+
+  const invitationFields = {
+    organizationId: team.id,
+    email: DEV_INVITATION.email,
+    role: DEV_INVITATION.role,
+    invitedById: owner.id,
+    expiresAt: inSevenDays(),
+    acceptedAt: null,
+    declinedAt: null,
+    revokedAt: null,
+  };
+
+  await prisma.invitation.upsert({
+    where: { tokenHash: sha256Hex(DEV_INVITATION.token) },
+    update: invitationFields,
+    create: { tokenHash: sha256Hex(DEV_INVITATION.token), ...invitationFields },
+  });
+
+  const serviceAccountFields = {
+    organizationId: org.id,
+    projectId: org.project.id,
+    description: SERVICE_ACCOUNT.description,
+    suspendedAt: null,
+    deletedAt: null,
+  };
+
+  const existingServiceAccount = await prisma.serviceAccount.findFirst({
+    where: { projectId: org.project.id, name: SERVICE_ACCOUNT.name },
+    select: { id: true },
+  });
+
+  const serviceAccount = existingServiceAccount
+    ? await prisma.serviceAccount.update({
+        where: { id: existingServiceAccount.id },
+        data: serviceAccountFields,
+        select: { id: true },
+      })
+    : await prisma.serviceAccount.create({
+        data: {
+          name: SERVICE_ACCOUNT.name,
+          createdById: owner.id,
+          ...serviceAccountFields,
+        },
+        select: { id: true },
+      });
+
+  const serviceAccountKeyFields = {
+    organizationId: org.id,
+    projectId: org.project.id,
+    environmentId: org.project.environments.SANDBOX,
+    serviceAccountId: serviceAccount.id,
+    scopes: [...SERVICE_ACCOUNT_KEY.scopes],
+    name: SERVICE_ACCOUNT_KEY.name,
+    prefix: `${SERVICE_ACCOUNT_KEY.namespace}_${SERVICE_ACCOUNT_KEY.body.slice(0, 4)}`,
+    last4: SERVICE_ACCOUNT_KEY.body.slice(-4),
+    revokedAt: null,
+    expiresAt: null,
+  };
+
+  await prisma.apiKey.upsert({
+    where: { hashedKey: sha256Hex(SERVICE_ACCOUNT_SECRET) },
+    update: serviceAccountKeyFields,
+    create: {
+      hashedKey: sha256Hex(SERVICE_ACCOUNT_SECRET),
+      createdById: owner.id,
+      ...serviceAccountKeyFields,
+    },
+  });
+
+  const financeFields = {
+    username: FINANCE_MEMBER.username,
+    name: FINANCE_MEMBER.name,
+    email: FINANCE_MEMBER.email,
+    emailVerified: true,
+    private: false,
+    completeOnboarding: true,
+    isSeeded: true,
+  };
+
+  const financeMember = await prisma.user.upsert({
+    where: { clerkUserId: FINANCE_MEMBER.clerkUserId },
+    update: financeFields,
+    create: { clerkUserId: FINANCE_MEMBER.clerkUserId, ...financeFields },
+    select: { id: true },
+  });
+
+  await ensurePersonalOrganization({
+    id: financeMember.id,
+    username: FINANCE_MEMBER.username,
+    name: FINANCE_MEMBER.name,
+    avatarUrl: null,
+  });
+
+  await prisma.membership.upsert({
+    where: {
+      organizationId_userId: {
+        organizationId: team.id,
+        userId: financeMember.id,
+      },
+    },
+    update: { role: "FINANCE" },
+    create: {
+      organizationId: team.id,
+      userId: financeMember.id,
+      role: "FINANCE",
+    },
+  });
+
+  const governanceFields = {
+    approvalsRequired: TEAM_GOVERNANCE.approvalsRequired,
+    governedActions: [...TEAM_GOVERNANCE.governedActions],
+  };
+
+  await prisma.governanceSettings.upsert({
+    where: { organizationId: team.id },
+    update: governanceFields,
+    create: { organizationId: team.id, ...governanceFields },
+  });
+
+  const approvalFields = {
+    organizationId: team.id,
+    projectId: null,
+    kind: "GOVERNANCE" as const,
+    action: TEAM_APPROVAL.action,
+    summary: TEAM_APPROVAL.summary,
+    payload: TEAM_APPROVAL.payload,
+    payloadHash: payloadHash(TEAM_APPROVAL.action, TEAM_APPROVAL.payload),
+    requestedById: owner.id,
+    requestedByApiKeyId: null,
+    requiredApprovals: TEAM_GOVERNANCE.approvalsRequired,
+    status: "PENDING" as const,
+    expiresAt: new Date(Date.now() + TEAM_APPROVAL.ttlHours * 60 * 60 * 1000),
+    decidedAt: null,
+    executedAt: null,
+  };
+
+  await prisma.approvalRequest.upsert({
+    where: { id: TEAM_APPROVAL.id },
+    update: approvalFields,
+    create: { id: TEAM_APPROVAL.id, ...approvalFields },
+  });
+
+  await prisma.organizationDomain.upsert({
+    where: {
+      organizationId_domain: {
+        organizationId: team.id,
+        domain: TEAM_ENTERPRISE.domain,
+      },
+    },
+    update: { verifiedAt: new Date(), autoJoin: false },
+    create: {
+      organizationId: team.id,
+      domain: TEAM_ENTERPRISE.domain,
+      verificationToken: TEAM_ENTERPRISE.verificationToken,
+      verifiedAt: new Date(),
+      createdById: owner.id,
+    },
+  });
+
+  await prisma.customRole.upsert({
+    where: {
+      organizationId_name: {
+        organizationId: team.id,
+        name: TEAM_ENTERPRISE.customRole.name,
+      },
+    },
+    update: {
+      description: TEAM_ENTERPRISE.customRole.description,
+      permissions: [...TEAM_ENTERPRISE.customRole.permissions],
+      projectRole: "VIEWER",
+      deletedAt: null,
+    },
+    create: {
+      organizationId: team.id,
+      name: TEAM_ENTERPRISE.customRole.name,
+      description: TEAM_ENTERPRISE.customRole.description,
+      permissions: [...TEAM_ENTERPRISE.customRole.permissions],
+      projectRole: "VIEWER",
+      createdById: owner.id,
+    },
+  });
+
+  await prisma.securitySettings.upsert({
+    where: { organizationId: team.id },
+    update: { reauthWindowMinutes: 15 },
+    create: { organizationId: team.id, reauthWindowMinutes: 15 },
+  });
+
+  await prisma.approvalDecision.deleteMany({
+    where: { approvalRequestId: TEAM_APPROVAL.id },
+  });
+
+  const ensurePolicy = async (
+    name: string,
+    fields: Omit<
+      Prisma.SpendingPolicyUncheckedCreateInput,
+      "organizationId" | "name"
+    >,
+  ) => {
+    const existing = await prisma.spendingPolicy.findFirst({
+      where: { organizationId: org.id, name },
+      select: { id: true },
+    });
+    const data = { ...fields, enabled: true, frozenAt: null, deletedAt: null };
+    return existing
+      ? prisma.spendingPolicy.update({
+          where: { id: existing.id },
+          data,
+          select: { id: true },
+        })
+      : prisma.spendingPolicy.create({
+          data: {
+            organizationId: org.id,
+            name,
+            createdById: owner.id,
+            ...data,
+          },
+          select: { id: true },
+        });
+  };
+
+  const guardrail = await ensurePolicy(GUARDRAIL_POLICY.name, {
+    scope: GUARDRAIL_POLICY.scope,
+    mode: GUARDRAIL_POLICY.mode,
+    network: GUARDRAIL_POLICY.network,
+    assetAddress: GUARDRAIL_POLICY.assetAddress,
+    perPaymentLimit: GUARDRAIL_POLICY.perPaymentLimit,
+    dailyLimit: GUARDRAIL_POLICY.dailyLimit,
+    monthlyLimit: null,
+    approvalThreshold: GUARDRAIL_POLICY.approvalThreshold,
+    approvalsRequired: 1,
+    allowedRecipients: [],
+    alertThresholds: [80, 100],
+  });
+
+  const budget = await ensurePolicy(BUDGET_POLICY.name, {
+    scope: BUDGET_POLICY.scope,
+    mode: BUDGET_POLICY.mode,
+    network: BUDGET_POLICY.network,
+    assetAddress: BUDGET_POLICY.assetAddress,
+    perPaymentLimit: null,
+    dailyLimit: null,
+    monthlyLimit: BUDGET_POLICY.monthlyLimit,
+    approvalThreshold: null,
+    approvalsRequired: 1,
+    allowedRecipients: [],
+    alertThresholds: [...BUDGET_POLICY.alertThresholds],
+  });
+
+  const sentThisMonth = PAYMENTS.findLastIndex(
+    (entry) => entry.direction === "out" && entry.monthsAgo === 0,
+  );
+  const sentReqId = `0xseed${sentThisMonth.toString(16).padStart(4, "0")}`;
+  const sentPayment = await prisma.payment.findFirst({
+    where: { organizationId: org.id, reqId: sentReqId },
+    select: { id: true, amount: true, createdAt: true },
+  });
+
+  const spendScope = {
+    organizationId: org.id,
+    projectId: agentRow?.projectId ?? org.project.id,
+    environment: "SANDBOX" as const,
+    apiKeyId: null,
+    agentId: agentRow?.id ?? null,
+    network: "BASE_SEPOLIA" as const,
+    assetAddress: USDC_BASE_SEPOLIA,
+    payerAddress: ATLAS_PAYER,
+    approvalRequestId: null,
+  };
+  const consumedAt = sentPayment?.createdAt ?? now;
+  const deniedAt = new Date(now.getTime() - 26 * 60 * 60 * 1000);
+
+  const spendAuthorizations: (Prisma.SpendAuthorizationUncheckedCreateInput & {
+    id: string;
+  })[] = [
+    {
+      ...spendScope,
+      id: SPEND_AUTHORIZATION_IDS.consumed,
+      recipientAddress: CUSTOMER_ADDRESS,
+      amount: sentPayment?.amount ?? "0.002",
+      reqId: sentPayment ? sentReqId : null,
+      status: "CONSUMED",
+      deniedReason: null,
+      policyId: null,
+      paymentId: sentPayment?.id ?? null,
+      expiresAt: new Date(consumedAt.getTime() + TEN_MINUTES_MS),
+      consumedAt,
+      createdAt: consumedAt,
+    },
+    {
+      ...spendScope,
+      id: SPEND_AUTHORIZATION_IDS.reserved,
+      recipientAddress: TEAM_WALLET.address,
+      amount: TEAM_LISTINGS[0].priceAmount,
+      reqId: null,
+      status: "RESERVED",
+      deniedReason: null,
+      policyId: null,
+      paymentId: null,
+      expiresAt: new Date(now.getTime() + TEN_MINUTES_MS),
+      consumedAt: null,
+      createdAt: now,
+    },
+    {
+      ...spendScope,
+      id: SPEND_AUTHORIZATION_IDS.denied,
+      recipientAddress: BLOCKED_SELLER,
+      amount: "7.5",
+      reqId: null,
+      status: "DENIED",
+      deniedReason: "per_payment_limit",
+      policyId: guardrail.id,
+      paymentId: null,
+      expiresAt: new Date(deniedAt.getTime() + TEN_MINUTES_MS),
+      consumedAt: null,
+      createdAt: deniedAt,
+    },
+  ];
+
+  for (const { id, ...fields } of spendAuthorizations) {
+    await prisma.spendAuthorization.upsert({
+      where: { id },
+      update: fields,
+      create: { id, ...fields },
+    });
+  }
+
+  const period = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
+  const budgetPercent = BUDGET_POLICY.alertThresholds[0];
+  const budgetAlertKey = `budget:${budget.id}:monthly:${period}:${budgetPercent}`;
+  const budgetAlertFields = {
+    projectId: null,
+    kind: "BUDGET_THRESHOLD" as const,
+    policyId: budget.id,
+    title: `${BUDGET_POLICY.name} reached ${budgetPercent}% this month`,
+    detail: {
+      window: "monthly",
+      period,
+      percent: budgetPercent,
+      limit: BUDGET_POLICY.monthlyLimit,
+      spent: "250",
+      network: BUDGET_POLICY.network,
+      assetAddress: BUDGET_POLICY.assetAddress,
+    },
+    acknowledgedAt: null,
+    acknowledgedById: null,
+  };
+
+  await prisma.financialAlert.upsert({
+    where: {
+      organizationId_dedupeKey: {
+        organizationId: org.id,
+        dedupeKey: budgetAlertKey,
+      },
+    },
+    update: budgetAlertFields,
+    create: {
+      organizationId: org.id,
+      dedupeKey: budgetAlertKey,
+      ...budgetAlertFields,
+    },
+  });
 
   const [agents, wallets, listings, banners, payments, customers] =
     await Promise.all([
@@ -858,7 +1669,7 @@ const seed = async (): Promise<void> => {
     `${count} ${noun}${count === 1 ? "" : "s"}`;
 
   console.info(
-    `[@4mica/seed] upserted profile @${PROFILE.username}, ${plural(AGENTS.length, "agent")}, ${plural(WALLETS.length, "wallet")}, ${plural(API_LISTINGS.length, "api listing")} ${plural(BANNERS.length, "banner")}, ${plural(PAYMENTS.length, "payment")} and ${plural(CUSTOMERS.length, "customer")} (${agents} agent rows, ${wallets} wallet rows, ${listings} listing rows, ${banners} banner rows, ${payments} payment rows, ${customers} customer rows total).`,
+    `[@4mica/seed] upserted profile @${PROFILE.username}, team @${TEAM.handle} (${plural(TEAM_LISTINGS.length, "api listing")}, invitation token "${DEV_INVITATION.token}", restricted project "${RESEARCH_PROJECT.slug}"), service account "${SERVICE_ACCOUNT.name}" (sandbox key "${SERVICE_ACCOUNT_SECRET}"), finance member @${FINANCE_MEMBER.username} in @${TEAM.handle} (governance on ${TEAM_GOVERNANCE.governedActions.join(", ")}; pending approval ${TEAM_APPROVAL.id}), spending policies "${GUARDRAIL_POLICY.name}" (enforce) and "${BUDGET_POLICY.name}" (monitor) with ${plural(spendAuthorizations.length, "spend authorization")} and a budget alert, ${plural(AGENTS.length, "agent")}, ${plural(WALLETS.length, "wallet")}, ${plural(API_LISTINGS.length, "api listing")} ${plural(BANNERS.length, "banner")}, ${plural(PAYMENTS.length, "payment")} and ${plural(CUSTOMERS.length, "customer")} (${agents} agent rows, ${wallets} wallet rows, ${listings} listing rows, ${banners} banner rows, ${payments} payment rows, ${customers} customer rows total).`,
   );
 };
 

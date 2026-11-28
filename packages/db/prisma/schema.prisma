@@ -43,18 +43,21 @@ enum HttpMethod {
 }
 
 model Agent {
-  id          String           @id @default(uuid(7))
-  ownerId     String?          @map("owner_id")
-  slug        String?          @db.VarChar(64)
-  name        String
-  headline    String?          @db.VarChar(160)
-  description String?
-  avatarUrl   String?          @map("avatar_url")
-  docsUrl     String?          @map("docs_url") @db.VarChar(2048)
-  status      AgentStatus      @default(PENDING)
-  visibility  PublicVisibility @default(PRIVATE)
+  id             String           @id @default(uuid(7))
+  projectId      String?          @map("project_id")
+  environmentId  String?          @map("environment_id")
+  organizationId String?          @map("organization_id")
+  createdById    String?          @map("created_by_id")
+  slug           String?          @db.VarChar(64)
+  name           String
+  headline       String?          @db.VarChar(160)
+  description    String?
+  avatarUrl      String?          @map("avatar_url")
+  docsUrl        String?          @map("docs_url") @db.VarChar(2048)
+  status         AgentStatus      @default(PENDING)
+  visibility     PublicVisibility @default(PRIVATE)
   /// The chain this agent signs payment guarantees on.
-  network     PaymentNetwork   @default(ETHEREUM_SEPOLIA)
+  network        PaymentNetwork   @default(ETHEREUM_SEPOLIA)
 
   walletAddress String? @map("wallet_address") @db.VarChar(42)
   payerWalletId String? @map("payer_wallet_id")
@@ -74,20 +77,27 @@ model Agent {
   updatedAt   DateTime  @updatedAt @map("updated_at")
   deletedAt   DateTime? @map("deleted_at")
 
-  owner       User?           @relation(fields: [ownerId], references: [id], onDelete: SetNull)
-  payerWallet Wallet?         @relation("AgentPayerWallet", fields: [payerWalletId], references: [id], onDelete: SetNull)
-  wallet      Wallet?         @relation("AgentRecipientWallet", fields: [walletId], references: [id], onDelete: SetNull)
-  payments    Payment[]
-  reviews     Review[]
-  reports     Report[]
-  policy      ResourcePolicy?
-  faqs        FaqItem[]
-  apiKeys     ApiKey[]
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project      Project?      @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  environment  Environment?  @relation(fields: [environmentId], references: [id], onDelete: Restrict)
+
+  createdBy           User?                @relation("AgentCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  payerWallet         Wallet?              @relation("AgentPayerWallet", fields: [payerWalletId], references: [id], onDelete: SetNull)
+  wallet              Wallet?              @relation("AgentRecipientWallet", fields: [walletId], references: [id], onDelete: SetNull)
+  payments            Payment[]
+  reviews             Review[]
+  reports             Report[]
+  policy              ResourcePolicy?
+  faqs                FaqItem[]
+  apiKeys             ApiKey[]
+  spendingPolicies    SpendingPolicy[]
+  spendAuthorizations SpendAuthorization[]
 
   @@unique([walletAddress, network])
-  @@unique([ownerId, slug])
+  @@unique([organizationId, slug])
   @@index([status])
-  @@index([ownerId, visibility])
+  @@index([organizationId, visibility])
+  @@index([projectId, environmentId])
   @@map("agents")
 }
 
@@ -163,74 +173,735 @@ enum WalletVerificationMethod {
   ERC1271
 }
 
+enum OrgRole {
+  OWNER
+  ADMIN
+  DEVELOPER
+  VIEWER
+  FINANCE
+}
+
+enum MembershipSource {
+  INVITATION
+  CREATOR
+  SCIM
+  DOMAIN
+}
+
+enum SsoProvider {
+  OKTA
+  MICROSOFT_ENTRA
+  GOOGLE_WORKSPACE
+  CUSTOM
+}
+
+enum AuditStreamStatus {
+  ACTIVE
+  PAUSED
+  FAILING
+}
+
+enum SpendingPolicyScope {
+  ORGANIZATION
+  PROJECT
+  AGENT
+  API_KEY
+}
+
+enum SpendingPolicyMode {
+  ENFORCE
+  MONITOR
+}
+
+enum SpendAuthorizationStatus {
+  RESERVED
+  PENDING_APPROVAL
+  CONSUMED
+  RELEASED
+  EXPIRED
+  DENIED
+}
+
+enum ApprovalKind {
+  PAYMENT
+  SELLER_PAYMENT
+  GOVERNANCE
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  EXPIRED
+  CANCELLED
+}
+
+enum ApprovalVote {
+  APPROVE
+  REJECT
+}
+
+enum FinancialAlertKind {
+  BUDGET_THRESHOLD
+  UNAUTHORIZED_SPEND
+  POLICY_DENIAL
+  APPROVAL_REQUESTED
+}
+
+enum ProjectRole {
+  ADMIN
+  DEVELOPER
+  VIEWER
+}
+
+enum EnvironmentKind {
+  SANDBOX
+  PRODUCTION
+}
+
+enum ApiKeyScope {
+  PAYMENTS_WRITE
+  CUSTOMERS_READ
+  RESOURCE_READ
+  SPEND_AUTHORIZE
+  APPROVALS_WRITE
+}
+
+model Organization {
+  id        String    @id @default(uuid(7))
+  handle    String?   @unique @db.VarChar(64)
+  name      String    @default("") @db.VarChar(120)
+  avatarUrl String?   @map("avatar_url")
+  personal  Boolean   @default(false)
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  memberships           Membership[]
+  invitations           Invitation[]
+  auditLogs             AuditLog[]
+  defaultFor            User[]                    @relation("UserDefaultOrganization")
+  agents                Agent[]
+  apiListings           ApiListing[]
+  apiKeys               ApiKey[]
+  payments              Payment[]
+  customers             Customer[]
+  customerCoupons       CustomerCoupon[]
+  customerCreditEntries CustomerCreditEntry[]
+  customerIdentities    CustomerPaymentIdentity[]
+  webhooks              Webhook[]
+  business              Business?
+  complianceProfile     ComplianceProfile?
+  beneficialOwners      BeneficialOwner[]
+  wallets               Wallet[]
+  supportRequests       SupportRequest[]
+  projects              Project[]
+  serviceAccounts       ServiceAccount[]
+  spendingPolicies      SpendingPolicy[]
+  spendAuthorizations   SpendAuthorization[]
+  approvalRequests      ApprovalRequest[]
+  governanceSettings    GovernanceSettings?
+  financialAlerts       FinancialAlert[]
+  domains               OrganizationDomain[]
+  ssoConnections        SsoConnection[]
+  securitySettings      SecuritySettings?
+  customRoles           CustomRole[]
+  scimTokens            ScimToken[]
+  scimGroups            ScimGroup[]
+  auditStreams          AuditStream[]
+  cliSessions           CliSession[]
+
+  @@map("organizations")
+}
+
+model Project {
+  id                 String    @id @default(uuid(7))
+  organizationId     String    @map("organization_id")
+  slug               String    @db.VarChar(64)
+  name               String    @db.VarChar(120)
+  description        String?   @db.VarChar(280)
+  isDefault          Boolean   @default(false) @map("is_default")
+  restricted         Boolean   @default(false)
+  restrictProduction Boolean   @default(false) @map("restrict_production")
+  archivedAt         DateTime? @map("archived_at")
+  deletedAt          DateTime? @map("deleted_at")
+  createdById        String?   @map("created_by_id")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  organization        Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy           User?                @relation("ProjectCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  environments        Environment[]
+  members             ProjectMembership[]
+  serviceAccounts     ServiceAccount[]
+  agents              Agent[]
+  apiListings         ApiListing[]
+  apiKeys             ApiKey[]
+  webhooks            Webhook[]
+  customers           Customer[]
+  payments            Payment[]
+  spendingPolicies    SpendingPolicy[]
+  spendAuthorizations SpendAuthorization[]
+  approvalRequests    ApprovalRequest[]
+
+  @@unique([organizationId, slug])
+  @@index([organizationId])
+  @@map("projects")
+}
+
+model Environment {
+  id        String          @id @default(uuid(7))
+  projectId String          @map("project_id")
+  kind      EnvironmentKind
+  createdAt DateTime        @default(now()) @map("created_at")
+
+  project     Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  agents      Agent[]
+  apiListings ApiListing[]
+  apiKeys     ApiKey[]
+  webhooks    Webhook[]
+
+  @@unique([projectId, kind])
+  @@map("environments")
+}
+
+model ProjectMembership {
+  id        String      @id @default(uuid(7))
+  projectId String      @map("project_id")
+  userId    String      @map("user_id")
+  role      ProjectRole @default(DEVELOPER)
+  createdAt DateTime    @default(now()) @map("created_at")
+  updatedAt DateTime    @updatedAt @map("updated_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
+  @@index([userId])
+  @@map("project_memberships")
+}
+
+model ServiceAccount {
+  id             String    @id @default(uuid(7))
+  organizationId String    @map("organization_id")
+  projectId      String    @map("project_id")
+  name           String    @db.VarChar(120)
+  description    String?   @db.VarChar(280)
+  suspendedAt    DateTime? @map("suspended_at")
+  deletedAt      DateTime? @map("deleted_at")
+  createdById    String?   @map("created_by_id")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project      Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy    User?        @relation("ServiceAccountCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  apiKeys      ApiKey[]
+
+  spendAuthorizations SpendAuthorization[]
+
+  @@index([projectId, createdAt(sort: Desc)])
+  @@map("service_accounts")
+}
+
+model SpendingPolicy {
+  id                String              @id @default(uuid(7))
+  organizationId    String              @map("organization_id")
+  name              String              @db.VarChar(120)
+  scope             SpendingPolicyScope
+  projectId         String?             @map("project_id")
+  agentId           String?             @map("agent_id")
+  apiKeyId          String?             @map("api_key_id")
+  mode              SpendingPolicyMode  @default(ENFORCE)
+  network           PaymentNetwork?
+  assetAddress      String?             @map("asset_address") @db.VarChar(42)
+  perPaymentLimit   Decimal?            @map("per_payment_limit") @db.Decimal(38, 18)
+  dailyLimit        Decimal?            @map("daily_limit") @db.Decimal(38, 18)
+  monthlyLimit      Decimal?            @map("monthly_limit") @db.Decimal(38, 18)
+  approvalThreshold Decimal?            @map("approval_threshold") @db.Decimal(38, 18)
+  approvalsRequired Int                 @default(1) @map("approvals_required")
+  allowedRecipients String[]            @default([]) @map("allowed_recipients")
+  alertThresholds   Int[]               @default([80, 100]) @map("alert_thresholds")
+  frozenAt          DateTime?           @map("frozen_at")
+  enabled           Boolean             @default(true)
+  createdById       String?             @map("created_by_id")
+  createdAt         DateTime            @default(now()) @map("created_at")
+  updatedAt         DateTime            @updatedAt @map("updated_at")
+  deletedAt         DateTime?           @map("deleted_at")
+
+  organization   Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project        Project?             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  agent          Agent?               @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  apiKey         ApiKey?              @relation(fields: [apiKeyId], references: [id], onDelete: Cascade)
+  createdBy      User?                @relation("SpendingPolicyCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  authorizations SpendAuthorization[]
+  alerts         FinancialAlert[]
+
+  @@index([organizationId, scope])
+  @@index([projectId])
+  @@index([agentId])
+  @@index([apiKeyId])
+  @@map("spending_policies")
+}
+
+model SpendAuthorization {
+  id                String                   @id @default(uuid(7))
+  organizationId    String                   @map("organization_id")
+  projectId         String                   @map("project_id")
+  environment       EnvironmentKind
+  apiKeyId          String?                  @map("api_key_id")
+  issuedByKeyId     String?                  @map("issued_by_key_id")
+  issuedByKeyPrefix String?                  @map("issued_by_key_prefix") @db.VarChar(32)
+  serviceAccountId  String?                  @map("service_account_id")
+  agentId           String?                  @map("agent_id")
+  network           PaymentNetwork
+  assetAddress      String?                  @map("asset_address") @db.VarChar(42)
+  payerAddress      String                   @map("payer_address") @db.VarChar(42)
+  recipientAddress  String                   @map("recipient_address") @db.VarChar(42)
+  amount            Decimal                  @db.Decimal(38, 18)
+  authorizedAmount  Decimal?                 @map("authorized_amount") @db.Decimal(38, 18)
+  settledAmount     Decimal?                 @map("settled_amount") @db.Decimal(38, 18)
+  reqId             String?                  @map("req_id") @db.VarChar(66)
+  reqIdConflict     String?                  @map("req_id_conflict") @db.VarChar(64)
+  status            SpendAuthorizationStatus
+  deniedReason      String?                  @map("denied_reason") @db.VarChar(64)
+  policyId          String?                  @map("policy_id")
+  approvalRequestId String?                  @unique @map("approval_request_id")
+  paymentId         String?                  @map("payment_id")
+  matchedAt         DateTime?                @map("matched_at")
+  expiresAt         DateTime                 @map("expires_at")
+  consumedAt        DateTime?                @map("consumed_at")
+  createdAt         DateTime                 @default(now()) @map("created_at")
+  updatedAt         DateTime                 @updatedAt @map("updated_at")
+
+  organization    Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project         Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  apiKey          ApiKey?          @relation(fields: [apiKeyId], references: [id], onDelete: SetNull)
+  serviceAccount  ServiceAccount?  @relation(fields: [serviceAccountId], references: [id], onDelete: SetNull)
+  agent           Agent?           @relation(fields: [agentId], references: [id], onDelete: SetNull)
+  policy          SpendingPolicy?  @relation(fields: [policyId], references: [id], onDelete: SetNull)
+  approvalRequest ApprovalRequest? @relation(fields: [approvalRequestId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, network, assetAddress, createdAt])
+  @@index([organizationId, reqId])
+  @@index([apiKeyId, createdAt])
+  @@index([serviceAccountId, createdAt])
+  @@index([agentId, createdAt])
+  @@map("spend_authorizations")
+}
+
+model ApprovalRequest {
+  id                  String         @id @default(uuid(7))
+  organizationId      String         @map("organization_id")
+  projectId           String?        @map("project_id")
+  kind                ApprovalKind
+  action              String         @db.VarChar(64)
+  summary             String         @db.VarChar(280)
+  payload             Json
+  payloadHash         String         @map("payload_hash") @db.VarChar(64)
+  requestedById       String?        @map("requested_by_id")
+  requestedByApiKeyId String?        @map("requested_by_api_key_id")
+  requiredApprovals   Int            @default(1) @map("required_approvals")
+  status              ApprovalStatus @default(PENDING)
+  expiresAt           DateTime       @map("expires_at")
+  decidedAt           DateTime?      @map("decided_at")
+  executedAt          DateTime?      @map("executed_at")
+  createdAt           DateTime       @default(now()) @map("created_at")
+  updatedAt           DateTime       @updatedAt @map("updated_at")
+
+  organization       Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project            Project?            @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  requestedBy        User?               @relation("ApprovalRequester", fields: [requestedById], references: [id], onDelete: SetNull)
+  decisions          ApprovalDecision[]
+  spendAuthorization SpendAuthorization?
+
+  @@index([organizationId, status, createdAt(sort: Desc)])
+  @@index([organizationId, action, payloadHash])
+  @@map("approval_requests")
+}
+
+model ApprovalDecision {
+  id                String       @id @default(uuid(7))
+  approvalRequestId String       @map("approval_request_id")
+  userId            String       @map("user_id")
+  vote              ApprovalVote
+  comment           String?      @db.VarChar(500)
+  createdAt         DateTime     @default(now()) @map("created_at")
+
+  approvalRequest ApprovalRequest @relation(fields: [approvalRequestId], references: [id], onDelete: Cascade)
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([approvalRequestId, userId])
+  @@map("approval_decisions")
+}
+
+model GovernanceSettings {
+  organizationId      String   @id @map("organization_id")
+  approvalsRequired   Int      @default(0) @map("approvals_required")
+  governedActions     String[] @default([]) @map("governed_actions")
+  approvalTtlHours    Int      @default(72) @map("approval_ttl_hours")
+  financeRecipientIds String[] @default([]) @map("finance_recipient_ids")
+  auditRetentionDays  Int?     @map("audit_retention_days")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("governance_settings")
+}
+
+model FinancialAlert {
+  id               String             @id @default(uuid(7))
+  organizationId   String             @map("organization_id")
+  projectId        String?            @map("project_id")
+  kind             FinancialAlertKind
+  policyId         String?            @map("policy_id")
+  title            String             @db.VarChar(160)
+  detail           Json
+  dedupeKey        String?            @map("dedupe_key") @db.VarChar(160)
+  acknowledgedAt   DateTime?          @map("acknowledged_at")
+  acknowledgedById String?            @map("acknowledged_by_id")
+  createdAt        DateTime           @default(now()) @map("created_at")
+
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  policy       SpendingPolicy? @relation(fields: [policyId], references: [id], onDelete: SetNull)
+
+  @@unique([organizationId, dedupeKey])
+  @@index([organizationId, createdAt(sort: Desc)])
+  @@map("financial_alerts")
+}
+
+model OrganizationDomain {
+  id                String    @id @default(uuid(7))
+  organizationId    String    @map("organization_id")
+  domain            String    @db.VarChar(253)
+  verificationToken String    @map("verification_token") @db.VarChar(64)
+  verifiedAt        DateTime? @map("verified_at")
+  lastCheckedAt     DateTime? @map("last_checked_at")
+  autoJoin          Boolean   @default(false) @map("auto_join")
+  autoJoinRole      OrgRole   @default(VIEWER) @map("auto_join_role")
+  createdById       String?   @map("created_by_id")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy      User?           @relation("OrganizationDomainCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  ssoConnections SsoConnection[]
+
+  @@unique([organizationId, domain])
+  @@index([domain])
+  @@map("organization_domains")
+}
+
+model SsoConnection {
+  id                String      @id @default(uuid(7))
+  organizationId    String      @map("organization_id")
+  domainId          String      @map("domain_id")
+  provider          SsoProvider
+  name              String      @db.VarChar(120)
+  clerkConnectionId String?     @unique @map("clerk_connection_id")
+  idpEntityId       String?     @map("idp_entity_id") @db.VarChar(2048)
+  idpSsoUrl         String?     @map("idp_sso_url") @db.VarChar(2048)
+  idpMetadataUrl    String?     @map("idp_metadata_url") @db.VarChar(2048)
+  active            Boolean     @default(false)
+  enforced          Boolean     @default(false)
+  jitProvisioning   Boolean     @default(true) @map("jit_provisioning")
+  defaultRole       OrgRole     @default(VIEWER) @map("default_role")
+  createdById       String?     @map("created_by_id")
+  createdAt         DateTime    @default(now()) @map("created_at")
+  updatedAt         DateTime    @updatedAt @map("updated_at")
+
+  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  domain       OrganizationDomain @relation(fields: [domainId], references: [id], onDelete: Cascade)
+  createdBy    User?              @relation("SsoConnectionCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@map("sso_connections")
+}
+
+model SecuritySettings {
+  organizationId               String   @id @map("organization_id")
+  requireMfa                   Boolean  @default(false) @map("require_mfa")
+  sessionMaxAgeHours           Int?     @map("session_max_age_hours")
+  reauthWindowMinutes          Int      @default(15) @map("reauth_window_minutes")
+  ipAllowlist                  String[] @default([]) @map("ip_allowlist")
+  enforceIpAllowlistForApiKeys Boolean  @default(false) @map("enforce_ip_allowlist_for_api_keys")
+  updatedAt                    DateTime @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("security_settings")
+}
+
+model CustomRole {
+  id             String      @id @default(uuid(7))
+  organizationId String      @map("organization_id")
+  name           String      @db.VarChar(64)
+  description    String?     @db.VarChar(280)
+  permissions    String[]
+  projectRole    ProjectRole @default(VIEWER) @map("project_role")
+  createdById    String?     @map("created_by_id")
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
+  deletedAt      DateTime?   @map("deleted_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy    User?        @relation("CustomRoleCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  memberships  Membership[]
+  scimGroups   ScimGroup[]
+
+  @@unique([organizationId, name])
+  @@map("custom_roles")
+}
+
+model ScimToken {
+  id             String    @id @default(uuid(7))
+  organizationId String    @map("organization_id")
+  name           String    @db.VarChar(120)
+  prefix         String    @db.VarChar(32)
+  last4          String    @db.VarChar(4)
+  hashedToken    String    @unique @map("hashed_token")
+  lastUsedAt     DateTime? @map("last_used_at")
+  revokedAt      DateTime? @map("revoked_at")
+  createdById    String?   @map("created_by_id")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy    User?        @relation("ScimTokenCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@map("scim_tokens")
+}
+
+model ScimGroup {
+  id             String   @id @default(uuid(7))
+  organizationId String   @map("organization_id")
+  externalId     String?  @map("external_id") @db.VarChar(255)
+  displayName    String   @map("display_name") @db.VarChar(255)
+  role           OrgRole?
+  customRoleId   String?  @map("custom_role_id")
+  priority       Int      @default(0)
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customRole   CustomRole?       @relation(fields: [customRoleId], references: [id], onDelete: SetNull)
+  members      ScimGroupMember[]
+
+  @@unique([organizationId, displayName])
+  @@index([organizationId, externalId])
+  @@map("scim_groups")
+}
+
+model ScimGroupMember {
+  groupId   String   @map("group_id")
+  userId    String   @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  group ScimGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([groupId, userId])
+  @@index([userId])
+  @@map("scim_group_members")
+}
+
+model AuditStream {
+  id                  String            @id @default(uuid(7))
+  organizationId      String            @map("organization_id")
+  name                String            @db.VarChar(120)
+  url                 String            @db.VarChar(2048)
+  status              AuditStreamStatus @default(ACTIVE)
+  secretVersion       Int               @default(1) @map("secret_version")
+  actionPrefixes      String[]          @default([]) @map("action_prefixes")
+  cursorId            String?           @map("cursor_id")
+  lastDeliveryAt      DateTime?         @map("last_delivery_at")
+  lastStatusCode      Int?              @map("last_status_code")
+  lastError           String?           @map("last_error") @db.VarChar(500)
+  consecutiveFailures Int               @default(0) @map("consecutive_failures")
+  nextAttemptAt       DateTime?         @map("next_attempt_at")
+  createdById         String?           @map("created_by_id")
+  createdAt           DateTime          @default(now()) @map("created_at")
+  updatedAt           DateTime          @updatedAt @map("updated_at")
+  deletedAt           DateTime?         @map("deleted_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy    User?        @relation("AuditStreamCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@index([status, nextAttemptAt])
+  @@map("audit_streams")
+}
+
+model Membership {
+  id             String           @id @default(uuid(7))
+  organizationId String           @map("organization_id")
+  userId         String           @map("user_id")
+  role           OrgRole          @default(DEVELOPER)
+  customRoleId   String?          @map("custom_role_id")
+  source         MembershipSource @default(INVITATION)
+  scimExternalId String?          @map("scim_external_id") @db.VarChar(255)
+  suspendedAt    DateTime?        @map("suspended_at")
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  customRole   CustomRole?  @relation(fields: [customRoleId], references: [id], onDelete: SetNull)
+
+  @@unique([organizationId, userId])
+  @@index([userId])
+  @@index([organizationId, scimExternalId])
+  @@map("memberships")
+}
+
+model Invitation {
+  id             String    @id @default(uuid(7))
+  organizationId String    @map("organization_id")
+  email          String    @db.VarChar(255)
+  role           OrgRole   @default(DEVELOPER)
+  tokenHash      String    @unique @map("token_hash")
+  invitedById    String?   @map("invited_by_id")
+  expiresAt      DateTime  @map("expires_at")
+  acceptedAt     DateTime? @map("accepted_at")
+  declinedAt     DateTime? @map("declined_at")
+  revokedAt      DateTime? @map("revoked_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  invitedBy    User?        @relation(fields: [invitedById], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, createdAt(sort: Desc)])
+  @@index([email])
+  @@map("invitations")
+}
+
+model AuditLog {
+  id             String   @id @default(uuid(7))
+  organizationId String   @map("organization_id")
+  projectId      String?  @map("project_id")
+  actorUserId    String?  @map("actor_user_id")
+  actorApiKeyId  String?  @map("actor_api_key_id")
+  action         String   @db.VarChar(64)
+  targetType     String?  @map("target_type") @db.VarChar(64)
+  targetId       String?  @map("target_id") @db.VarChar(64)
+  metadata       Json?
+  ip             String?  @db.VarChar(64)
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  actor        User?        @relation(fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, createdAt(sort: Desc)])
+  @@index([organizationId, action, createdAt(sort: Desc)])
+  @@index([organizationId, projectId, createdAt(sort: Desc)])
+  @@map("audit_logs")
+}
+
+enum ExternalOperationStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  UNKNOWN
+}
+
+model ExternalOperation {
+  id             String                  @id @default(uuid(7))
+  organizationId String                  @map("organization_id")
+  actorUserId    String?                 @map("actor_user_id")
+  kind           String                  @db.VarChar(64)
+  targetType     String?                 @map("target_type") @db.VarChar(64)
+  targetId       String?                 @map("target_id") @db.VarChar(64)
+  status         ExternalOperationStatus @default(PENDING)
+  error          String?                 @db.VarChar(500)
+  createdAt      DateTime                @default(now()) @map("created_at")
+  completedAt    DateTime?               @map("completed_at")
+
+  @@index([organizationId, createdAt(sort: Desc)])
+  @@index([status, createdAt])
+  @@map("external_operations")
+}
+
 model User {
-  id                             String                    @id @default(uuid(7))
-  clerkUserId                    String                    @unique @map("clerk_user_id")
-  username                       String?                   @unique @db.VarChar(64)
-  name                           String                    @default("")
-  email                          String?                   @unique @db.VarChar(255)
-  emailVerified                  Boolean                   @default(false) @map("email_verified")
+  id                             String                   @id @default(uuid(7))
+  clerkUserId                    String                   @unique @map("clerk_user_id")
+  username                       String?                  @unique @db.VarChar(64)
+  name                           String                   @default("")
+  email                          String?                  @unique @db.VarChar(255)
+  emailVerified                  Boolean                  @default(false) @map("email_verified")
   /// An address the user asked to switch to; promoted to `email` only once verified.
-  pendingEmail                   String?                   @map("pending_email") @db.VarChar(255)
-  phoneNumber                    String?                   @unique @map("phone_number") @db.VarChar(20)
-  phoneNumberVerified            Boolean                   @default(false) @map("phone_number_verified")
-  avatarUrl                      String?                   @map("avatar_url")
+  pendingEmail                   String?                  @map("pending_email") @db.VarChar(255)
+  phoneNumber                    String?                  @unique @map("phone_number") @db.VarChar(20)
+  phoneNumberVerified            Boolean                  @default(false) @map("phone_number_verified")
+  avatarUrl                      String?                  @map("avatar_url")
   bio                            String?
-  private                        Boolean                   @default(true)
-  verified                       Boolean                   @default(false)
-  locked                         Boolean                   @default(false)
-  banned                         Boolean                   @default(false)
-  theme                          String                    @default("dark")
-  appTheme                       String                    @default("dark") @map("app_theme")
-  language                       String                    @default("en")
-  timeZone                       String                    @default("UTC") @map("time_zone")
-  privacyMode                    Boolean                   @default(false) @map("privacy_mode")
-  defaultHome                    String                    @default("overview") @map("default_home")
-  disableBranding                Boolean                   @default(false) @map("disable_branding")
-  allowCustomBrandColor          Boolean                   @default(false) @map("allow_custom_brand_color")
-  primaryBrandColor              String                    @default("") @map("primary_brand_color")
-  secondaryBrandColor            String                    @default("") @map("secondary_brand_color")
-  allowSEOIndexing               Boolean                   @default(false) @map("allow_seo_indexing")
-  allowNotification              Boolean                   @default(true) @map("allow_notification")
-  allowSMS                       Boolean                   @default(false) @map("allow_sms")
-  notificationPlacement          NotificationPlacement     @default(bottomRight) @map("notification_placement")
-  allowMonthlyEmails             Boolean                   @default(true) @map("allow_monthly_emails")
-  allowInviteAcceptedEmails      Boolean                   @default(true) @map("allow_invite_accepted_emails")
-  allowChangelogNewsletterEmails Boolean                   @default(true) @map("allow_changelog_newsletter_emails")
-  allowMarketingOnboardingEmails Boolean                   @default(true) @map("allow_marketing_onboarding_emails")
-  allowPrivacyLegalEmails        Boolean                   @default(true) @map("allow_privacy_legal_emails")
-  allowDpaEmails                 Boolean                   @default(true) @map("allow_dpa_emails")
-  allowEmailVisibility           Boolean                   @default(true) @map("allow_email_visibility")
-  allowPhoneNumberVisibility     Boolean                   @default(true) @map("allow_phone_number_visibility")
-  completeOnboarding             Boolean                   @default(false) @map("complete_onboarding")
-  isSeeded                       Boolean                   @default(false) @map("is_seeded")
-  lastViewed                     String?                   @map("last_viewed")
-  lastLogin                      DateTime                  @default(now()) @map("last_login")
-  lastSeenAt                     DateTime                  @default(now()) @map("last_seen_at")
-  usageTime                      Int                       @default(0) @map("usage_time")
-  createdAt                      DateTime                  @default(now()) @map("created_at")
-  updatedAt                      DateTime                  @updatedAt @map("updated_at")
-  deletedAt                      DateTime?                 @map("deleted_at")
-  business                       Business?
-  complianceProfile              ComplianceProfile?
-  beneficialOwners               BeneficialOwner[]
-  apiKeys                        ApiKey[]
-  webhooks                       Webhook[]
-  agents                         Agent[]
-  apiListings                    ApiListing[]
+  private                        Boolean                  @default(true)
+  verified                       Boolean                  @default(false)
+  locked                         Boolean                  @default(false)
+  banned                         Boolean                  @default(false)
+  theme                          String                   @default("dark")
+  appTheme                       String                   @default("dark") @map("app_theme")
+  language                       String                   @default("en")
+  timeZone                       String                   @default("UTC") @map("time_zone")
+  privacyMode                    Boolean                  @default(false) @map("privacy_mode")
+  defaultHome                    String                   @default("overview") @map("default_home")
+  disableBranding                Boolean                  @default(false) @map("disable_branding")
+  allowCustomBrandColor          Boolean                  @default(false) @map("allow_custom_brand_color")
+  primaryBrandColor              String                   @default("") @map("primary_brand_color")
+  secondaryBrandColor            String                   @default("") @map("secondary_brand_color")
+  allowSEOIndexing               Boolean                  @default(false) @map("allow_seo_indexing")
+  allowNotification              Boolean                  @default(true) @map("allow_notification")
+  allowSMS                       Boolean                  @default(false) @map("allow_sms")
+  notificationPlacement          NotificationPlacement    @default(bottomRight) @map("notification_placement")
+  allowMonthlyEmails             Boolean                  @default(true) @map("allow_monthly_emails")
+  allowInviteAcceptedEmails      Boolean                  @default(true) @map("allow_invite_accepted_emails")
+  allowChangelogNewsletterEmails Boolean                  @default(true) @map("allow_changelog_newsletter_emails")
+  allowMarketingOnboardingEmails Boolean                  @default(true) @map("allow_marketing_onboarding_emails")
+  allowPrivacyLegalEmails        Boolean                  @default(true) @map("allow_privacy_legal_emails")
+  allowDpaEmails                 Boolean                  @default(true) @map("allow_dpa_emails")
+  allowEmailVisibility           Boolean                  @default(true) @map("allow_email_visibility")
+  allowPhoneNumberVisibility     Boolean                  @default(true) @map("allow_phone_number_visibility")
+  completeOnboarding             Boolean                  @default(false) @map("complete_onboarding")
+  isSeeded                       Boolean                  @default(false) @map("is_seeded")
+  lastViewed                     String?                  @map("last_viewed")
+  lastLogin                      DateTime                 @default(now()) @map("last_login")
+  lastSeenAt                     DateTime                 @default(now()) @map("last_seen_at")
+  usageTime                      Int                      @default(0) @map("usage_time")
+  createdAt                      DateTime                 @default(now()) @map("created_at")
+  updatedAt                      DateTime                 @updatedAt @map("updated_at")
+  deletedAt                      DateTime?                @map("deleted_at")
+  defaultOrganizationId          String?                  @map("default_organization_id")
+  defaultOrganization            Organization?            @relation("UserDefaultOrganization", fields: [defaultOrganizationId], references: [id], onDelete: SetNull)
+  memberships                    Membership[]
+  sentInvitations                Invitation[]
+  auditLogs                      AuditLog[]
+  createdApiKeys                 ApiKey[]                 @relation("ApiKeyCreator")
+  createdWebhooks                Webhook[]                @relation("WebhookCreator")
+  createdAgents                  Agent[]                  @relation("AgentCreator")
+  createdApiListings             ApiListing[]             @relation("ApiListingCreator")
+  createdWallets                 Wallet[]                 @relation("WalletCreator")
+  createdCustomers               Customer[]               @relation("CustomerCreator")
+  createdSupportRequests         SupportRequest[]         @relation("SupportRequestCreator")
+  createdProjects                Project[]                @relation("ProjectCreator")
+  createdServiceAccounts         ServiceAccount[]         @relation("ServiceAccountCreator")
+  projectMemberships             ProjectMembership[]
+  createdSpendingPolicies        SpendingPolicy[]         @relation("SpendingPolicyCreator")
+  requestedApprovals             ApprovalRequest[]        @relation("ApprovalRequester")
+  approvalDecisions              ApprovalDecision[]
+  createdDomains                 OrganizationDomain[]     @relation("OrganizationDomainCreator")
+  createdSsoConnections          SsoConnection[]          @relation("SsoConnectionCreator")
+  createdCustomRoles             CustomRole[]             @relation("CustomRoleCreator")
+  createdScimTokens              ScimToken[]              @relation("ScimTokenCreator")
+  createdAuditStreams            AuditStream[]            @relation("AuditStreamCreator")
+  scimGroupMemberships           ScimGroupMember[]
   reviews                        Review[]
   reports                        Report[]
   bannerInteractions             BannerInteraction[]
   emailVerificationTokens        EmailVerificationToken[]
   onboardingQueue                OnboardingEmailQueue?
-  wallets                        Wallet[]
-  supportRequests                SupportRequest[]
   walletNonces                   WalletNonce[]
-  reportedPayments               Payment[]
-  customers                      Customer[]
-  customerIdentities             CustomerPaymentIdentity[]
-  customerCoupons                CustomerCoupon[]
-  customerCreditEntries          CustomerCreditEntry[]
+  cliSessions                    CliSession[]
+  cliDeviceRequests              CliDeviceRequest[]
 
   @@index([email])
   @@map("users")
@@ -305,47 +976,66 @@ model OnboardingEmailSend {
 }
 
 model ApiKey {
-  id         String    @id @default(uuid(7))
-  ownerId    String    @map("owner_id")
-  listingId  String?   @map("listing_id")
-  agentId    String?   @map("agent_id")
-  name       String    @db.VarChar(120)
-  prefix     String    @db.VarChar(32)
-  last4      String    @db.VarChar(4)
-  hashedKey  String    @unique @map("hashed_key")
-  lastUsedAt DateTime? @map("last_used_at")
-  expiresAt  DateTime? @map("expires_at")
-  revokedAt  DateTime? @map("revoked_at")
-  createdAt  DateTime  @default(now()) @map("created_at")
-  updatedAt  DateTime  @updatedAt @map("updated_at")
+  id               String        @id @default(uuid(7))
+  projectId        String        @map("project_id")
+  environmentId    String        @map("environment_id")
+  serviceAccountId String?       @map("service_account_id")
+  ipAllowlist      String[]      @default([]) @map("ip_allowlist")
+  scopes           ApiKeyScope[] @default([])
+  organizationId   String        @map("organization_id")
+  createdById      String?       @map("created_by_id")
+  listingId        String?       @map("listing_id")
+  agentId          String?       @map("agent_id")
+  name             String        @db.VarChar(120)
+  prefix           String        @db.VarChar(32)
+  last4            String        @db.VarChar(4)
+  hashedKey        String        @unique @map("hashed_key")
+  lastUsedAt       DateTime?     @map("last_used_at")
+  expiresAt        DateTime?     @map("expires_at")
+  revokedAt        DateTime?     @map("revoked_at")
+  createdAt        DateTime      @default(now()) @map("created_at")
+  updatedAt        DateTime      @updatedAt @map("updated_at")
 
-  owner   User        @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  listing ApiListing? @relation(fields: [listingId], references: [id], onDelete: Cascade)
-  agent   Agent?      @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project        Project         @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  environment    Environment     @relation(fields: [environmentId], references: [id], onDelete: Restrict)
+  serviceAccount ServiceAccount? @relation(fields: [serviceAccountId], references: [id], onDelete: Cascade)
 
-  @@index([ownerId])
+  createdBy           User?                @relation("ApiKeyCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  listing             ApiListing?          @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  agent               Agent?               @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  spendingPolicies    SpendingPolicy[]
+  spendAuthorizations SpendAuthorization[]
+  payments            Payment[]
+
+  @@index([organizationId])
   @@index([listingId])
   @@index([agentId])
+  @@index([projectId, environmentId])
+  @@index([serviceAccountId])
   @@map("api_keys")
 }
 
 model ApiListing {
-  id          String           @id @default(uuid(7))
-  ownerId     String           @map("owner_id")
-  slug        String           @db.VarChar(64)
-  name        String           @db.VarChar(120)
-  summary     String?          @db.VarChar(280)
-  description String?
-  url         String?          @db.VarChar(2048)
-  method      HttpMethod       @default(GET)
-  docsUrl     String?          @map("docs_url") @db.VarChar(2048)
-  category    String?          @db.VarChar(64)
-  tags        String[]
+  id             String           @id @default(uuid(7))
+  projectId      String           @map("project_id")
+  environmentId  String           @map("environment_id")
+  organizationId String           @map("organization_id")
+  createdById    String?          @map("created_by_id")
+  slug           String           @db.VarChar(64)
+  name           String           @db.VarChar(120)
+  summary        String?          @db.VarChar(280)
+  description    String?
+  url            String?          @db.VarChar(2048)
+  method         HttpMethod       @default(GET)
+  docsUrl        String?          @map("docs_url") @db.VarChar(2048)
+  category       String?          @db.VarChar(64)
+  tags           String[]
   /// Human display string ("Free in sandbox", "Usage-based"). The machine
   /// price that drives payment snippets is `priceAmount`/`priceCurrency`.
-  priceLabel  String?          @map("price_label") @db.VarChar(64)
-  visibility  PublicVisibility @default(PRIVATE)
-  publishedAt DateTime?        @map("published_at")
+  priceLabel     String?          @map("price_label") @db.VarChar(64)
+  visibility     PublicVisibility @default(PRIVATE)
+  publishedAt    DateTime?        @map("published_at")
 
   // --- x402 payment facts. Nullable because a listing can be published as a
   // --- description before its owner has wired up payments.
@@ -366,17 +1056,22 @@ model ApiListing {
   updatedAt DateTime  @updatedAt @map("updated_at")
   deletedAt DateTime? @map("deleted_at")
 
-  owner    User            @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  wallet   Wallet?         @relation(fields: [walletId], references: [id], onDelete: SetNull)
-  payments Payment[]
-  reviews  Review[]
-  reports  Report[]
-  policy   ResourcePolicy?
-  faqs     FaqItem[]
-  apiKeys  ApiKey[]
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project      Project      @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  environment  Environment  @relation(fields: [environmentId], references: [id], onDelete: Restrict)
 
-  @@unique([ownerId, slug])
-  @@index([ownerId, visibility])
+  createdBy User?           @relation("ApiListingCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  wallet    Wallet?         @relation(fields: [walletId], references: [id], onDelete: SetNull)
+  payments  Payment[]
+  reviews   Review[]
+  reports   Report[]
+  policy    ResourcePolicy?
+  faqs      FaqItem[]
+  apiKeys   ApiKey[]
+
+  @@unique([organizationId, slug])
+  @@index([organizationId, visibility])
+  @@index([projectId, environmentId])
   @@map("api_listings")
 }
 
@@ -391,20 +1086,28 @@ enum PaymentStatus {
   FAILED
 }
 
+enum ReconciliationState {
+  PENDING
+  RECONCILED
+  UNRESOLVED
+}
+
 /**
  * One x402 payment, as reported by the resource server that took it.
  * 4Mica is not in the payment path — the seller's own service calls the
  * facilitator directly — so this is a reported ledger, not an authoritative
  * one. It exists because core cannot answer the questions a dashboard needs:
  * core has no payer-side query at all, and no idea which listing was paid.
- * `ownerId` is whoever reported the row, which is the seller. Visibility is
+ * `organizationId` is the tenant that reported the row, the seller. Visibility is
  * NOT scoped to it: both sides see a payment by matching `payerAddress` or
  * `recipientAddress` against the wallets they have proved they control, so one
  * row serves the buyer and the seller without being stored twice.
  */
 model Payment {
-  id      String @id @default(uuid(7))
-  ownerId String @map("owner_id")
+  id             String  @id @default(uuid(7))
+  projectId      String? @map("project_id")
+  apiKeyId       String? @map("api_key_id")
+  organizationId String  @map("organization_id")
 
   listingId String? @map("listing_id")
   agentId   String? @map("agent_id")
@@ -438,14 +1141,25 @@ model Payment {
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
 
-  owner   User        @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  listing ApiListing? @relation(fields: [listingId], references: [id], onDelete: SetNull)
-  agent   Agent?      @relation(fields: [agentId], references: [id], onDelete: SetNull)
+  reconciliationState ReconciliationState @default(PENDING) @map("reconciliation_state")
+  reconcileAttempts   Int                 @default(0) @map("reconcile_attempts")
+  reconcileAfter      DateTime            @default(now()) @map("reconcile_after")
+  reconcileError      String?             @map("reconcile_error") @db.VarChar(500)
+  reconciledAt        DateTime?           @map("reconciled_at")
 
-  @@unique([ownerId, reqId])
-  @@index([ownerId, createdAt(sort: Desc)])
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project      Project?     @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  apiKey       ApiKey?      @relation(fields: [apiKeyId], references: [id], onDelete: SetNull)
+  listing      ApiListing?  @relation(fields: [listingId], references: [id], onDelete: SetNull)
+  agent        Agent?       @relation(fields: [agentId], references: [id], onDelete: SetNull)
+
+  @@unique([organizationId, reqId])
+  @@index([organizationId, createdAt(sort: Desc)])
   @@index([payerAddress, createdAt(sort: Desc)])
   @@index([recipientAddress, createdAt(sort: Desc)])
+  @@index([projectId, createdAt(sort: Desc)])
+  @@index([apiKeyId, createdAt(sort: Desc)])
+  @@index([reconciliationState, reconcileAfter])
   @@map("payments")
 }
 
@@ -499,17 +1213,21 @@ enum CustomerIdentitySource {
 }
 
 model Customer {
-  id            String         @id @default(uuid(7))
-  ownerId       String         @map("owner_id")
-  name          String         @db.VarChar(120)
-  email         String?        @db.VarChar(320)
-  type          CustomerType   @default(ORGANIZATION)
-  status        CustomerStatus @default(ACTIVE)
-  description   String?        @db.VarChar(280)
-  notes         String?        @db.VarChar(2000)
-  dailyLimit    Decimal?       @map("daily_limit") @db.Decimal(38, 18)
-  monthlyLimit  Decimal?       @map("monthly_limit") @db.Decimal(38, 18)
-  limitCurrency String         @default("USD") @map("limit_currency") @db.VarChar(16)
+  id                String          @id @default(uuid(7))
+  projectId         String          @map("project_id")
+  organizationId    String          @map("organization_id")
+  createdById       String?         @map("created_by_id")
+  name              String          @db.VarChar(120)
+  email             String?         @db.VarChar(320)
+  type              CustomerType    @default(ORGANIZATION)
+  status            CustomerStatus  @default(ACTIVE)
+  description       String?         @db.VarChar(280)
+  notes             String?         @db.VarChar(2000)
+  dailyLimit        Decimal?        @map("daily_limit") @db.Decimal(38, 18)
+  monthlyLimit      Decimal?        @map("monthly_limit") @db.Decimal(38, 18)
+  limitCurrency     String          @default("USD") @map("limit_currency") @db.VarChar(16)
+  limitNetwork      PaymentNetwork? @map("limit_network")
+  limitAssetAddress String?         @map("limit_asset_address") @db.VarChar(42)
 
   statusReason   String?   @map("status_reason") @db.VarChar(280)
   suspendedUntil DateTime? @map("suspended_until")
@@ -527,20 +1245,23 @@ model Customer {
   createdAt     DateTime                  @default(now()) @map("created_at")
   updatedAt     DateTime                  @updatedAt @map("updated_at")
   deletedAt     DateTime?                 @map("deleted_at")
-  owner         User                      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  organization  Organization              @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project       Project                   @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  createdBy     User?                     @relation("CustomerCreator", fields: [createdById], references: [id], onDelete: SetNull)
   identities    CustomerPaymentIdentity[]
   coupons       CustomerCoupon[]
   creditEntries CustomerCreditEntry[]
 
-  @@index([ownerId, createdAt(sort: Desc)])
-  @@index([ownerId, status])
+  @@index([organizationId, createdAt(sort: Desc)])
+  @@index([organizationId, status])
+  @@index([projectId, createdAt(sort: Desc)])
   @@map("customers")
 }
 
 model CustomerCoupon {
-  id         String @id @default(uuid(7))
-  ownerId    String @map("owner_id")
-  customerId String @map("customer_id")
+  id             String @id @default(uuid(7))
+  organizationId String @map("organization_id")
+  customerId     String @map("customer_id")
 
   code  String             @db.VarChar(64)
   kind  CustomerCouponKind
@@ -554,18 +1275,18 @@ model CustomerCoupon {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  owner    User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customer     Customer     @relation(fields: [customerId], references: [id], onDelete: Cascade)
 
-  @@unique([ownerId, code])
+  @@unique([organizationId, code])
   @@index([customerId, createdAt(sort: Desc)])
   @@map("customer_coupons")
 }
 
 model CustomerCreditEntry {
-  id         String @id @default(uuid(7))
-  ownerId    String @map("owner_id")
-  customerId String @map("customer_id")
+  id             String @id @default(uuid(7))
+  organizationId String @map("organization_id")
+  customerId     String @map("customer_id")
 
   kind   CustomerCreditKind
   amount Decimal            @db.Decimal(38, 18)
@@ -573,17 +1294,17 @@ model CustomerCreditEntry {
 
   createdAt DateTime @default(now()) @map("created_at")
 
-  owner    User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customer     Customer     @relation(fields: [customerId], references: [id], onDelete: Cascade)
 
   @@index([customerId, createdAt(sort: Desc)])
   @@map("customer_credit_entries")
 }
 
 model CustomerPaymentIdentity {
-  id         String @id @default(uuid(7))
-  customerId String @map("customer_id")
-  ownerId    String @map("owner_id")
+  id             String @id @default(uuid(7))
+  customerId     String @map("customer_id")
+  organizationId String @map("organization_id")
 
   type    CustomerIdentityType
   network PaymentNetwork?
@@ -599,11 +1320,11 @@ model CustomerPaymentIdentity {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  owner    User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  customer     Customer     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  @@unique([ownerId, network, address])
-  @@unique([ownerId, type, value])
+  @@unique([organizationId, network, address])
+  @@unique([organizationId, type, value])
   @@index([customerId])
   @@index([address, network])
   @@map("customer_payment_identities")
@@ -611,7 +1332,10 @@ model CustomerPaymentIdentity {
 
 model Webhook {
   id                 String        @id @default(uuid(7))
-  ownerId            String        @map("owner_id")
+  projectId          String        @map("project_id")
+  environmentId      String        @map("environment_id")
+  organizationId     String        @map("organization_id")
+  createdById        String?       @map("created_by_id")
   url                String        @db.VarChar(2048)
   description        String?       @db.VarChar(255)
   events             String[]
@@ -623,15 +1347,19 @@ model Webhook {
   failureCount       Int           @default(0) @map("failure_count")
   createdAt          DateTime      @default(now()) @map("created_at")
   updatedAt          DateTime      @updatedAt @map("updated_at")
-  owner              User          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  organization       Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project            Project       @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  environment        Environment   @relation(fields: [environmentId], references: [id], onDelete: Restrict)
+  createdBy          User?         @relation("WebhookCreator", fields: [createdById], references: [id], onDelete: SetNull)
 
-  @@index([ownerId])
+  @@index([organizationId])
+  @@index([projectId, environmentId])
   @@map("webhooks")
 }
 
 model Business {
   id                  String        @id @default(uuid(7))
-  ownerId             String        @unique @map("owner_id")
+  organizationId      String        @unique @map("organization_id")
   legalName           String        @default("") @map("legal_name") @db.VarChar(255)
   tradingName         String?       @map("trading_name") @db.VarChar(255)
   businessType        BusinessType? @map("business_type")
@@ -656,7 +1384,7 @@ model Business {
   createdAt           DateTime      @default(now()) @map("created_at")
   updatedAt           DateTime      @updatedAt @map("updated_at")
   deletedAt           DateTime?     @map("deleted_at")
-  owner               User          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  organization        Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([kybStatus])
   @@map("businesses")
@@ -664,7 +1392,7 @@ model Business {
 
 model ComplianceProfile {
   id                     String         @id @default(uuid(7))
-  ownerId                String         @unique @map("owner_id")
+  organizationId         String         @unique @map("organization_id")
   incorporationCountry   String?        @map("incorporation_country") @db.VarChar(2)
   incorporatedOn         DateTime?      @map("incorporated_on") @db.Date
   monthlyVolume          MonthlyVolume? @map("monthly_volume")
@@ -689,27 +1417,27 @@ model ComplianceProfile {
   submittedAt            DateTime?      @map("submitted_at")
   createdAt              DateTime       @default(now()) @map("created_at")
   updatedAt              DateTime       @updatedAt @map("updated_at")
-  owner                  User           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  organization           Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@map("compliance_profiles")
 }
 
 model BeneficialOwner {
-  id                 String    @id @default(uuid(7))
-  ownerId            String    @map("owner_id")
-  fullName           String    @map("full_name") @db.VarChar(120)
+  id                 String       @id @default(uuid(7))
+  organizationId     String       @map("organization_id")
+  fullName           String       @map("full_name") @db.VarChar(120)
   role               OwnerRole
-  ownershipPercent   Int?      @map("ownership_percent")
-  dateOfBirth        DateTime  @map("date_of_birth") @db.Date
-  nationality        String    @db.VarChar(2)
-  countryOfResidence String    @map("country_of_residence") @db.VarChar(2)
-  email              String?   @db.VarChar(255)
-  isPep              Boolean   @default(false) @map("is_pep")
-  createdAt          DateTime  @default(now()) @map("created_at")
-  updatedAt          DateTime  @updatedAt @map("updated_at")
-  owner              User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  ownershipPercent   Int?         @map("ownership_percent")
+  dateOfBirth        DateTime     @map("date_of_birth") @db.Date
+  nationality        String       @db.VarChar(2)
+  countryOfResidence String       @map("country_of_residence") @db.VarChar(2)
+  email              String?      @db.VarChar(255)
+  isPep              Boolean      @default(false) @map("is_pep")
+  createdAt          DateTime     @default(now()) @map("created_at")
+  updatedAt          DateTime     @updatedAt @map("updated_at")
+  organization       Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  @@index([ownerId])
+  @@index([organizationId])
   @@map("beneficial_owners")
 }
 
@@ -762,15 +1490,16 @@ model BannerInteraction {
 }
 
 model Wallet {
-  id          String         @id @default(uuid(7))
-  ownerId     String         @map("owner_id")
-  label       String         @db.VarChar(120)
-  description String?        @db.VarChar(280)
-  address     String         @db.VarChar(42)
-  network     PaymentNetwork
-  role        WalletRole     @default(BOTH)
-  status      WalletStatus   @default(ACTIVE)
-  isDefault   Boolean        @default(false) @map("is_default")
+  id             String         @id @default(uuid(7))
+  organizationId String         @map("organization_id")
+  createdById    String?        @map("created_by_id")
+  label          String         @db.VarChar(120)
+  description    String?        @db.VarChar(280)
+  address        String         @db.VarChar(42)
+  network        PaymentNetwork
+  role           WalletRole     @default(BOTH)
+  status         WalletStatus   @default(ACTIVE)
+  isDefault      Boolean        @default(false) @map("is_default")
 
   verifiedAt         DateTime                 @map("verified_at")
   verificationMethod WalletVerificationMethod @default(EOA_SIGNATURE) @map("verification_method")
@@ -779,14 +1508,16 @@ model Wallet {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  createdBy User? @relation("WalletCreator", fields: [createdById], references: [id], onDelete: SetNull)
 
   apiListings       ApiListing[]
   agentsAsRecipient Agent[]      @relation("AgentRecipientWallet")
   agentsAsPayer     Agent[]      @relation("AgentPayerWallet")
 
-  @@unique([ownerId, address, network])
-  @@index([ownerId, createdAt(sort: Desc)])
+  @@unique([organizationId, address, network])
+  @@index([organizationId, createdAt(sort: Desc)])
   @@index([address, network])
   @@map("wallets")
 }
@@ -813,6 +1544,69 @@ model WalletNonce {
   @@index([userId])
   @@index([expiresAt])
   @@map("wallet_nonces")
+}
+
+enum CliSessionKind {
+  DEVICE
+  TOKEN
+}
+
+model CliSession {
+  id                   String         @id @default(uuid(7))
+  userId               String         @map("user_id")
+  kind                 CliSessionKind
+  organizationId       String?        @map("organization_id")
+  name                 String         @db.VarChar(120)
+  prefix               String         @db.VarChar(32)
+  last4                String         @db.VarChar(4)
+  hashedToken          String         @unique @map("hashed_token")
+  scopes               String[]
+  mfaVerified          Boolean        @default(false) @map("mfa_verified")
+  clerkSsoConnectionId String?        @map("clerk_sso_connection_id")
+  lastUsedAt           DateTime?      @map("last_used_at")
+  expiresAt            DateTime       @map("expires_at")
+  revokedAt            DateTime?      @map("revoked_at")
+  createdAt            DateTime       @default(now()) @map("created_at")
+  updatedAt            DateTime       @updatedAt @map("updated_at")
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([organizationId])
+  @@map("cli_sessions")
+}
+
+enum CliDeviceRequestStatus {
+  PENDING
+  APPROVED
+  DENIED
+}
+
+model CliDeviceRequest {
+  id                   String                 @id @default(uuid(7))
+  deviceCodeHash       String                 @unique @map("device_code_hash")
+  userCode             String                 @unique @map("user_code") @db.VarChar(16)
+  clientName           String                 @map("client_name") @db.VarChar(120)
+  scopes               String[]
+  organizationId       String?                @map("organization_id")
+  status               CliDeviceRequestStatus @default(PENDING)
+  userId               String?                @map("user_id")
+  requestIp            String?                @map("request_ip") @db.VarChar(64)
+  intervalSecs         Int                    @map("interval_secs")
+  lastPolledAt         DateTime?              @map("last_polled_at")
+  expiresAt            DateTime               @map("expires_at")
+  mfaVerified          Boolean                @default(false) @map("mfa_verified")
+  clerkSsoConnectionId String?                @map("clerk_sso_connection_id")
+  decidedAt            DateTime?              @map("decided_at")
+  consumedAt           DateTime?              @map("consumed_at")
+  createdAt            DateTime               @default(now()) @map("created_at")
+
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("cli_device_requests")
 }
 
 enum ReportReason {
@@ -973,15 +1767,16 @@ enum SupportAuthor {
 }
 
 model SupportRequest {
-  id          String          @id @default(uuid(7))
-  number      Int             @unique @default(autoincrement())
-  ownerId     String          @map("owner_id")
-  subject     String          @db.VarChar(160)
-  category    SupportCategory
-  priority    SupportPriority @default(NORMAL)
-  status      SupportStatus   @default(OPEN)
-  description String          @db.VarChar(5000)
-  reference   String?         @db.VarChar(255)
+  id             String          @id @default(uuid(7))
+  number         Int             @unique @default(autoincrement())
+  organizationId String          @map("organization_id")
+  createdById    String?         @map("created_by_id")
+  subject        String          @db.VarChar(160)
+  category       SupportCategory
+  priority       SupportPriority @default(NORMAL)
+  status         SupportStatus   @default(OPEN)
+  description    String          @db.VarChar(5000)
+  reference      String?         @db.VarChar(255)
 
   firstRespondedAt DateTime? @map("first_responded_at")
   resolvedAt       DateTime? @map("resolved_at")
@@ -990,11 +1785,13 @@ model SupportRequest {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  owner    User             @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  messages SupportMessage[]
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  @@index([ownerId, lastActivityAt(sort: Desc)])
-  @@index([ownerId, status])
+  createdBy User?            @relation("SupportRequestCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  messages  SupportMessage[]
+
+  @@index([organizationId, lastActivityAt(sort: Desc)])
+  @@index([organizationId, status])
   @@map("support_requests")
 }
 

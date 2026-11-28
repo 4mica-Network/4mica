@@ -1,3 +1,5 @@
+import type { EnvironmentKind } from "@4mica/rules";
+
 export const WEBHOOK_STATUS = {
   ENABLED: "ENABLED",
   DISABLED: "DISABLED",
@@ -6,16 +8,55 @@ export const WEBHOOK_STATUS = {
 export type WebhookStatus =
   (typeof WEBHOOK_STATUS)[keyof typeof WEBHOOK_STATUS];
 
+export const API_KEY_SCOPES = [
+  "PAYMENTS_WRITE",
+  "CUSTOMERS_READ",
+  "RESOURCE_READ",
+] as const;
+
+export type ApiKeyScope = (typeof API_KEY_SCOPES)[number];
+
 export interface ApiKey {
   id: string;
   name: string;
   prefix: string;
   last4: string;
+  environment: EnvironmentKind;
+  scopes: ApiKeyScope[];
+  serviceAccountId: string | null;
+  ipAllowlist?: string[];
   lastUsedAt: string | null;
   expiresAt: string | null;
   revokedAt: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export type CliSessionKind = "DEVICE" | "TOKEN";
+
+export type CliScope =
+  | "account:read"
+  | "wallets:read"
+  | "wallets:link"
+  | "wallets:unlink";
+
+export interface NewCliToken {
+  name: string;
+  scopes: CliScope[];
+  expiresInDays: 30 | 90 | 365;
+}
+
+export interface CliSession {
+  id: string;
+  kind: CliSessionKind;
+  name: string;
+  prefix: string;
+  last4: string;
+  scopes: string[];
+  lastUsedAt: string | null;
+  expiresAt: string;
+  createdAt: string;
+  organization?: { id: string; name: string; handle: string | null } | null;
 }
 
 export interface Webhook {
@@ -39,7 +80,7 @@ export interface WebhookEvent {
 }
 
 export interface RevealedSecret {
-  kind: "apiKey" | "webhookSecret";
+  kind: "apiKey" | "webhookSecret" | "cliToken";
   id: string;
   plaintext: string;
 }
@@ -50,6 +91,11 @@ export type DeveloperState = {
   apiKeys: ApiKey[];
   webhooks: Webhook[];
   events: WebhookEvent[];
+  cliSessions: CliSession[];
+  cliSessionsLoading: boolean;
+  cliSessionsLoaded: boolean;
+  cliSessionsError: string | null;
+  cliSessionsVersion: number;
   isLoading: boolean;
   hasLoaded: boolean;
   pending: Record<string, boolean>;

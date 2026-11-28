@@ -1,8 +1,12 @@
+import { requestedEnvironment } from "@auth/project";
+import { requireApproval } from "@controllers/approvals/gate";
 import {
   invalidBody,
   notFound,
   parseBody,
+  requireTenant,
   requireUserId,
+  withAudit,
 } from "@controllers/shared";
 import { appLogger } from "@logger/index";
 import { isUniqueViolation } from "@utils/prisma-errors";
@@ -48,9 +52,14 @@ const invalidChallenge = (reply: FastifyReply) =>
   });
 
 export const listWalletsHandler: RouteHandler = async (request, reply) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const tenant = await requireTenant(request, reply, "resources.read");
+  if (!tenant) {
     return reply;
+  }
+
+  const environment = requestedEnvironment(request);
+  if (!environment) {
+    return notFound(reply, "environment");
   }
 
   const parsed = parseBody(ListWalletsQuerySchema, request.query);
@@ -64,17 +73,17 @@ export const listWalletsHandler: RouteHandler = async (request, reply) => {
     ]);
   }
 
-  return reply.send(await listWallets(userId, parsed.data));
+  return reply.send(await listWallets(tenant.orgId, environment, parsed.data));
 };
 
 export const getWalletHandler: RouteHandler = async (request, reply) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const tenant = await requireTenant(request, reply, "resources.read");
+  if (!tenant) {
     return reply;
   }
 
   const { id } = request.params as { id: string };
-  const wallet = await getWallet(userId, id);
+  const wallet = await getWallet(tenant.orgId, id);
 
   return wallet ? reply.send(wallet) : notFound(reply, "wallet");
 };
@@ -103,8 +112,8 @@ export const createWalletNonceHandler: RouteHandler = async (
 };
 
 export const createWalletHandler: RouteHandler = async (request, reply) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const tenant = await requireTenant(request, reply, "wallets.manage");
+  if (!tenant) {
     return reply;
   }
 
@@ -114,7 +123,7 @@ export const createWalletHandler: RouteHandler = async (request, reply) => {
   }
 
   const data = parsed.data;
-  const challenge = await findWalletNonce(userId, data.nonce);
+  const challenge = await findWalletNonce(tenant.userId, data.nonce);
 
   if (
     !challenge ||
@@ -138,7 +147,7 @@ export const createWalletHandler: RouteHandler = async (request, reply) => {
     nonce: challenge.nonce,
     issuedAt: challenge.issuedAt,
     expiresAt: challenge.expiresAt,
-    userId,
+    userId: tenant.userId,
   });
 
   let verified = false;
@@ -163,11 +172,25 @@ export const createWalletHandler: RouteHandler = async (request, reply) => {
   }
 
   try {
-    const wallet = await consumeNonceAndCreateWallet(
-      userId,
-      challenge.id,
-      data,
-      challenge.chainId,
+    const wallet = await withAudit(
+      request,
+      tenant,
+      (tx) =>
+        consumeNonceAndCreateWallet(
+          tenant.orgId,
+          tenant.userId,
+          challenge.id,
+          data,
+          challenge.chainId,
+          tx,
+        ),
+      (created) =>
+        created && {
+          action: "wallet.added",
+          targetType: "wallet",
+          targetId: created.id,
+          metadata: { address: created.address, network: created.network },
+        },
     );
 
     if (!wallet) {
@@ -175,7 +198,7 @@ export const createWalletHandler: RouteHandler = async (request, reply) => {
     }
 
     appLogger.info("Wallet linked", {
-      userId,
+      userId: tenant.userId,
       walletId: wallet.id,
       address: wallet.address,
       network: wallet.network,
@@ -192,7 +215,10 @@ export const createWalletHandler: RouteHandler = async (request, reply) => {
         issues: [{ path: "address", message }],
       });
     }
-    appLogger.error("Wallet create failed", { error, userId });
+    appLogger.error("Wallet create failed", {
+      error,
+      userId: tenant.userId,
+    });
     throw error;
   }
 };
@@ -209,8 +235,8 @@ const ALLOWED_TRANSITIONS: Record<
 };
 
 export const updateWalletHandler: RouteHandler = async (request, reply) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const tenant = await requireTenant(request, reply, "wallets.manage");
+  if (!tenant) {
     return reply;
   }
 
@@ -220,7 +246,7 @@ export const updateWalletHandler: RouteHandler = async (request, reply) => {
   }
 
   const { id } = request.params as { id: string };
-  const current = await getWallet(userId, id);
+  const current = await getWallet(tenant.orgId, id);
   if (!current) {
     return notFound(reply, "wallet");
   }
@@ -243,21 +269,68 @@ export const updateWalletHandler: RouteHandler = async (request, reply) => {
     });
   }
 
-  const updated = await updateWallet(userId, id, next);
-  return updated ? reply.send(updated) : notFound(reply, "wallet");
+  const updated = await withAudit(
+    request,
+    tenant,
+    (tx) => updateWallet(tenant.orgId, id, next, tx),
+    (row) =>
+      row && {
+        action: "wallet.updated",
+        targetType: "wallet",
+        targetId: id,
+        metadata: { fields: Object.keys(next) },
+      },
+  );
+  if (!updated) {
+    return notFound(reply, "wallet");
+  }
+
+  return reply.send(updated);
 };
 
 export const deleteWalletHandler: RouteHandler = async (request, reply) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const tenant = await requireTenant(request, reply, "wallets.manage");
+  if (!tenant) {
     return reply;
   }
 
   const { id } = request.params as { id: string };
-  const deleted = await deleteWallet(userId, id);
+  const wallet = await getWallet(tenant.orgId, id);
+  if (!wallet) {
+    return notFound(reply, "wallet");
+  }
+
+  const gate = await requireApproval(
+    request,
+    reply,
+    tenant,
+    "wallet.remove",
+    { walletIds: [id] },
+    `Remove wallet ${wallet.address} on ${wallet.network}`,
+  );
+  if (!gate.proceed) {
+    return reply;
+  }
+
+  const deleted = await withAudit(
+    request,
+    tenant,
+    (tx) => deleteWallet(tenant.orgId, id, tx),
+    (found) =>
+      found
+        ? {
+            action: "wallet.removed",
+            targetType: "wallet",
+            targetId: id,
+            ...(gate.approvalId
+              ? { metadata: { approvalId: gate.approvalId } }
+              : {}),
+          }
+        : null,
+  );
 
   if (deleted) {
-    appLogger.info("Wallet removed", { userId, walletId: id });
+    appLogger.info("Wallet removed", { userId: tenant.userId, walletId: id });
     return reply.code(204).send();
   }
 
@@ -268,8 +341,8 @@ export const batchDeleteWalletsHandler: RouteHandler = async (
   request,
   reply,
 ) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const tenant = await requireTenant(request, reply, "wallets.manage");
+  if (!tenant) {
     return reply;
   }
 
@@ -278,9 +351,37 @@ export const batchDeleteWalletsHandler: RouteHandler = async (
     return invalidBody(reply, parsed.issues);
   }
 
-  const result = await batchDeleteWallets(userId, parsed.data.ids);
+  const walletIds = [...parsed.data.ids].sort();
+  const gate = await requireApproval(
+    request,
+    reply,
+    tenant,
+    "wallet.remove",
+    { walletIds },
+    `Remove ${walletIds.length} wallet${walletIds.length === 1 ? "" : "s"}`,
+  );
+  if (!gate.proceed) {
+    return reply;
+  }
+
+  const result = await withAudit(
+    request,
+    tenant,
+    (tx) => batchDeleteWallets(tenant.orgId, parsed.data.ids, tx),
+    (removed) =>
+      removed.deleted.length > 0
+        ? {
+            action: "wallet.removed",
+            targetType: "wallet",
+            metadata: {
+              ids: removed.deleted,
+              ...(gate.approvalId ? { approvalId: gate.approvalId } : {}),
+            },
+          }
+        : null,
+  );
   appLogger.info("Wallets removed", {
-    userId,
+    userId: tenant.userId,
     count: result.deleted.length,
   });
 

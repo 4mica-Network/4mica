@@ -1,0 +1,57 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`env use > saves the environment and sends it with every request > json shape: env use 1`] = `
+{
+  "environment": "string",
+}
+`;
+
+exports[`orgs > lists the organizations, marking the default one in use > json shape: orgs 1`] = `
+[
+  {
+    "active": "boolean",
+    "handle": "string",
+    "id": "string",
+    "name": "string",
+    "personal": "boolean",
+    "role": "string",
+  },
+]
+`;
+
+exports[`orgs > switches to an organization by handle, and acts in it from then on > json shape: orgs use 1`] = `
+{
+  "active": "boolean",
+  "handle": "string",
+  "id": "string",
+  "name": "string",
+  "personal": "boolean",
+  "role": "string",
+}
+`;
+
+exports[`projects > lists the projects in the organization in use > json shape: projects 1`] = `
+[
+  {
+    "active": "boolean",
+    "archived": "boolean",
+    "id": "string",
+    "isDefault": "boolean",
+    "name": "string",
+    "role": "string",
+    "slug": "string",
+  },
+]
+`;
+
+exports[`projects > switches project, and sends it with every request > json shape: projects use 1`] = `
+{
+  "active": "boolean",
+  "archived": "boolean",
+  "id": "string",
+  "isDefault": "boolean",
+  "name": "string",
+  "role": "string",
+  "slug": "string",
+}
+`;

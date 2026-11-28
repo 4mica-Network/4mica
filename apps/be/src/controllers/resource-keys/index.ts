@@ -1,11 +1,16 @@
-import { requireResourceKey } from "@auth/api-key";
+import { requireApiKeyScope, requireResourceKey } from "@auth/api-key";
+import type { ProjectPermission } from "@auth/permissions";
+import type { ProjectScope } from "@auth/project";
 import { getAgent } from "@controllers/agents/repository";
 import { getApiListing } from "@controllers/api-listings/repository";
+import { requireProductionKeyApproval } from "@controllers/approvals/key-gate";
+import { UpdateApiKeySchema } from "@controllers/developer/schema";
 import {
   invalidBody,
   notFound,
   parseBody,
-  requireUserId,
+  requireProject,
+  withProjectAudit,
 } from "@controllers/shared";
 import {
   getPolicy,
@@ -21,6 +26,7 @@ import {
   deleteResourceKey,
   listResourceKeys,
   revokeResourceKey,
+  updateResourceKey,
 } from "./repository";
 import { CreateResourceKeySchema } from "./schema";
 
@@ -30,85 +36,180 @@ const what = (kind: ResourceKind) =>
 const withOwnedResource =
   (
     kind: ResourceKind,
+    permission: ProjectPermission,
     run: (
       id: string,
-      userId: string,
+      scope: ProjectScope,
       request: Parameters<RouteHandler>[0],
       reply: Parameters<RouteHandler>[1],
     ) => Promise<unknown>,
   ): RouteHandler =>
   async (request, reply) => {
-    const userId = requireUserId(request, reply);
-    if (!userId) {
+    const scope = await requireProject(request, reply, permission);
+    if (!scope) {
       return reply;
     }
 
     const { id } = request.params as { id: string };
 
-    if (!(await ownsResource(kind, userId, id))) {
+    if (!(await ownsResource(kind, scope, id))) {
       return notFound(reply, what(kind));
     }
 
-    return run(id, userId, request, reply);
+    return run(id, scope, request, reply);
   };
 
+const resourceRef = (kind: ResourceKind, id: string) => ({
+  [kind === "listing" ? "listingId" : "agentId"]: id,
+});
+
 export const listResourceKeysHandler = (kind: ResourceKind): RouteHandler =>
-  withOwnedResource(kind, async (id, _userId, _request, reply) =>
-    reply.send({ items: await listResourceKeys(kind, id) }),
+  withOwnedResource(
+    kind,
+    "resources.read",
+    async (id, scope, _request, reply) =>
+      reply.send({ items: await listResourceKeys(scope, kind, id) }),
   );
 
 export const createResourceKeyHandler = (kind: ResourceKind): RouteHandler =>
-  withOwnedResource(kind, async (id, userId, request, reply) => {
+  withOwnedResource(kind, "keys.manage", async (id, scope, request, reply) => {
     const parsed = parseBody(CreateResourceKeySchema, request.body);
     if (!parsed.success) {
       return invalidBody(reply, parsed.issues);
     }
 
-    const { apiKey, plaintext } = await createResourceKey(
-      userId,
-      kind,
-      id,
-      parsed.data,
+    const gate = await requireProductionKeyApproval(
+      request,
+      reply,
+      scope,
+      { kind, resourceId: id, ...parsed.data },
+      `Create ${what(kind)} key "${parsed.data.name}"`,
+    );
+    if (!gate.proceed) {
+      return reply;
+    }
+
+    const { apiKey, plaintext } = await withProjectAudit(
+      request,
+      scope,
+      (tx) => createResourceKey(scope, scope.userId, kind, id, parsed.data, tx),
+      (created) => ({
+        action: "api_key.created",
+        targetType: "api_key",
+        targetId: created.apiKey.id,
+        metadata: {
+          ...resourceRef(kind, id),
+          ...(gate.approvalId ? { approvalId: gate.approvalId } : {}),
+        },
+      }),
     );
     appLogger.info("API key created", {
-      userId,
+      userId: scope.userId,
       apiKeyId: apiKey.id,
-      [kind === "listing" ? "listingId" : "agentId"]: id,
+      ...resourceRef(kind, id),
     });
 
     return reply.code(201).send({ apiKey, plaintext });
   });
 
 export const revokeResourceKeyHandler = (kind: ResourceKind): RouteHandler =>
-  withOwnedResource(kind, async (id, userId, request, reply) => {
+  withOwnedResource(kind, "keys.manage", async (id, scope, request, reply) => {
     const { keyId } = request.params as { keyId: string };
-    const revoked = await revokeResourceKey(kind, id, keyId);
+    const revoked = await withProjectAudit(
+      request,
+      scope,
+      (tx) => revokeResourceKey(scope, kind, id, keyId, tx),
+      (row) =>
+        row && {
+          action: "api_key.revoked",
+          targetType: "api_key",
+          targetId: keyId,
+          metadata: resourceRef(kind, id),
+        },
+    );
 
     if (revoked) {
-      appLogger.info("API key revoked", { userId, apiKeyId: keyId });
+      appLogger.info("API key revoked", {
+        userId: scope.userId,
+        apiKeyId: keyId,
+      });
       return reply.send(revoked);
     }
 
     return notFound(reply, "active key");
   });
 
-export const deleteResourceKeyHandler = (kind: ResourceKind): RouteHandler =>
-  withOwnedResource(kind, async (id, _userId, request, reply) => {
-    const { keyId } = request.params as { keyId: string };
-    const deleted = await deleteResourceKey(kind, id, keyId);
+export const updateResourceKeyHandler = (kind: ResourceKind): RouteHandler =>
+  withOwnedResource(kind, "keys.manage", async (id, scope, request, reply) => {
+    const parsed = parseBody(UpdateApiKeySchema, request.body);
+    if (!parsed.success) {
+      return invalidBody(reply, parsed.issues);
+    }
 
-    return deleted ? reply.code(204).send() : notFound(reply, "key");
+    const { keyId } = request.params as { keyId: string };
+    const updated = await withProjectAudit(
+      request,
+      scope,
+      (tx) => updateResourceKey(scope, kind, id, keyId, parsed.data, tx),
+      (row) =>
+        row && {
+          action: "api_key.updated",
+          targetType: "api_key",
+          targetId: keyId,
+          metadata: { ...resourceRef(kind, id), ...parsed.data },
+        },
+    );
+    if (!updated) {
+      return notFound(reply, "key");
+    }
+
+    return reply.send(updated);
+  });
+
+export const deleteResourceKeyHandler = (kind: ResourceKind): RouteHandler =>
+  withOwnedResource(kind, "keys.manage", async (id, scope, request, reply) => {
+    const { keyId } = request.params as { keyId: string };
+    const deleted = await withProjectAudit(
+      request,
+      scope,
+      (tx) => deleteResourceKey(scope, kind, id, keyId, tx),
+      (found) =>
+        found
+          ? {
+              action: "api_key.deleted",
+              targetType: "api_key",
+              targetId: keyId,
+              metadata: resourceRef(kind, id),
+            }
+          : null,
+    );
+
+    if (!deleted) {
+      return notFound(reply, "key");
+    }
+
+    return reply.code(204).send();
   });
 
 export const getResourceHandler: RouteHandler = async (request, reply) => {
+  const apiKey = requireApiKeyScope(request, reply, "RESOURCE_READ");
+  if (!apiKey) {
+    return reply;
+  }
   const key = requireResourceKey(request, reply);
   if (!key) {
     return reply;
   }
 
+  const scope = {
+    orgId: apiKey.orgId,
+    projectId: apiKey.projectId,
+    environmentId: apiKey.environmentId,
+    environment: apiKey.environment,
+  };
   const [listing, agent] = await Promise.all([
-    key.kind === "listing" ? getApiListing(key.ownerId, key.id) : null,
-    key.kind === "agent" ? getAgent(key.ownerId, key.id) : null,
+    key.kind === "listing" ? getApiListing(scope, key.id) : null,
+    key.kind === "agent" ? getAgent(scope, key.id) : null,
   ]);
 
   if (!listing && !agent) {

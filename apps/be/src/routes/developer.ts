@@ -16,6 +16,7 @@ import type { FastifyPluginCallback } from "fastify";
 import { guards } from "./guards";
 import {
   apiKeyResponseSchema,
+  approvalRequiredResponseSchema,
   createdApiKeyResponseSchema,
   createdWebhookResponseSchema,
   errorResponseSchema,
@@ -86,6 +87,8 @@ export const developerRoutes: FastifyPluginCallback = (app, _opts, done) => {
         response: {
           ...limitedResponses,
           201: createdApiKeyResponseSchema,
+          202: approvalRequiredResponseSchema,
+          409: errorResponseSchema,
           400: errorResponseSchema,
           401: errorResponseSchema,
         },
@@ -100,7 +103,8 @@ export const developerRoutes: FastifyPluginCallback = (app, _opts, done) => {
       ...base,
       schema: {
         tags: ["developer"],
-        summary: "Rename an API key",
+        summary:
+          "Rename an API key or change the addresses it may be used from",
         security: [{ bearerAuth: [] }],
         params: idParamSchema,
         response: {

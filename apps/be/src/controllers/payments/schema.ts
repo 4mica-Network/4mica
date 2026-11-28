@@ -74,6 +74,9 @@ export const ListPaymentsQuerySchema = v.object({
   status: v.optional(PaymentStatusSchema),
   network: v.optional(PaymentNetworkSchema),
   wallet: v.optional(address),
+  projectId: v.optional(
+    v.pipe(v.string(), v.trim(), v.toLowerCase(), v.maxLength(64)),
+  ),
   q: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(100))),
   sort: v.optional(
     v.picklist(["createdAt", "-createdAt", "amount", "-amount"]),

@@ -6,9 +6,21 @@ import Fastify, { type FastifyInstance } from "fastify";
 import { loadUser } from "./auth/user-store";
 import { config, productionWarnings } from "./config/index";
 import {
+  startAuditRetention,
+  stopAuditRetention,
+} from "./jobs/audit-retention/index";
+import {
+  startAuditStreams,
+  stopAuditStreams,
+} from "./jobs/audit-streams/index";
+import {
   startOnboardingDrip,
   stopOnboardingDrip,
 } from "./jobs/onboarding/index";
+import {
+  startReconciliation,
+  stopReconciliation,
+} from "./jobs/reconciliation/index";
 import { installShutdownHandlers, isAcceptingTraffic } from "./lifecycle/index";
 import { appLogger } from "./logger/index";
 import { genReqId, installHttpHardening } from "./plugins/http-hardening";
@@ -83,6 +95,12 @@ export const initApp = async (
 
   app.addHook("onClose", stopOnboardingDrip);
 
+  app.addHook("onClose", stopAuditRetention);
+
+  app.addHook("onClose", stopAuditStreams);
+
+  app.addHook("onClose", stopReconciliation);
+
   app.addHook("onClose", closeCoreClient);
 
   app.addHook("onClose", async () => {
@@ -136,11 +154,23 @@ export const initApp = async (
           { name: "system", description: "Health and diagnostics" },
           { name: "account", description: "Authenticated user account" },
           {
+            name: "organizations",
+            description: "Organizations, members, invitations and audit log",
+          },
+          {
+            name: "projects",
+            description: "Projects, their environments and members",
+          },
+          {
             name: "compliance",
             description: "KYB details, beneficial owners and review",
           },
           { name: "verification", description: "Email verification" },
           { name: "developer", description: "API keys and webhooks" },
+          {
+            name: "service-accounts",
+            description: "Non-human identities a project mints keys for",
+          },
           {
             name: "banners",
             description: "Dashboard promo banners and interaction tracking",
@@ -167,6 +197,10 @@ export const initApp = async (
             description: "Counterparties that spend through this account",
           },
           {
+            name: "cli",
+            description: "Signing the 4mica CLI in to an account",
+          },
+          {
             name: "support",
             description: "Help requests the account has opened with 4Mica",
           },
@@ -177,6 +211,13 @@ export const initApp = async (
               type: "http",
               scheme: "bearer",
               bearerFormat: "JWT",
+            },
+            cliTokenAuth: {
+              type: "http",
+              scheme: "bearer",
+              bearerFormat: "4mica_cli_…",
+              description:
+                "A token held by the 4mica CLI, from `4mica auth login` or Settings → Developer.",
             },
             apiKeyAuth: {
               type: "http",
@@ -236,6 +277,9 @@ export const runServer = async (): Promise<FastifyInstance> => {
   }
 
   await startOnboardingDrip(app);
+  await startAuditRetention();
+  await startAuditStreams();
+  await startReconciliation();
 
   return app;
 };

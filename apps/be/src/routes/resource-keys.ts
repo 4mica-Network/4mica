@@ -5,6 +5,7 @@ import {
   getResourceHandler,
   listResourceKeysHandler,
   revokeResourceKeyHandler,
+  updateResourceKeyHandler,
 } from "@controllers/resource-keys/index";
 import type { ResourceKind } from "@controllers/trust/repository";
 import { apiKeyRateLimit, sensitiveRateLimit } from "@plugins/rate-limit";
@@ -12,6 +13,7 @@ import type { FastifyPluginCallback } from "fastify";
 import { guards } from "./guards";
 import {
   apiKeyResponseSchema,
+  approvalRequiredResponseSchema,
   createdApiKeyResponseSchema,
   errorResponseSchema,
   idParam,
@@ -30,6 +32,14 @@ const keyParamSchema = {
   type: "object",
   required: ["id", "keyId"],
   properties: { id: idParam, keyId: idParam },
+} as const;
+
+const scopeErrorResponseSchema = {
+  ...errorResponseSchema,
+  properties: {
+    ...errorResponseSchema.properties,
+    scope: { type: "string" },
+  },
 } as const;
 
 interface Surface {
@@ -90,9 +100,11 @@ export const resourceKeyRoutes: FastifyPluginCallback = (app, _opts, done) => {
           response: {
             ...limitedResponses,
             201: createdApiKeyResponseSchema,
+            202: approvalRequiredResponseSchema,
             400: errorResponseSchema,
             401: errorResponseSchema,
             404: errorResponseSchema,
+            409: errorResponseSchema,
           },
         },
       },
@@ -117,6 +129,27 @@ export const resourceKeyRoutes: FastifyPluginCallback = (app, _opts, done) => {
         },
       },
       revokeResourceKeyHandler(kind),
+    );
+
+    app.patch(
+      `${prefix}/:id/keys/:keyId`,
+      {
+        ...strict,
+        schema: {
+          tags: [tag],
+          summary: "Rename a key or change the addresses it may be used from",
+          security: [{ bearerAuth: [] }],
+          params: keyParamSchema,
+          response: {
+            ...limitedResponses,
+            200: apiKeyResponseSchema,
+            400: errorResponseSchema,
+            401: errorResponseSchema,
+            404: errorResponseSchema,
+          },
+        },
+      },
+      updateResourceKeyHandler(kind),
     );
 
     app.delete(
@@ -155,7 +188,7 @@ export const resourceKeyRoutes: FastifyPluginCallback = (app, _opts, done) => {
           ...limitedResponses,
           200: resourceContextResponseSchema,
           401: errorResponseSchema,
-          403: errorResponseSchema,
+          403: scopeErrorResponseSchema,
           404: errorResponseSchema,
         },
       },

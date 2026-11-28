@@ -91,26 +91,98 @@ export async function writeConfig(
   config: ConfigFile,
   options: { reset?: boolean } = {},
 ): Promise<void> {
-  await mkdir(configDir, { recursive: true, mode: 0o700 });
   const raw = options.reset ? {} : await readRaw(configDir);
   for (const key of CONFIG_KEYS) delete raw[key];
+  await writeRaw(configDir, { ...raw, ...config });
+}
+
+async function writeRaw(
+  configDir: string,
+  raw: Record<string, unknown>,
+): Promise<void> {
+  await mkdir(configDir, { recursive: true, mode: 0o700 });
   const path = configPath(configDir);
   const temp = `${path}.${process.pid}.tmp`;
   try {
-    await writeFile(
-      temp,
-      `${JSON.stringify({ ...raw, ...config }, null, 2)}\n`,
-      {
-        mode: 0o600,
-      },
-    );
+    await writeFile(temp, `${JSON.stringify(raw, null, 2)}\n`, {
+      mode: 0o600,
+    });
     await rename(temp, path);
   } catch (error) {
     await rm(temp, { force: true });
     throw error;
   }
-  // A file written before this version may still be 0644.
   if (process.platform !== "win32") await chmod(path, 0o600);
+}
+
+export interface SavedOrganization {
+  id: string;
+  handle: string | null;
+  name: string;
+}
+
+export interface SavedProject {
+  id: string;
+  slug: string;
+  name: string;
+  orgId: string | null;
+}
+
+export interface SavedContext {
+  org?: SavedOrganization;
+  project?: SavedProject;
+  environment?: string;
+}
+
+const isText = (value: unknown): value is string =>
+  typeof value === "string" && value !== "";
+
+const record = (value: unknown): Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+
+export async function readContext(configDir: string): Promise<SavedContext> {
+  const raw = record((await readRaw(configDir)).context);
+  const org = record(raw.org);
+  const project = record(raw.project);
+  return {
+    ...(isText(org.id)
+      ? {
+          org: {
+            id: org.id,
+            handle: isText(org.handle) ? org.handle : null,
+            name: isText(org.name) ? org.name : org.id,
+          },
+        }
+      : {}),
+    ...(isText(project.id) && isText(project.slug)
+      ? {
+          project: {
+            id: project.id,
+            slug: project.slug,
+            name: isText(project.name) ? project.name : project.slug,
+            orgId: isText(project.orgId) ? project.orgId : null,
+          },
+        }
+      : {}),
+    ...(isText(raw.environment) ? { environment: raw.environment } : {}),
+  };
+}
+
+export async function writeContext(
+  configDir: string,
+  context: SavedContext,
+): Promise<void> {
+  const raw = await readRaw(configDir);
+  delete raw.context;
+  const kept = Object.fromEntries(
+    Object.entries(context).filter(([, value]) => value !== undefined),
+  );
+  await writeRaw(
+    configDir,
+    Object.keys(kept).length > 0 ? { ...raw, context: kept } : raw,
+  );
 }
 
 /** https, or plain http to this machine, as for `--rpc-url`. */

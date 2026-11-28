@@ -1,23 +1,56 @@
-import { prisma } from "@4mica/db";
+import { type ApiKeyScope, type Prisma, prisma } from "@4mica/db";
+import { type ResourceScope, scopeData, scopeWhere } from "@utils/scope";
 import { generateApiKey, generateWebhookSecret } from "@utils/secrets";
-import type {
-  CreateApiKeyInput,
-  CreateWebhookInput,
-  UpdateApiKeyInput,
-  UpdateWebhookInput,
+import {
+  type CreateApiKeyInput,
+  type CreateWebhookInput,
+  DEFAULT_API_KEY_SCOPES,
+  type UpdateApiKeyInput,
+  type UpdateWebhookInput,
 } from "./schema";
+
+type Db = Prisma.TransactionClient;
 
 export const API_KEY_SELECT = {
   id: true,
   name: true,
   prefix: true,
   last4: true,
+  scopes: true,
+  serviceAccountId: true,
+  ipAllowlist: true,
   lastUsedAt: true,
   expiresAt: true,
   revokedAt: true,
   createdAt: true,
   updatedAt: true,
-} as const;
+  environment: { select: { kind: true } },
+} satisfies Prisma.ApiKeySelect;
+
+type RawApiKey = Prisma.ApiKeyGetPayload<{ select: typeof API_KEY_SELECT }>;
+
+export type ApiKeyRow = Omit<RawApiKey, "environment"> & {
+  environment: RawApiKey["environment"]["kind"];
+};
+
+export const toApiKey = ({ environment, ...rest }: RawApiKey): ApiKeyRow => ({
+  ...rest,
+  environment: environment.kind,
+});
+
+export const findApiKey = async (
+  id: string,
+  db: Db = prisma,
+): Promise<ApiKeyRow | null> => {
+  const row = await db.apiKey.findUnique({
+    where: { id },
+    select: API_KEY_SELECT,
+  });
+  return row ? toApiKey(row) : null;
+};
+
+export const scopesOrAll = (scopes: ApiKeyScope[] | undefined) =>
+  scopes ?? [...DEFAULT_API_KEY_SCOPES];
 
 export const WEBHOOK_SELECT = {
   id: true,
@@ -33,89 +66,104 @@ export const WEBHOOK_SELECT = {
   updatedAt: true,
 } as const;
 
-const ACCOUNT_KEY = { listingId: null, agentId: null } as const;
+const ACCOUNT_KEY = {
+  listingId: null,
+  agentId: null,
+  serviceAccountId: null,
+} as const;
 
-export const listApiKeys = (ownerId: string) =>
-  prisma.apiKey.findMany({
-    where: { ownerId, ...ACCOUNT_KEY },
+export const listApiKeys = async (scope: ResourceScope) => {
+  const rows = await prisma.apiKey.findMany({
+    where: { ...scopeWhere(scope), ...ACCOUNT_KEY },
     orderBy: { createdAt: "desc" },
     select: API_KEY_SELECT,
   });
+  return rows.map(toApiKey);
+};
 
 export const createApiKey = async (
-  ownerId: string,
+  scope: ResourceScope,
+  userId: string,
   data: CreateApiKeyInput,
+  db: Db = prisma,
 ) => {
-  const secret = generateApiKey();
+  const secret = generateApiKey(scope.environment);
 
-  const apiKey = await prisma.apiKey.create({
+  const row = await db.apiKey.create({
     data: {
-      ownerId,
+      ...scopeData(scope),
+      createdById: userId,
       name: data.name,
+      scopes: scopesOrAll(data.scopes),
       prefix: secret.prefix,
       last4: secret.last4,
       hashedKey: secret.hash,
       expiresAt: data.expiresAt ? new Date(data.expiresAt) : null,
+      ipAllowlist: data.ipAllowlist ?? [],
     },
     select: API_KEY_SELECT,
   });
 
-  return { apiKey, plaintext: secret.plaintext };
+  return { apiKey: toApiKey(row), plaintext: secret.plaintext };
 };
 
 export const updateApiKey = async (
-  ownerId: string,
+  scope: ResourceScope,
   id: string,
   data: UpdateApiKeyInput,
+  db: Db = prisma,
 ) => {
-  const { count } = await prisma.apiKey.updateMany({
-    where: { id, ownerId, ...ACCOUNT_KEY },
+  const { count } = await db.apiKey.updateMany({
+    where: { id, ...scopeWhere(scope), ...ACCOUNT_KEY },
     data,
   });
 
-  if (count === 0) {
-    return null;
-  }
-
-  return prisma.apiKey.findUnique({ where: { id }, select: API_KEY_SELECT });
+  return count > 0 ? findApiKey(id, db) : null;
 };
 
-export const revokeApiKey = async (ownerId: string, id: string) => {
-  const { count } = await prisma.apiKey.updateMany({
-    where: { id, ownerId, ...ACCOUNT_KEY, revokedAt: null },
+export const revokeApiKey = async (
+  scope: ResourceScope,
+  id: string,
+  db: Db = prisma,
+) => {
+  const { count } = await db.apiKey.updateMany({
+    where: { id, ...scopeWhere(scope), ...ACCOUNT_KEY, revokedAt: null },
     data: { revokedAt: new Date() },
   });
 
-  if (count === 0) {
-    return null;
-  }
-
-  return prisma.apiKey.findUnique({ where: { id }, select: API_KEY_SELECT });
+  return count > 0 ? findApiKey(id, db) : null;
 };
 
-export const deleteApiKey = async (ownerId: string, id: string) => {
-  const { count } = await prisma.apiKey.deleteMany({
-    where: { id, ownerId, ...ACCOUNT_KEY },
+export const deleteApiKey = async (
+  scope: ResourceScope,
+  id: string,
+  db: Db = prisma,
+) => {
+  const { count } = await db.apiKey.deleteMany({
+    where: { id, ...scopeWhere(scope), ...ACCOUNT_KEY },
   });
   return count > 0;
 };
 
-export const listWebhooks = (ownerId: string) =>
+export const listWebhooks = (scope: ResourceScope) =>
   prisma.webhook.findMany({
-    where: { ownerId },
+    where: scopeWhere(scope),
     orderBy: { createdAt: "desc" },
     select: WEBHOOK_SELECT,
   });
 
 export const createWebhook = async (
-  ownerId: string,
+  scope: ResourceScope,
+  userId: string,
   data: CreateWebhookInput,
+  db: Db = prisma,
 ) => {
   const secret = generateWebhookSecret();
 
-  const webhook = await prisma.webhook.create({
+  const webhook = await db.webhook.create({
     data: {
-      ownerId,
+      ...scopeData(scope),
+      createdById: userId,
       url: data.url,
       description: data.description ?? null,
       events: data.events,
@@ -129,12 +177,13 @@ export const createWebhook = async (
 };
 
 export const updateWebhook = async (
-  ownerId: string,
+  scope: ResourceScope,
   id: string,
   data: UpdateWebhookInput,
+  db: Db = prisma,
 ) => {
-  const { count } = await prisma.webhook.updateMany({
-    where: { id, ownerId },
+  const { count } = await db.webhook.updateMany({
+    where: { id, ...scopeWhere(scope) },
     data,
   });
 
@@ -142,14 +191,18 @@ export const updateWebhook = async (
     return null;
   }
 
-  return prisma.webhook.findUnique({ where: { id }, select: WEBHOOK_SELECT });
+  return db.webhook.findUnique({ where: { id }, select: WEBHOOK_SELECT });
 };
 
-export const rotateWebhookSecret = async (ownerId: string, id: string) => {
+export const rotateWebhookSecret = async (
+  scope: ResourceScope,
+  id: string,
+  db: Db = prisma,
+) => {
   const secret = generateWebhookSecret();
 
-  const { count } = await prisma.webhook.updateMany({
-    where: { id, ownerId },
+  const { count } = await db.webhook.updateMany({
+    where: { id, ...scopeWhere(scope) },
     data: { secretHash: secret.hash, secretPrefix: secret.prefix },
   });
 
@@ -157,7 +210,7 @@ export const rotateWebhookSecret = async (ownerId: string, id: string) => {
     return null;
   }
 
-  const webhook = await prisma.webhook.findUnique({
+  const webhook = await db.webhook.findUnique({
     where: { id },
     select: WEBHOOK_SELECT,
   });
@@ -165,7 +218,13 @@ export const rotateWebhookSecret = async (ownerId: string, id: string) => {
   return webhook ? { webhook, plaintext: secret.plaintext } : null;
 };
 
-export const deleteWebhook = async (ownerId: string, id: string) => {
-  const { count } = await prisma.webhook.deleteMany({ where: { id, ownerId } });
+export const deleteWebhook = async (
+  scope: ResourceScope,
+  id: string,
+  db: Db = prisma,
+) => {
+  const { count } = await db.webhook.deleteMany({
+    where: { id, ...scopeWhere(scope) },
+  });
   return count > 0;
 };

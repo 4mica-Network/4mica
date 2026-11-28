@@ -4,13 +4,15 @@ import { useCallback, useEffect, useState } from "react";
 
 export const EPHEMERAL_SECRET_TTL_MS = 60_000;
 
-export function useEphemeralSecret(ttlMs = EPHEMERAL_SECRET_TTL_MS) {
+export function useEphemeralSecret<T = RevealedSecret>(
+  ttlMs = EPHEMERAL_SECRET_TTL_MS,
+) {
   const { isSignedIn } = useAuth();
-  const [secret, setSecret] = useState<RevealedSecret | null>(null);
+  const [secret, setSecret] = useState<T | null>(null);
 
   const clear = useCallback(() => setSecret(null), []);
   const reveal = useCallback(
-    (next: RevealedSecret) => setSecret(document.hidden ? null : next),
+    (next: T) => setSecret(document.hidden ? null : next),
     [],
   );
 

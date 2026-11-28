@@ -73,12 +73,46 @@ const PUBLIC = new Set([
   "GET /verify-email",
   "GET /unsubscribe",
   "POST /unsubscribe",
+  "POST /v1/cli/device/code",
+  "POST /v1/cli/device/token",
+  "GET /v1/invitations/:token/preview",
 ]);
 
 const API_KEY_ROUTES = new Set([
   "POST /v1/payments",
   "POST /v1/customers/resolve",
   "GET /v1/resource",
+  "POST /v1/approvals",
+  "GET /v1/approvals/:id",
+  "POST /v1/spend/authorize",
+  "GET /v1/spend/authorizations/:id",
+  "POST /v1/spend/authorizations/:id/consume",
+  "POST /v1/spend/authorizations/:id/release",
+]);
+
+const SCIM_ROUTES = new Set([
+  "GET /scim/v2/ServiceProviderConfig",
+  "GET /scim/v2/ResourceTypes",
+  "GET /scim/v2/ResourceTypes/:id",
+  "GET /scim/v2/Schemas",
+  "GET /scim/v2/Schemas/:id",
+  "GET /scim/v2/Users",
+  "POST /scim/v2/Users",
+  "GET /scim/v2/Users/:id",
+  "PUT /scim/v2/Users/:id",
+  "PATCH /scim/v2/Users/:id",
+  "DELETE /scim/v2/Users/:id",
+  "GET /scim/v2/Groups",
+  "POST /scim/v2/Groups",
+  "GET /scim/v2/Groups/:id",
+  "PUT /scim/v2/Groups/:id",
+  "PATCH /scim/v2/Groups/:id",
+  "DELETE /scim/v2/Groups/:id",
+]);
+
+const CLI_TOKEN_ROUTES = new Set([
+  "GET /v1/cli/session",
+  "DELETE /v1/cli/session",
 ]);
 
 const ID = "019fce62-0000-7000-8000-00000000beef";
@@ -130,6 +164,8 @@ const recordRoutes = Object.assign(
   { [Symbol.for("skip-override")]: true },
 );
 
+let clearCachedUsers: () => void = () => {};
+
 let inject: (
   route: Route,
   headers: Record<string, string>,
@@ -138,10 +174,13 @@ let inject: (
 beforeAll(async () => {
   vi.stubEnv("RATE_LIMIT_ENABLED", "false");
 
-  const [{ initApp }, { routes: appRoutes }] = await Promise.all([
-    import("@/server"),
-    import("@routes/index"),
-  ]);
+  const [{ initApp }, { routes: appRoutes }, { clearUserCache }] =
+    await Promise.all([
+      import("@/server"),
+      import("@routes/index"),
+      import("@auth/user-store"),
+    ]);
+  clearCachedUsers = clearUserCache;
   const app = await initApp([{ plugin: recordRoutes }, ...appRoutes]);
 
   inject = async ({ method, url }, headers) => {
@@ -160,7 +199,12 @@ beforeAll(async () => {
 
 const protectedRoutes = () => routes.filter((r) => !PUBLIC.has(keyOf(r)));
 const sessionRoutes = () =>
-  protectedRoutes().filter((r) => !API_KEY_ROUTES.has(keyOf(r)));
+  protectedRoutes().filter(
+    (r) =>
+      !API_KEY_ROUTES.has(keyOf(r)) &&
+      !CLI_TOKEN_ROUTES.has(keyOf(r)) &&
+      !SCIM_ROUTES.has(keyOf(r)),
+  );
 
 describe("route inventory", () => {
   it("registers every route the audit expects, and no surprises", () => {
@@ -169,18 +213,30 @@ describe("route inventory", () => {
     expect(keys.length).toBeGreaterThanOrEqual(80);
     expect(new Set(keys).size).toBe(keys.length);
 
-    for (const expected of [...PUBLIC, ...API_KEY_ROUTES]) {
+    for (const expected of [
+      ...PUBLIC,
+      ...API_KEY_ROUTES,
+      ...CLI_TOKEN_ROUTES,
+      ...SCIM_ROUTES,
+    ]) {
       expect(keys).toContain(expected);
     }
     expect(
-      keys.filter((key) =>
-        /\/(admin|internal|debug|metrics|docs|v2|legacy|test)\b/.test(key),
+      keys.filter(
+        (key) =>
+          key !== "POST /me/organization/audit-streams/:id/test" &&
+          !SCIM_ROUTES.has(key) &&
+          /\/(admin|internal|debug|metrics|docs|v2|legacy|test)\b/.test(key),
       ),
     ).toEqual([]);
+    expect(
+      keys.filter((key) => /^[A-Z]+ \/scim(\/|$)/.test(key)).sort(),
+    ).toEqual([...SCIM_ROUTES].sort());
     expect(
       keys.filter(
         (key) =>
           !PUBLIC.has(key) &&
+          !SCIM_ROUTES.has(key) &&
           !/^[A-Z]+ \/(me|v1)(\/|$)/.test(key) &&
           !/^[A-Z]+ \/(banners|config|webhook-events)(\/|$)/.test(key),
       ),
@@ -194,6 +250,7 @@ describe("authentication matrix", () => {
     getUser.mockReset();
     touched.clear();
     userRow.current = null;
+    clearCachedUsers();
   });
 
   const credentials: [string, () => void, Record<string, string>][] = [
@@ -261,6 +318,145 @@ describe("authentication matrix", () => {
       });
       expect(statusCode, keyOf(route)).toBe(401);
     }
+  });
+
+  it("lets an organization the caller does not belong to reach no tenant data", async () => {
+    authenticateRequest.mockResolvedValue(signedIn());
+    userRow.current = {
+      id: ID,
+      clerkUserId: "user_matrix",
+      email: null,
+      name: null,
+      avatarUrl: null,
+      banned: false,
+      locked: false,
+      deletedAt: null,
+    };
+
+    const tenantModels = [
+      "agent",
+      "apiListing",
+      "apiKey",
+      "payment",
+      "customer",
+      "customerCoupon",
+      "customerCreditEntry",
+      "customerPaymentIdentity",
+      "webhook",
+      "wallet",
+      "business",
+      "complianceProfile",
+      "beneficialOwner",
+      "supportRequest",
+      "supportMessage",
+      "resourcePolicy",
+      "faqItem",
+      "review",
+      "report",
+      "auditLog",
+      "organization",
+      "approvalRequest",
+      "spendingPolicy",
+      "spendAuthorization",
+      "financialAlert",
+      "approvalDecision",
+      "governanceSettings",
+      "scimToken",
+      "scimGroup",
+      "scimGroupMember",
+      "securitySettings",
+      "$queryRaw",
+    ];
+    const failures: string[] = [];
+
+    for (const route of sessionRoutes()) {
+      touched.clear();
+      const { statusCode, body } = await inject(route, {
+        authorization: "Bearer good",
+        "x-org-id": "019fce62-0000-7000-8000-00000000f00d",
+      });
+      const leaked = [...touched].filter((name) => tenantModels.includes(name));
+      if (statusCode < 400 && leaked.length > 0) {
+        failures.push(`${keyOf(route)} → ${statusCode} ${body}`);
+      }
+      if (leaked.length > 0) {
+        failures.push(`${keyOf(route)} touched ${leaked.join(", ")}`);
+      }
+    }
+
+    expect(failures).toEqual([]);
+  });
+
+  it("accepts neither a Clerk session nor an API key on SCIM routes", async () => {
+    authenticateRequest.mockResolvedValue(signedIn());
+    userRow.current = {
+      id: ID,
+      clerkUserId: "user_matrix",
+      email: null,
+      name: null,
+      avatarUrl: null,
+      banned: false,
+      locked: false,
+      deletedAt: null,
+    };
+    const scimRoutes = routes.filter((r) => SCIM_ROUTES.has(keyOf(r)));
+    expect(scimRoutes).toHaveLength(SCIM_ROUTES.size);
+
+    for (const authorization of [
+      "Bearer a-valid-session-token",
+      "Bearer 4mica_sk_live_abcdefghijklmnop",
+      "Bearer 4mica_cli_abcdefghijklmnop",
+    ]) {
+      touched.clear();
+      for (const route of scimRoutes) {
+        const { statusCode, body } = await inject(route, { authorization });
+        expect(statusCode, `${keyOf(route)} ${authorization}`).toBe(401);
+        expect(JSON.parse(body).schemas).toEqual([
+          "urn:ietf:params:scim:api:messages:2.0:Error",
+        ]);
+      }
+      expect([...touched]).toEqual([]);
+    }
+    expect(authenticateRequest).not.toHaveBeenCalled();
+  });
+
+  it("does not accept a valid Clerk session on CLI-token routes", async () => {
+    authenticateRequest.mockResolvedValue(signedIn());
+
+    for (const route of routes.filter((r) => CLI_TOKEN_ROUTES.has(keyOf(r)))) {
+      const { statusCode } = await inject(route, {
+        authorization: "Bearer a-valid-session-token",
+      });
+      expect(statusCode, keyOf(route)).toBe(401);
+    }
+    expect([...touched]).toEqual([]);
+  });
+
+  it("looks a CLI token up only on the routes that opted in", async () => {
+    authenticateRequest.mockResolvedValue(signedOut("token-invalid"));
+    const lookedUp: string[] = [];
+
+    for (const route of protectedRoutes()) {
+      touched.clear();
+      const { statusCode } = await inject(route, {
+        authorization: "Bearer 4mica_cli_not-a-real-token",
+      });
+      expect(statusCode, keyOf(route)).toBe(401);
+      if (touched.has("cliSession")) {
+        lookedUp.push(keyOf(route));
+      }
+    }
+
+    expect(lookedUp.sort()).toEqual([
+      "DELETE /me/wallets/:id",
+      "DELETE /v1/cli/session",
+      "GET /me/organizations",
+      "GET /me/projects",
+      "GET /me/wallets",
+      "GET /v1/cli/session",
+      "POST /me/wallets",
+      "POST /me/wallets/siwe-nonce",
+    ]);
   });
 
   it("lets a disabled account reach no data on any session route", async () => {

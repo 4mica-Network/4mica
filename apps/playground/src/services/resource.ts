@@ -46,7 +46,7 @@ export const resolveApiListing = async (
   }
 
   const listing = await getPublicApiListing(
-    resolved.result.ownerId,
+    resolved.result.organizationId,
     resolved.ref,
     resolved.result.profile.isOwner,
   );
@@ -64,7 +64,7 @@ export const resolveAgent = async (
   }
 
   const agent = await getPublicAgent(
-    resolved.result.ownerId,
+    resolved.result.organizationId,
     resolved.ref,
     resolved.result.profile.isOwner,
   );

@@ -1,8 +1,11 @@
+import { requireProductionKeyApproval } from "@controllers/approvals/key-gate";
 import {
   invalidBody,
   notFound,
   parseBody,
+  requireProject,
   requireUserId,
+  withProjectAudit,
 } from "@controllers/shared";
 import { appLogger } from "@logger/index";
 import { WEBHOOK_EVENTS } from "@utils/webhook-events";
@@ -37,16 +40,16 @@ export const listWebhookEventsHandler: RouteHandler = async (
 };
 
 export const listApiKeysHandler: RouteHandler = async (request, reply) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const scope = await requireProject(request, reply, "resources.read");
+  if (!scope) {
     return reply;
   }
-  return reply.send(await listApiKeys(userId));
+  return reply.send(await listApiKeys(scope));
 };
 
 export const createApiKeyHandler: RouteHandler = async (request, reply) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const scope = await requireProject(request, reply, "keys.manage");
+  if (!scope) {
     return reply;
   }
 
@@ -55,15 +58,39 @@ export const createApiKeyHandler: RouteHandler = async (request, reply) => {
     return invalidBody(reply, parsed.issues);
   }
 
-  const { apiKey, plaintext } = await createApiKey(userId, parsed.data);
-  appLogger.info("API key created", { userId, apiKeyId: apiKey.id });
+  const gate = await requireProductionKeyApproval(
+    request,
+    reply,
+    scope,
+    { kind: "account", ...parsed.data },
+    `Create API key "${parsed.data.name}"`,
+  );
+  if (!gate.proceed) {
+    return reply;
+  }
+
+  const { apiKey, plaintext } = await withProjectAudit(
+    request,
+    scope,
+    (tx) => createApiKey(scope, scope.userId, parsed.data, tx),
+    (created) => ({
+      action: "api_key.created",
+      targetType: "api_key",
+      targetId: created.apiKey.id,
+      ...(gate.approvalId ? { metadata: { approvalId: gate.approvalId } } : {}),
+    }),
+  );
+  appLogger.info("API key created", {
+    userId: scope.userId,
+    apiKeyId: apiKey.id,
+  });
 
   return reply.code(201).send({ apiKey, plaintext });
 };
 
 export const updateApiKeyHandler: RouteHandler = async (request, reply) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const scope = await requireProject(request, reply, "keys.manage");
+  if (!scope) {
     return reply;
   }
 
@@ -73,22 +100,43 @@ export const updateApiKeyHandler: RouteHandler = async (request, reply) => {
   }
 
   const { id } = request.params as { id: string };
-  const updated = await updateApiKey(userId, id, parsed.data);
+  const updated = await withProjectAudit(
+    request,
+    scope,
+    (tx) => updateApiKey(scope, id, parsed.data, tx),
+    (row) =>
+      row && {
+        action: "api_key.updated",
+        targetType: "api_key",
+        targetId: id,
+        metadata: parsed.data,
+      },
+  );
 
-  return updated ? reply.send(updated) : notFound(reply, "API key");
+  if (!updated) {
+    return notFound(reply, "API key");
+  }
+
+  return reply.send(updated);
 };
 
 export const revokeApiKeyHandler: RouteHandler = async (request, reply) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const scope = await requireProject(request, reply, "keys.manage");
+  if (!scope) {
     return reply;
   }
 
   const { id } = request.params as { id: string };
-  const revoked = await revokeApiKey(userId, id);
+  const revoked = await withProjectAudit(
+    request,
+    scope,
+    (tx) => revokeApiKey(scope, id, tx),
+    (row) =>
+      row && { action: "api_key.revoked", targetType: "api_key", targetId: id },
+  );
 
   if (revoked) {
-    appLogger.info("API key revoked", { userId, apiKeyId: id });
+    appLogger.info("API key revoked", { userId: scope.userId, apiKeyId: id });
     return reply.send(revoked);
   }
 
@@ -96,28 +144,40 @@ export const revokeApiKeyHandler: RouteHandler = async (request, reply) => {
 };
 
 export const deleteApiKeyHandler: RouteHandler = async (request, reply) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const scope = await requireProject(request, reply, "keys.manage");
+  if (!scope) {
     return reply;
   }
 
   const { id } = request.params as { id: string };
-  const deleted = await deleteApiKey(userId, id);
+  const deleted = await withProjectAudit(
+    request,
+    scope,
+    (tx) => deleteApiKey(scope, id, tx),
+    (found) =>
+      found
+        ? { action: "api_key.deleted", targetType: "api_key", targetId: id }
+        : null,
+  );
 
-  return deleted ? reply.code(204).send() : notFound(reply, "API key");
+  if (!deleted) {
+    return notFound(reply, "API key");
+  }
+
+  return reply.code(204).send();
 };
 
 export const listWebhooksHandler: RouteHandler = async (request, reply) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const scope = await requireProject(request, reply, "resources.read");
+  if (!scope) {
     return reply;
   }
-  return reply.send(await listWebhooks(userId));
+  return reply.send(await listWebhooks(scope));
 };
 
 export const createWebhookHandler: RouteHandler = async (request, reply) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const scope = await requireProject(request, reply, "resources.write");
+  if (!scope) {
     return reply;
   }
 
@@ -126,15 +186,27 @@ export const createWebhookHandler: RouteHandler = async (request, reply) => {
     return invalidBody(reply, parsed.issues);
   }
 
-  const { webhook, plaintext } = await createWebhook(userId, parsed.data);
-  appLogger.info("Webhook created", { userId, webhookId: webhook.id });
+  const { webhook, plaintext } = await withProjectAudit(
+    request,
+    scope,
+    (tx) => createWebhook(scope, scope.userId, parsed.data, tx),
+    (created) => ({
+      action: "webhook.created",
+      targetType: "webhook",
+      targetId: created.webhook.id,
+    }),
+  );
+  appLogger.info("Webhook created", {
+    userId: scope.userId,
+    webhookId: webhook.id,
+  });
 
   return reply.code(201).send({ webhook, plaintext });
 };
 
 export const updateWebhookHandler: RouteHandler = async (request, reply) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const scope = await requireProject(request, reply, "resources.write");
+  if (!scope) {
     return reply;
   }
 
@@ -144,39 +216,74 @@ export const updateWebhookHandler: RouteHandler = async (request, reply) => {
   }
 
   const { id } = request.params as { id: string };
-  const updated = await updateWebhook(userId, id, parsed.data);
+  const updated = await withProjectAudit(
+    request,
+    scope,
+    (tx) => updateWebhook(scope, id, parsed.data, tx),
+    (row) =>
+      row && { action: "webhook.updated", targetType: "webhook", targetId: id },
+  );
 
-  return updated ? reply.send(updated) : notFound(reply, "webhook");
+  if (!updated) {
+    return notFound(reply, "webhook");
+  }
+
+  return reply.send(updated);
 };
 
 export const rotateWebhookSecretHandler: RouteHandler = async (
   request,
   reply,
 ) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const scope = await requireProject(request, reply, "resources.write");
+  if (!scope) {
     return reply;
   }
 
   const { id } = request.params as { id: string };
-  const rotated = await rotateWebhookSecret(userId, id);
+  const rotated = await withProjectAudit(
+    request,
+    scope,
+    (tx) => rotateWebhookSecret(scope, id, tx),
+    (row) =>
+      row && {
+        action: "webhook.secret_rotated",
+        targetType: "webhook",
+        targetId: id,
+      },
+  );
 
   if (!rotated) {
     return notFound(reply, "webhook");
   }
 
-  appLogger.info("Webhook secret rotated", { userId, webhookId: id });
+  appLogger.info("Webhook secret rotated", {
+    userId: scope.userId,
+    webhookId: id,
+  });
   return reply.send(rotated);
 };
 
 export const deleteWebhookHandler: RouteHandler = async (request, reply) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const scope = await requireProject(request, reply, "resources.write");
+  if (!scope) {
     return reply;
   }
 
   const { id } = request.params as { id: string };
-  const deleted = await deleteWebhook(userId, id);
+  const deleted = await withProjectAudit(
+    request,
+    scope,
+    (tx) => deleteWebhook(scope, id, tx),
+    (found) =>
+      found
+        ? { action: "webhook.deleted", targetType: "webhook", targetId: id }
+        : null,
+  );
 
-  return deleted ? reply.code(204).send() : notFound(reply, "webhook");
+  if (!deleted) {
+    return notFound(reply, "webhook");
+  }
+
+  return reply.code(204).send();
 };

@@ -1,6 +1,16 @@
 import { formatUnits, parseAmount, toBaseUnits } from "@/amounts";
-import { SpendLimitError } from "@/errors";
-import type { AssetRef, PaymentRecord, SpendLimits } from "@/facade/models";
+import type { SpendAuthorization } from "@/app/models";
+import { SpendAuthorizationError, SpendLimitError } from "@/errors";
+import {
+  recordGovernanceOutcome,
+  type SpendGovernor,
+} from "@/facade/governance";
+import type {
+  AccountingStatus,
+  AssetRef,
+  PaymentRecord,
+  SpendLimits,
+} from "@/facade/models";
 import type { PaymentProtocol, PaymentTerms } from "@/facade/protocols/types";
 import { assetRef, type NetworkSession } from "@/facade/session";
 
@@ -112,8 +122,21 @@ export interface FetchContext {
   /** `undefined` where this session does not pay. */
   sessionFor(caip2: string): NetworkSession | undefined;
   limiter: SpendLimiter;
+  governor?: SpendGovernor;
   record(response: Response, payment: PaymentRecord): void;
 }
+
+type PaymentOutcome = "settled" | "rejected" | "unknown";
+
+const paymentOutcome = (
+  protocol: PaymentProtocol,
+  paid: Response,
+): PaymentOutcome =>
+  paid.status === 402
+    ? "rejected"
+    : (protocol.settled(paid) ?? paid.ok)
+      ? "settled"
+      : "unknown";
 
 export async function payingFetch(
   ctx: FetchContext,
@@ -141,7 +164,7 @@ export async function payingFetch(
     return response;
   }
 
-  let refusal: SpendLimitError | undefined;
+  let refusal: SpendLimitError | SpendAuthorizationError | undefined;
   for (const { protocol, terms, session } of options) {
     const reservation = await ctx.limiter.reserve(session, terms, request.url);
     if (reservation instanceof SpendLimitError) {
@@ -149,28 +172,77 @@ export async function payingFetch(
       continue;
     }
 
-    const headers = new Headers(request.headers);
-    try {
-      for (const [name, value] of Object.entries(
-        await protocol.pay(terms, session.client),
-      )) {
-        headers.set(name, value);
+    let authorization: SpendAuthorization | undefined;
+    if (ctx.governor) {
+      let granted: SpendAuthorization | SpendAuthorizationError;
+      try {
+        granted = await ctx.governor.authorize({
+          terms,
+          asset: reservation.asset,
+          payerAddress: session.client.signerAddress,
+          url: request.url,
+          signal: request.signal,
+        });
+      } catch (err) {
+        ctx.limiter.release(reservation);
+        throw err;
       }
+      if (granted instanceof SpendAuthorizationError) {
+        ctx.limiter.release(reservation);
+        refusal ??= granted;
+        continue;
+      }
+      authorization = granted;
+    }
+    const releaseAuthorization = () =>
+      authorization && ctx.governor?.release(authorization.id);
+
+    const headers = new Headers(request.headers);
+    let signed: Record<string, string>;
+    try {
+      signed = await protocol.pay(terms, session.client);
     } catch (err) {
-      // Nothing has left this process.
       ctx.limiter.release(reservation);
+      await releaseAuthorization();
       throw err;
     }
-    // Retried once; a second 402 goes back to the caller. If this throws the
-    // amount stays reserved: the seller may hold the payment and redeem it.
-    const paid = await ctx.fetchFn(new Request(request, { headers }));
-    if (paid.status === 402) {
-      ctx.limiter.release(reservation);
-      return paid;
+    for (const [name, value] of Object.entries(signed)) {
+      headers.set(name, value);
     }
-    // A seller that says nothing is taken to charge for what it delivered.
-    // The amount stays reserved either way: the payment is in its hands.
-    if (protocol.settled(paid) ?? paid.ok) {
+    if (request.signal.aborted) {
+      ctx.limiter.release(reservation);
+      await releaseAuthorization();
+      throw request.signal.reason;
+    }
+    const conclude = async (
+      outcome: PaymentOutcome,
+    ): Promise<AccountingStatus | undefined> => {
+      if (outcome === "rejected") {
+        ctx.limiter.release(reservation);
+        return releaseAuthorization();
+      }
+      return (
+        authorization &&
+        ctx.governor?.consume(authorization.id, protocol.reqId?.(signed))
+      );
+    };
+
+    let paid: Response;
+    try {
+      paid = await ctx.fetchFn(new Request(request, { headers }));
+    } catch (err) {
+      await conclude("unknown");
+      throw err;
+    }
+    const outcome = paymentOutcome(protocol, paid);
+    const accounting = await conclude(outcome);
+    if (authorization && accounting) {
+      recordGovernanceOutcome(paid, {
+        authorizationId: authorization.id,
+        accounting,
+      });
+    }
+    if (outcome === "settled") {
       ctx.record(paid, {
         protocol: protocol.name,
         network: terms.network,
@@ -182,5 +254,5 @@ export async function payingFetch(
     }
     return paid;
   }
-  throw refusal as SpendLimitError;
+  throw refusal as SpendLimitError | SpendAuthorizationError;
 }

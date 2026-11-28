@@ -29,6 +29,8 @@ export {
   CreditLimitChangedSchema,
   type DisputeCreatedPayload,
   DisputeCreatedSchema,
+  type FinancialAlertPayload,
+  FinancialAlertSchema,
   type Money,
   OnboardingStepSchema,
   type PaymentSucceededPayload,

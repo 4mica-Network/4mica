@@ -1,10 +1,13 @@
-import { requireApiKeyOwner } from "@auth/api-key";
+import { requireApiKeyScope } from "@auth/api-key";
+import { consumeSellerApproval } from "@controllers/approvals/repository";
 import { MAX_OFFSET } from "@controllers/schema-primitives";
 import {
+  auditProject,
   invalidBody,
   notFound,
   parseBody,
-  requireUserId,
+  requireProject,
+  withProjectAudit,
 } from "@controllers/shared";
 import { appLogger } from "@logger/index";
 import { optionalAmountText } from "@utils/amount";
@@ -22,6 +25,7 @@ import {
   creditBalance,
   customerActivity,
   customerBreakdown,
+  customerLimitNetwork,
   customerOverview,
   deleteCoupon,
   findCouponByCode,
@@ -77,8 +81,8 @@ const identityTaken = (reply: FastifyReply, error: unknown) => {
 };
 
 export const listCustomersHandler: RouteHandler = async (request, reply) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const scope = await requireProject(request, reply, "resources.read");
+  if (!scope) {
     return reply;
   }
 
@@ -93,24 +97,24 @@ export const listCustomersHandler: RouteHandler = async (request, reply) => {
     ]);
   }
 
-  return reply.send(await listCustomers(userId, parsed.data));
+  return reply.send(await listCustomers(scope, parsed.data));
 };
 
 export const getCustomerHandler: RouteHandler = async (request, reply) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const scope = await requireProject(request, reply, "resources.read");
+  if (!scope) {
     return reply;
   }
 
   const { id } = request.params as { id: string };
-  const customer = await getCustomer(userId, id);
+  const customer = await getCustomer(scope, id);
 
   return customer ? reply.send(customer) : notFound(reply, "customer");
 };
 
 export const createCustomerHandler: RouteHandler = async (request, reply) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const scope = await requireProject(request, reply, "resources.write");
+  if (!scope) {
     return reply;
   }
 
@@ -120,10 +124,16 @@ export const createCustomerHandler: RouteHandler = async (request, reply) => {
   }
 
   try {
-    const customer = await createCustomer(userId, parsed.data);
+    const customer = await createCustomer(scope, scope.userId, parsed.data);
+
+    await auditProject(request, scope, {
+      action: "customer.created",
+      targetType: "customer",
+      targetId: customer.id,
+    });
 
     appLogger.info("Customer created", {
-      userId,
+      userId: scope.userId,
       customerId: customer.id,
       identities: customer.identities.length,
     });
@@ -133,14 +143,14 @@ export const createCustomerHandler: RouteHandler = async (request, reply) => {
     if (isUniqueViolation(error)) {
       return identityTaken(reply, error);
     }
-    appLogger.error("Customer create failed", { error, userId });
+    appLogger.error("Customer create failed", { error, userId: scope.userId });
     throw error;
   }
 };
 
 export const updateCustomerHandler: RouteHandler = async (request, reply) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const scope = await requireProject(request, reply, "resources.write");
+  if (!scope) {
     return reply;
   }
 
@@ -150,8 +160,35 @@ export const updateCustomerHandler: RouteHandler = async (request, reply) => {
   }
 
   const { id } = request.params as { id: string };
-  const updated = await updateCustomer(userId, id, parsed.data);
+  const fields = Object.keys(parsed.data);
+  const change = await withProjectAudit(
+    request,
+    scope,
+    (tx) => updateCustomer(scope, id, parsed.data, tx),
+    (result) =>
+      result && result.limitFields.length > 0
+        ? {
+            action: "customer.limits_updated",
+            targetType: "customer",
+            targetId: id,
+            metadata: { fields, before: result.before, after: result.after },
+          }
+        : null,
+  );
+  if (!change) {
+    return notFound(reply, "customer");
+  }
 
+  if (change.limitFields.length === 0) {
+    await auditProject(request, scope, {
+      action: "customer.updated",
+      targetType: "customer",
+      targetId: id,
+      metadata: { fields },
+    });
+  }
+
+  const updated = await getCustomer(scope, id);
   return updated ? reply.send(updated) : notFound(reply, "customer");
 };
 
@@ -159,8 +196,8 @@ export const setCustomerStatusHandler: RouteHandler = async (
   request,
   reply,
 ) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const scope = await requireProject(request, reply, "resources.write");
+  if (!scope) {
     return reply;
   }
 
@@ -170,14 +207,28 @@ export const setCustomerStatusHandler: RouteHandler = async (
   }
 
   const { id } = request.params as { id: string };
-  const updated = await setCustomerStatus(userId, id, parsed.data);
+  const changed = await withProjectAudit(
+    request,
+    scope,
+    (tx) => setCustomerStatus(scope, id, parsed.data, tx),
+    (found) =>
+      found
+        ? {
+            action: "customer.status_changed",
+            targetType: "customer",
+            targetId: id,
+            metadata: { status: parsed.data.status },
+          }
+        : null,
+  );
+  const updated = changed ? await getCustomer(scope, id) : null;
 
   if (!updated) {
     return notFound(reply, "customer");
   }
 
   appLogger.info("Customer status changed", {
-    userId,
+    userId: scope.userId,
     customerId: id,
     status: parsed.data.status,
   });
@@ -189,8 +240,8 @@ export const setCustomerPolicyHandler: RouteHandler = async (
   request,
   reply,
 ) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const scope = await requireProject(request, reply, "resources.write");
+  if (!scope) {
     return reply;
   }
 
@@ -200,13 +251,55 @@ export const setCustomerPolicyHandler: RouteHandler = async (
   }
 
   const { id } = request.params as { id: string };
-  const updated = await setCustomerPolicy(userId, id, parsed.data);
+  const { dailyLimit, monthlyLimit, limitNetwork } = parsed.data;
+
+  if (
+    limitNetwork === undefined &&
+    (dailyLimit != null || monthlyLimit != null)
+  ) {
+    const current = await customerLimitNetwork(scope, id);
+    if (!current) {
+      return notFound(reply, "customer");
+    }
+    if (current.limitNetwork === null) {
+      return invalidBody(reply, [
+        {
+          path: "limitNetwork",
+          message:
+            "is required with limitAssetAddress when setting a spend limit",
+        },
+      ]);
+    }
+  }
+
+  const change = await withProjectAudit(
+    request,
+    scope,
+    (tx) => setCustomerPolicy(scope, id, parsed.data, tx),
+    (result) =>
+      result && result.limitFields.length > 0
+        ? {
+            action: "customer.limits_updated",
+            targetType: "customer",
+            targetId: id,
+            metadata: {
+              fields: Object.keys(parsed.data),
+              before: result.before,
+              after: result.after,
+            },
+          }
+        : null,
+  );
+  const updated = change ? await getCustomer(scope, id) : null;
 
   if (!updated) {
     return notFound(reply, "customer");
   }
 
-  appLogger.info("Customer policy changed", { userId, customerId: id });
+  appLogger.info("Customer policy changed", {
+    userId: scope.userId,
+    customerId: id,
+  });
 
   return reply.send(updated);
 };
@@ -215,34 +308,61 @@ export const resetCustomerUsageHandler: RouteHandler = async (
   request,
   reply,
 ) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const scope = await requireProject(request, reply, "resources.write");
+  if (!scope) {
     return reply;
   }
 
   const { id } = request.params as { id: string };
-  const updated = await resetCustomerUsage(userId, id);
+  const reset = await withProjectAudit(
+    request,
+    scope,
+    (tx) => resetCustomerUsage(scope, id, tx),
+    (found) =>
+      found
+        ? {
+            action: "customer.usage_reset",
+            targetType: "customer",
+            targetId: id,
+          }
+        : null,
+  );
+  const updated = reset ? await getCustomer(scope, id) : null;
 
   if (!updated) {
     return notFound(reply, "customer");
   }
 
-  appLogger.info("Customer usage reset", { userId, customerId: id });
+  appLogger.info("Customer usage reset", {
+    userId: scope.userId,
+    customerId: id,
+  });
 
   return reply.send(updated);
 };
 
 export const deleteCustomerHandler: RouteHandler = async (request, reply) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const scope = await requireProject(request, reply, "resources.write");
+  if (!scope) {
     return reply;
   }
 
   const { id } = request.params as { id: string };
-  const deleted = await softDeleteCustomer(userId, id);
+  const deleted = await withProjectAudit(
+    request,
+    scope,
+    (tx) => softDeleteCustomer(scope, id, tx),
+    (found) =>
+      found
+        ? { action: "customer.deleted", targetType: "customer", targetId: id }
+        : null,
+  );
 
   if (deleted) {
-    appLogger.info("Customer removed", { userId, customerId: id });
+    appLogger.info("Customer removed", {
+      userId: scope.userId,
+      customerId: id,
+    });
     return reply.code(204).send();
   }
 
@@ -253,8 +373,8 @@ export const batchDeleteCustomersHandler: RouteHandler = async (
   request,
   reply,
 ) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const scope = await requireProject(request, reply, "resources.write");
+  if (!scope) {
     return reply;
   }
 
@@ -263,9 +383,21 @@ export const batchDeleteCustomersHandler: RouteHandler = async (
     return invalidBody(reply, parsed.issues);
   }
 
-  const result = await batchSoftDeleteCustomers(userId, parsed.data.ids);
+  const result = await withProjectAudit(
+    request,
+    scope,
+    (tx) => batchSoftDeleteCustomers(scope, parsed.data.ids, tx),
+    ({ deleted }) =>
+      deleted.length > 0
+        ? {
+            action: "customer.deleted",
+            targetType: "customer",
+            metadata: { ids: deleted },
+          }
+        : null,
+  );
   appLogger.info("Customers removed", {
-    userId,
+    userId: scope.userId,
     count: result.deleted.length,
   });
 
@@ -276,8 +408,8 @@ export const addCustomerIdentityHandler: RouteHandler = async (
   request,
   reply,
 ) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const scope = await requireProject(request, reply, "resources.write");
+  if (!scope) {
     return reply;
   }
 
@@ -287,18 +419,29 @@ export const addCustomerIdentityHandler: RouteHandler = async (
   }
 
   const { id } = request.params as { id: string };
-  if (!(await ownsCustomer(userId, id))) {
+  if (!(await ownsCustomer(scope, id))) {
     return notFound(reply, "customer");
   }
 
   try {
-    const customer = await addIdentity(userId, id, parsed.data);
+    await withProjectAudit(
+      request,
+      scope,
+      (tx) => addIdentity(scope, id, parsed.data, tx),
+      (identityId) => ({
+        action: "customer.identity_changed",
+        targetType: "customer",
+        targetId: id,
+        metadata: { identity: "added", identityId, type: parsed.data.type },
+      }),
+    );
+    const customer = await getCustomer(scope, id);
     if (!customer) {
       return notFound(reply, "customer");
     }
 
     appLogger.info("Customer identity added", {
-      userId,
+      userId: scope.userId,
       customerId: id,
       type: parsed.data.type,
     });
@@ -308,7 +451,10 @@ export const addCustomerIdentityHandler: RouteHandler = async (
     if (isUniqueViolation(error)) {
       return identityTaken(reply, error);
     }
-    appLogger.error("Customer identity add failed", { error, userId });
+    appLogger.error("Customer identity add failed", {
+      error,
+      userId: scope.userId,
+    });
     throw error;
   }
 };
@@ -317,8 +463,8 @@ export const updateCustomerIdentityHandler: RouteHandler = async (
   request,
   reply,
 ) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const scope = await requireProject(request, reply, "resources.write");
+  if (!scope) {
     return reply;
   }
 
@@ -329,29 +475,69 @@ export const updateCustomerIdentityHandler: RouteHandler = async (
 
   const { id } = request.params as { id: string };
   const { identityId } = request.params as { identityId: string };
+  if (!(await ownsCustomer(scope, id))) {
+    return notFound(reply, "customer");
+  }
 
-  const updated = await updateIdentity(userId, id, identityId, parsed.data);
+  const changed = await withProjectAudit(
+    request,
+    scope,
+    (tx) => updateIdentity(scope, id, identityId, parsed.data, tx),
+    (found) =>
+      found
+        ? {
+            action: "customer.identity_changed",
+            targetType: "customer",
+            targetId: id,
+            metadata: {
+              identity: "updated",
+              identityId,
+              fields: Object.keys(parsed.data),
+            },
+          }
+        : null,
+  );
+  const updated = changed ? await getCustomer(scope, id) : null;
+  if (!updated) {
+    return notFound(reply, "identity");
+  }
 
-  return updated ? reply.send(updated) : notFound(reply, "identity");
+  return reply.send(updated);
 };
 
 export const removeCustomerIdentityHandler: RouteHandler = async (
   request,
   reply,
 ) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const scope = await requireProject(request, reply, "resources.write");
+  if (!scope) {
     return reply;
   }
 
   const { id } = request.params as { id: string };
   const { identityId } = request.params as { identityId: string };
+  if (!(await ownsCustomer(scope, id))) {
+    return notFound(reply, "customer");
+  }
 
-  const removed = await removeIdentity(userId, id, identityId);
+  const removed = await withProjectAudit(
+    request,
+    scope,
+    (tx) => removeIdentity(scope.orgId, id, identityId, tx),
+    (found) =>
+      found
+        ? {
+            action: "customer.identity_changed",
+            targetType: "customer",
+            targetId: id,
+            metadata: { identity: "removed", identityId },
+          }
+        : null,
+  );
 
   if (removed) {
     appLogger.info("Customer identity removed", {
-      userId,
+      userId: scope.userId,
       customerId: id,
       identityId,
     });
@@ -365,19 +551,19 @@ export const listCustomerCreditHandler: RouteHandler = async (
   request,
   reply,
 ) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const scope = await requireProject(request, reply, "resources.read");
+  if (!scope) {
     return reply;
   }
 
   const { id } = request.params as { id: string };
-  if (!(await ownsCustomer(userId, id))) {
+  if (!(await ownsCustomer(scope, id))) {
     return notFound(reply, "customer");
   }
 
   const [balance, entries] = await Promise.all([
-    creditBalance(userId, id),
-    listCreditEntries(userId, id),
+    creditBalance(scope.orgId, id),
+    listCreditEntries(scope.orgId, id),
   ]);
 
   return reply.send({ balance, items: entries });
@@ -387,8 +573,8 @@ export const grantCustomerCreditHandler: RouteHandler = async (
   request,
   reply,
 ) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const scope = await requireProject(request, reply, "resources.write");
+  if (!scope) {
     return reply;
   }
 
@@ -398,11 +584,27 @@ export const grantCustomerCreditHandler: RouteHandler = async (
   }
 
   const { id } = request.params as { id: string };
-  if (!(await ownsCustomer(userId, id))) {
+  if (!(await ownsCustomer(scope, id))) {
     return notFound(reply, "customer");
   }
 
-  const entry = await grantCredit(userId, id, parsed.data);
+  const entry = await withProjectAudit(
+    request,
+    scope,
+    (tx) => grantCredit(scope.orgId, id, parsed.data, tx),
+    (granted) =>
+      granted && {
+        action: "customer.credit_adjusted",
+        targetType: "customer",
+        targetId: id,
+        metadata: {
+          entryId: granted.id,
+          kind: granted.kind,
+          amount: granted.amount,
+        },
+      },
+    { isolationLevel: "Serializable" },
+  );
   if (!entry) {
     const message = "would take the credit balance below zero";
     return reply.code(409).send({
@@ -412,10 +614,10 @@ export const grantCustomerCreditHandler: RouteHandler = async (
     });
   }
 
-  const balance = await creditBalance(userId, id);
+  const balance = await creditBalance(scope.orgId, id);
 
   appLogger.info("Customer credit granted", {
-    userId,
+    userId: scope.userId,
     customerId: id,
     kind: entry.kind,
     amount: entry.amount,
@@ -428,20 +630,34 @@ export const zeroCustomerCreditHandler: RouteHandler = async (
   request,
   reply,
 ) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const scope = await requireProject(request, reply, "resources.write");
+  if (!scope) {
     return reply;
   }
 
   const { id } = request.params as { id: string };
-  if (!(await ownsCustomer(userId, id))) {
+  if (!(await ownsCustomer(scope, id))) {
     return notFound(reply, "customer");
   }
 
-  const balance = await zeroCredit(userId, id, "reset");
-  const entries = await listCreditEntries(userId, id);
+  const balance = await withProjectAudit(
+    request,
+    scope,
+    (tx) => zeroCredit(scope.orgId, id, "reset", tx),
+    {
+      action: "customer.credit_adjusted",
+      targetType: "customer",
+      targetId: id,
+      metadata: { kind: "reset" },
+    },
+    { isolationLevel: "Serializable" },
+  );
+  const entries = await listCreditEntries(scope.orgId, id);
 
-  appLogger.info("Customer credit zeroed", { userId, customerId: id });
+  appLogger.info("Customer credit zeroed", {
+    userId: scope.userId,
+    customerId: id,
+  });
 
   return reply.send({ balance, items: entries });
 };
@@ -457,25 +673,25 @@ export const listCustomerCouponsHandler: RouteHandler = async (
   request,
   reply,
 ) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const scope = await requireProject(request, reply, "resources.read");
+  if (!scope) {
     return reply;
   }
 
   const { id } = request.params as { id: string };
-  if (!(await ownsCustomer(userId, id))) {
+  if (!(await ownsCustomer(scope, id))) {
     return notFound(reply, "customer");
   }
 
-  return reply.send({ items: await listCoupons(userId, id) });
+  return reply.send({ items: await listCoupons(scope.orgId, id) });
 };
 
 export const createCustomerCouponHandler: RouteHandler = async (
   request,
   reply,
 ) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const scope = await requireProject(request, reply, "resources.write");
+  if (!scope) {
     return reply;
   }
 
@@ -485,15 +701,25 @@ export const createCustomerCouponHandler: RouteHandler = async (
   }
 
   const { id } = request.params as { id: string };
-  if (!(await ownsCustomer(userId, id))) {
+  if (!(await ownsCustomer(scope, id))) {
     return notFound(reply, "customer");
   }
 
   try {
-    const coupon = await createCoupon(userId, id, parsed.data);
+    const coupon = await withProjectAudit(
+      request,
+      scope,
+      (tx) => createCoupon(scope.orgId, id, parsed.data, tx),
+      (created) => ({
+        action: "customer.coupon_created",
+        targetType: "customer",
+        targetId: id,
+        metadata: { couponId: created.id, code: created.code },
+      }),
+    );
 
     appLogger.info("Customer coupon created", {
-      userId,
+      userId: scope.userId,
       customerId: id,
       code: coupon.code,
     });
@@ -503,7 +729,10 @@ export const createCustomerCouponHandler: RouteHandler = async (
     if (isUniqueViolation(error)) {
       return couponTaken(reply);
     }
-    appLogger.error("Customer coupon create failed", { error, userId });
+    appLogger.error("Customer coupon create failed", {
+      error,
+      userId: scope.userId,
+    });
     throw error;
   }
 };
@@ -512,8 +741,8 @@ export const updateCustomerCouponHandler: RouteHandler = async (
   request,
   reply,
 ) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const scope = await requireProject(request, reply, "resources.write");
+  if (!scope) {
     return reply;
   }
 
@@ -524,29 +753,65 @@ export const updateCustomerCouponHandler: RouteHandler = async (
 
   const { id } = request.params as { id: string };
   const { couponId } = request.params as { couponId: string };
+  if (!(await ownsCustomer(scope, id))) {
+    return notFound(reply, "customer");
+  }
 
-  const coupon = await updateCoupon(userId, id, couponId, parsed.data);
+  const coupon = await withProjectAudit(
+    request,
+    scope,
+    (tx) => updateCoupon(scope.orgId, id, couponId, parsed.data, tx),
+    (updated) =>
+      updated && {
+        action:
+          parsed.data.revoked === true
+            ? "customer.coupon_revoked"
+            : "customer.coupon_updated",
+        targetType: "customer",
+        targetId: id,
+        metadata: { couponId, fields: Object.keys(parsed.data) },
+      },
+  );
+  if (!coupon) {
+    return notFound(reply, "coupon");
+  }
 
-  return coupon ? reply.send(coupon) : notFound(reply, "coupon");
+  return reply.send(coupon);
 };
 
 export const deleteCustomerCouponHandler: RouteHandler = async (
   request,
   reply,
 ) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const scope = await requireProject(request, reply, "resources.write");
+  if (!scope) {
     return reply;
   }
 
   const { id } = request.params as { id: string };
   const { couponId } = request.params as { couponId: string };
+  if (!(await ownsCustomer(scope, id))) {
+    return notFound(reply, "customer");
+  }
 
-  const removed = await deleteCoupon(userId, id, couponId);
+  const removed = await withProjectAudit(
+    request,
+    scope,
+    (tx) => deleteCoupon(scope.orgId, id, couponId, tx),
+    (found) =>
+      found
+        ? {
+            action: "customer.coupon_deleted",
+            targetType: "customer",
+            targetId: id,
+            metadata: { couponId },
+          }
+        : null,
+  );
 
   if (removed) {
     appLogger.info("Customer coupon removed", {
-      userId,
+      userId: scope.userId,
       customerId: id,
       couponId,
     });
@@ -557,19 +822,27 @@ export const deleteCustomerCouponHandler: RouteHandler = async (
 };
 
 export const resolveCustomerHandler: RouteHandler = async (request, reply) => {
-  const ownerId = requireApiKeyOwner(request, reply);
-  if (!ownerId) {
+  const key = requireApiKeyScope(request, reply, "CUSTOMERS_READ");
+  if (!key) {
     return reply;
   }
+  const { orgId } = key;
 
   const parsed = parseBody(ResolveCustomerSchema, request.body);
   if (!parsed.success) {
     return invalidBody(reply, parsed.issues);
   }
 
-  const { payerAddress, network, amount, couponCode } = parsed.data;
+  const {
+    payerAddress,
+    network,
+    amount,
+    assetAddress,
+    couponCode,
+    approvalRequestId,
+  } = parsed.data;
   const resolved = await resolveCustomerForPayer(
-    ownerId,
+    { orgId, projectId: key.projectId },
     network,
     payerAddress,
   );
@@ -593,12 +866,12 @@ export const resolveCustomerHandler: RouteHandler = async (request, reply) => {
   const { customer, identityBlocked } = resolved;
 
   const [quotaRemaining, credit, coupon, spent] = await Promise.all([
-    quotaRemainingFor(ownerId, customer),
-    creditBalance(ownerId, customer.id),
+    quotaRemainingFor(orgId, customer),
+    creditBalance(orgId, customer.id),
     couponCode
-      ? findCouponByCode(ownerId, customer.id, couponCode)
+      ? findCouponByCode(orgId, customer.id, couponCode)
       : Promise.resolve(null),
-    spendLimitUsageFor(ownerId, customer),
+    spendLimitUsageFor(orgId, customer, { network, assetAddress }),
   ]);
 
   const result = priceFor({
@@ -622,32 +895,48 @@ export const resolveCustomerHandler: RouteHandler = async (request, reply) => {
     discountFixed: optionalAmountText(customer.discountFixed),
     creditBalance: credit.total,
     approvalThreshold: optionalAmountText(customer.approvalThreshold),
-    dailyLimit: optionalAmountText(customer.dailyLimit),
+    dailyLimit: spent.applies ? optionalAmountText(customer.dailyLimit) : null,
     dailySpent: spent.dailySpent,
-    monthlyLimit: optionalAmountText(customer.monthlyLimit),
+    monthlyLimit: spent.applies
+      ? optionalAmountText(customer.monthlyLimit)
+      : null,
     monthlySpent: spent.monthlySpent,
   });
 
-  return reply.send({ customerId: customer.id, ...result });
+  const approved =
+    result.needsApproval &&
+    approvalRequestId != null &&
+    (await consumeSellerApproval(key, approvalRequestId, {
+      payerAddress,
+      network,
+      amount,
+      assetAddress: assetAddress ?? null,
+    }));
+
+  return reply.send({
+    customerId: customer.id,
+    ...result,
+    ...(approved ? { needsApproval: false } : {}),
+  });
 };
 
 export const customerOverviewHandler: RouteHandler = async (request, reply) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const scope = await requireProject(request, reply, "resources.read");
+  if (!scope) {
     return reply;
   }
 
   const { id } = request.params as { id: string };
-  if (!(await ownsCustomer(userId, id))) {
+  if (!(await ownsCustomer(scope, id))) {
     return notFound(reply, "customer");
   }
 
-  return reply.send(await customerOverview(userId, id));
+  return reply.send(await customerOverview(scope.orgId, id));
 };
 
 export const customerActivityHandler: RouteHandler = async (request, reply) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const scope = await requireProject(request, reply, "resources.read");
+  if (!scope) {
     return reply;
   }
 
@@ -663,26 +952,26 @@ export const customerActivityHandler: RouteHandler = async (request, reply) => {
   }
 
   const { id } = request.params as { id: string };
-  if (!(await ownsCustomer(userId, id))) {
+  if (!(await ownsCustomer(scope, id))) {
     return notFound(reply, "customer");
   }
 
-  return reply.send(await customerActivity(userId, id, parsed.data));
+  return reply.send(await customerActivity(scope.orgId, id, parsed.data));
 };
 
 export const customerBreakdownHandler: RouteHandler = async (
   request,
   reply,
 ) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const scope = await requireProject(request, reply, "resources.read");
+  if (!scope) {
     return reply;
   }
 
   const { id } = request.params as { id: string };
-  if (!(await ownsCustomer(userId, id))) {
+  if (!(await ownsCustomer(scope, id))) {
     return notFound(reply, "customer");
   }
 
-  return reply.send({ items: await customerBreakdown(userId, id) });
+  return reply.send({ items: await customerBreakdown(scope.orgId, id) });
 };

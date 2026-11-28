@@ -1,17 +1,27 @@
+import type { ApiKeyScope, EnvironmentKind } from "@4mica/db";
 import { appLogger } from "@logger/index";
+import { ipAllowed } from "@utils/ip-allowlist";
 import { hashSecret } from "@utils/secrets";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import { findApiKeyByHash, touchApiKey } from "./repository";
 
 export interface ApiKeyContext {
   id: string;
-  ownerId: string;
+  prefix: string;
+  orgId: string;
+  projectId: string;
+  environmentId: string;
+  environment: EnvironmentKind;
+  serviceAccountId: string | null;
+  scopes: ApiKeyScope[];
   listingId: string | null;
   agentId: string | null;
 }
 
 export interface ResourceKeyContext {
-  ownerId: string;
+  orgId: string;
+  projectId: string;
+  environment: EnvironmentKind;
   kind: "listing" | "agent";
   id: string;
 }
@@ -46,7 +56,7 @@ const rejected = (
   unauthorized(reply);
 };
 
-const bearerToken = (request: FastifyRequest): string | null => {
+export const bearerToken = (request: FastifyRequest): string | null => {
   const header = request.headers.authorization;
   if (typeof header !== "string") {
     return null;
@@ -59,6 +69,34 @@ const bearerToken = (request: FastifyRequest): string | null => {
       : null;
 
   return token && token.length > 0 ? token : null;
+};
+
+interface IpRestrictions {
+  ipAllowlist?: string[];
+  organization: {
+    securitySettings?: {
+      ipAllowlist: string[];
+      enforceIpAllowlistForApiKeys: boolean;
+    } | null;
+  };
+}
+
+export const ipRefusal = (
+  ip: string,
+  { ipAllowlist = [], organization }: IpRestrictions,
+): string | null => {
+  if (ipAllowlist.length > 0 && !ipAllowed(ip, ipAllowlist)) {
+    return "ip_not_allowed_by_key";
+  }
+  const org = organization.securitySettings;
+  if (
+    org?.enforceIpAllowlistForApiKeys &&
+    org.ipAllowlist.length > 0 &&
+    !ipAllowed(ip, org.ipAllowlist)
+  ) {
+    return "ip_not_allowed_by_organization";
+  }
+  return null;
 };
 
 export const authenticateApiKey = async (
@@ -81,13 +119,18 @@ export const authenticateApiKey = async (
       ? "revoked"
       : record.expiresAt !== null && record.expiresAt.getTime() <= Date.now()
         ? "expired"
-        : record.owner.banned ||
-            record.owner.locked ||
-            record.owner.deletedAt !== null
-          ? "owner_disabled"
-          : record.listing?.deletedAt || record.agent?.deletedAt
-            ? "resource_deleted"
-            : null;
+        : record.organization.deletedAt !== null
+          ? "organization_deleted"
+          : record.project.deletedAt !== null ||
+              record.project.archivedAt !== null
+            ? "project_inactive"
+            : record.serviceAccount &&
+                (record.serviceAccount.suspendedAt !== null ||
+                  record.serviceAccount.deletedAt !== null)
+              ? "service_account_inactive"
+              : record.listing?.deletedAt || record.agent?.deletedAt
+                ? "resource_deleted"
+                : ipRefusal(request.ip, record);
 
   if (!record || reason) {
     rejected(request, reply, reason ?? "unknown", token);
@@ -96,7 +139,13 @@ export const authenticateApiKey = async (
 
   request.apiKey = {
     id: record.id,
-    ownerId: record.ownerId,
+    prefix: record.prefix,
+    orgId: record.organizationId,
+    projectId: record.projectId,
+    environmentId: record.environmentId,
+    environment: record.environment.kind,
+    serviceAccountId: record.serviceAccountId,
+    scopes: record.scopes,
     listingId: record.listingId,
     agentId: record.agentId,
   };
@@ -104,7 +153,7 @@ export const authenticateApiKey = async (
   void touchApiKey(record.id).catch(() => {});
 };
 
-export const requireApiKeyOwner = (
+export const requireApiKeyOrg = (
   request: FastifyRequest,
   reply: FastifyReply,
 ): string | null => {
@@ -113,7 +162,7 @@ export const requireApiKeyOwner = (
     return null;
   }
 
-  return request.apiKey.ownerId;
+  return request.apiKey.orgId;
 };
 
 export const requireResourceKey = (
@@ -125,13 +174,13 @@ export const requireResourceKey = (
     return null;
   }
 
-  const { ownerId, listingId, agentId } = request.apiKey;
+  const { orgId, projectId, environment, listingId, agentId } = request.apiKey;
 
   if (listingId) {
-    return { ownerId, kind: "listing", id: listingId };
+    return { orgId, projectId, environment, kind: "listing", id: listingId };
   }
   if (agentId) {
-    return { ownerId, kind: "agent", id: agentId };
+    return { orgId, projectId, environment, kind: "agent", id: agentId };
   }
 
   reply.code(403).send({
@@ -139,4 +188,31 @@ export const requireResourceKey = (
     message: "This key is not tied to an API or agent.",
   });
   return null;
+};
+
+export const requireApiKeyScope = (
+  request: FastifyRequest,
+  reply: FastifyReply,
+  scope: ApiKeyScope,
+): ApiKeyContext | null => {
+  if (!request.apiKey) {
+    unauthorized(reply);
+    return null;
+  }
+
+  if (!request.apiKey.scopes.includes(scope)) {
+    appLogger.warn("API key lacks scope", {
+      keyId: request.apiKey.id,
+      scope,
+      route: request.routeOptions.url ?? null,
+    });
+    reply.code(403).send({
+      error: "insufficient_scope",
+      message: `This key is not allowed to do that. It needs the ${scope} scope.`,
+      scope,
+    });
+    return null;
+  }
+
+  return request.apiKey;
 };

@@ -1,11 +1,22 @@
 import { setPending } from "@stores/utils";
 import actionTypes from "./actionTypes";
-import type { ApiKey, DeveloperState, Webhook, WebhookEvent } from "./type";
+import type {
+  ApiKey,
+  CliSession,
+  DeveloperState,
+  Webhook,
+  WebhookEvent,
+} from "./type";
 
 export const INITIAL_STATE: DeveloperState = {
   apiKeys: [],
   webhooks: [],
   events: [],
+  cliSessions: [],
+  cliSessionsLoading: false,
+  cliSessionsLoaded: false,
+  cliSessionsError: null,
+  cliSessionsVersion: 0,
   isLoading: false,
   hasLoaded: false,
   pending: {},
@@ -64,6 +75,8 @@ export default function developerReducer(
     case actionTypes.UPDATE_WEBHOOK_REQUESTED:
     case actionTypes.ROTATE_WEBHOOK_SECRET_REQUESTED:
     case actionTypes.DELETE_WEBHOOK_REQUESTED:
+    case actionTypes.CREATE_CLI_TOKEN_REQUESTED:
+    case actionTypes.REVOKE_CLI_SESSION_REQUESTED:
       return {
         ...state,
         pending: setPending(state.pending, action.meta?.pendingKey, true),
@@ -127,6 +140,55 @@ export default function developerReducer(
       return {
         ...state,
         webhooks: state.webhooks.filter((hook) => hook.id !== id),
+        pending: setPending(state.pending, action.meta?.pendingKey, false),
+      };
+    }
+
+    case actionTypes.FETCH_CLI_SESSIONS_PENDING:
+      return { ...state, cliSessionsLoading: true, cliSessionsError: null };
+
+    case actionTypes.FETCH_CLI_SESSIONS_SUCCEEDED: {
+      const { sessions, version } = action.payload as {
+        sessions: CliSession[];
+        version: number;
+      };
+      if (version !== state.cliSessionsVersion) {
+        return state;
+      }
+      return {
+        ...state,
+        cliSessions: sessions,
+        cliSessionsLoading: false,
+        cliSessionsLoaded: true,
+        cliSessionsError: null,
+      };
+    }
+
+    case actionTypes.FETCH_CLI_SESSIONS_FAILED:
+      return {
+        ...state,
+        cliSessionsLoading: false,
+        cliSessionsError:
+          (action.payload as { message?: string })?.message ??
+          "Failed to load CLI sessions.",
+      };
+
+    case actionTypes.CREATE_CLI_TOKEN_SUCCEEDED: {
+      const { session } = action.payload as { session: CliSession };
+      return {
+        ...state,
+        cliSessions: [session, ...state.cliSessions],
+        cliSessionsVersion: state.cliSessionsVersion + 1,
+        pending: setPending(state.pending, action.meta?.pendingKey, false),
+      };
+    }
+
+    case actionTypes.REVOKE_CLI_SESSION_SUCCEEDED: {
+      const { id } = action.payload as { id: string };
+      return {
+        ...state,
+        cliSessions: state.cliSessions.filter((session) => session.id !== id),
+        cliSessionsVersion: state.cliSessionsVersion + 1,
         pending: setPending(state.pending, action.meta?.pendingKey, false),
       };
     }

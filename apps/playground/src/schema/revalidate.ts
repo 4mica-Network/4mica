@@ -7,7 +7,7 @@ const IdSchema = v.pipe(v.string(), v.regex(/^[A-Za-z0-9_-]{1,64}$/));
 const HandleSchema = v.pipe(v.string(), v.maxLength(256));
 
 export const RevalidateBodySchema = v.object({
-  ownerId: v.optional(IdSchema),
+  organizationId: v.optional(IdSchema),
   username: v.optional(HandleSchema),
   usernames: v.optional(
     v.pipe(v.array(HandleSchema), v.maxLength(MAX_ENTRIES)),

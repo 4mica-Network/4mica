@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, Literal
 
 
 class FourMicaError(Exception):
@@ -459,6 +459,60 @@ class SpendLimitError(PaymentError):
         self.url = url
 
 
+class SpendAuthorizationError(PaymentError):
+    """Nothing was signed. ``reason`` is ``"denied"`` by the organization's
+    spending policies or ``"approval_timeout"``."""
+
+    def __init__(
+        self,
+        reason: Literal["denied", "approval_timeout"],
+        url: str,
+        authorization_id: str,
+        denied_reason: str | None = None,
+        approval_request_id: str | None = None,
+    ) -> None:
+        if reason == "denied":
+            message = (
+                f"payment for {url} refused by your organization's spending "
+                f"policies ({denied_reason or 'denied'})"
+            )
+        else:
+            message = f"payment for {url} timed out waiting for approval" + (
+                f" {approval_request_id}" if approval_request_id else ""
+            )
+        super().__init__(message)
+        self.reason = reason
+        self.denied_reason = denied_reason
+        self.authorization_id = authorization_id
+        self.approval_request_id = approval_request_id
+        self.url = url
+
+
+class SpendAccountingError(PaymentError):
+    """A spend authorization could not be consumed or released. ``accounting``
+    is ``"failed"``, or ``"pending"`` when the caller was cancelled while
+    retrying."""
+
+    def __init__(
+        self,
+        transition: Literal["consume", "release"],
+        authorization_id: str,
+        accounting: Literal["pending", "failed"],
+        cause: BaseException,
+        req_id: str | None = None,
+    ) -> None:
+        super().__init__(
+            f"could not {transition} spend authorization {authorization_id}"
+            + (" before the request was cancelled" if accounting == "pending" else "")
+            + f": {cause}"
+        )
+        self.transition = transition
+        self.authorization_id = authorization_id
+        self.accounting = accounting
+        self.req_id = req_id
+        self.__cause__ = cause
+
+
 __all__: list[str] = [
     "AddressMismatchError",
     "AmbiguousTokenError",
@@ -504,6 +558,8 @@ __all__: list[str] = [
     "RevertedOnChainError",
     "RpcError",
     "SigningError",
+    "SpendAccountingError",
+    "SpendAuthorizationError",
     "SpendLimitError",
     "SponsorshipError",
     "SponsorshipTransportError",

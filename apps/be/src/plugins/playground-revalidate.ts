@@ -1,3 +1,4 @@
+import { resolveTenant } from "@auth/tenant";
 import {
   type PlaygroundResource,
   revalidatePlayground,
@@ -49,10 +50,18 @@ export const revalidateOnWrite: onResponseAsyncHookHandler = async (
     return;
   }
 
+  const tenant = await resolveTenant(request, request.user.id).catch(
+    () => null,
+  );
+
+  if (!tenant) {
+    return;
+  }
+
   const resources = resourcesOf(request.routeOptions.url, request.params);
 
   await revalidatePlayground({
-    ownerId: request.user.id,
+    organizationId: tenant.orgId,
     ...(request.staleUsernames?.length
       ? { usernames: request.staleUsernames }
       : {}),

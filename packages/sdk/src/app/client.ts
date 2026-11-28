@@ -1,11 +1,17 @@
 import { AppError } from "@/app/errors";
 import type {
   AppPayment,
+  ApprovalState,
+  AuthorizeSpendInput,
+  ConsumeSpendInput,
+  CreateApprovalInput,
+  CreatedApproval,
   CustomerResolution,
   ReportedPayment,
   ReportPaymentInput,
   ResolveCustomerInput,
   ResourceContext,
+  SpendAuthorization,
 } from "@/app/models";
 import { toAppNetwork } from "@/app/networks";
 import { ConfigError } from "@/errors";
@@ -19,6 +25,10 @@ export interface AppClientOptions {
   apiKey: string;
   baseUrl?: string;
   fetch?: FetchFn;
+}
+
+export interface AppRequestOptions {
+  signal?: AbortSignal;
 }
 
 interface ErrorBody {
@@ -80,10 +90,89 @@ export class AppClient {
     return { payment: body, created: status === 201 };
   }
 
+  async authorizeSpend(
+    input: AuthorizeSpendInput,
+    options?: AppRequestOptions,
+  ): Promise<SpendAuthorization> {
+    const { body } = await this.request<SpendAuthorization>(
+      "POST",
+      "/v1/spend/authorize",
+      {
+        ...input,
+        network: toAppNetwork(input.network),
+        assetAddress: input.assetAddress ?? null,
+      },
+      options,
+    );
+    return body;
+  }
+
+  async getSpendAuthorization(
+    id: string,
+    options?: AppRequestOptions,
+  ): Promise<SpendAuthorization> {
+    const { body } = await this.request<SpendAuthorization>(
+      "GET",
+      `/v1/spend/authorizations/${encodeURIComponent(id)}`,
+      undefined,
+      options,
+    );
+    return body;
+  }
+
+  async consumeSpendAuthorization(
+    id: string,
+    input: ConsumeSpendInput = {},
+    options?: AppRequestOptions,
+  ): Promise<SpendAuthorization> {
+    const { body } = await this.request<SpendAuthorization>(
+      "POST",
+      `/v1/spend/authorizations/${encodeURIComponent(id)}/consume`,
+      input,
+      options,
+    );
+    return body;
+  }
+
+  async releaseSpendAuthorization(
+    id: string,
+    options?: AppRequestOptions,
+  ): Promise<SpendAuthorization> {
+    const { body } = await this.request<SpendAuthorization>(
+      "POST",
+      `/v1/spend/authorizations/${encodeURIComponent(id)}/release`,
+      {},
+      options,
+    );
+    return body;
+  }
+
+  async createApproval(input: CreateApprovalInput): Promise<CreatedApproval> {
+    const { body } = await this.request<CreatedApproval>(
+      "POST",
+      "/v1/approvals",
+      {
+        ...input,
+        network: toAppNetwork(input.network),
+        assetAddress: input.assetAddress ?? null,
+      },
+    );
+    return body;
+  }
+
+  async getApproval(id: string): Promise<ApprovalState> {
+    const { body } = await this.request<ApprovalState>(
+      "GET",
+      `/v1/approvals/${encodeURIComponent(id)}`,
+    );
+    return body;
+  }
+
   private async request<T>(
     method: "GET" | "POST",
     path: string,
     payload?: unknown,
+    options?: AppRequestOptions,
   ): Promise<{ status: number; body: T }> {
     const url = `${this.baseUrl}${path}`;
     const headers: Record<string, string> = {
@@ -100,12 +189,20 @@ export class AppClient {
         method,
         headers,
         body: payload === undefined ? undefined : JSON.stringify(payload),
+        signal: options?.signal,
       });
     } catch (err) {
       throw new AppError(`request to ${path} failed: ${String(err)}`);
     }
 
-    const text = await response.text();
+    let text: string;
+    try {
+      text = await response.text();
+    } catch (err) {
+      throw new AppError(
+        `reading the response from ${path} failed: ${String(err)}`,
+      );
+    }
     let body: unknown = null;
     if (text) {
       try {

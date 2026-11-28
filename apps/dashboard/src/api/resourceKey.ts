@@ -17,7 +17,7 @@ export const getResourceKeys = (kind: ResourceKind, id: string) =>
 export const createResourceKey = (
   kind: ResourceKind,
   id: string,
-  data: { name: string },
+  data: { name: string; ipAllowlist?: string[] },
 ) =>
   httpClient.request<CreatedApiKey, typeof data>({
     url: base(kind, id),
@@ -33,6 +33,18 @@ export const revokeResourceKey = (
   httpClient.request<ApiKey>({
     url: `${base(kind, id)}/${encodeURIComponent(keyId)}/revoke`,
     method: HttpMethod.POST,
+  });
+
+export const updateResourceKey = (
+  kind: ResourceKind,
+  id: string,
+  keyId: string,
+  data: { ipAllowlist: string[] },
+) =>
+  httpClient.request<ApiKey, typeof data>({
+    url: `${base(kind, id)}/${encodeURIComponent(keyId)}`,
+    method: HttpMethod.PATCH,
+    data,
   });
 
 export const deleteResourceKey = (

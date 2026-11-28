@@ -77,6 +77,7 @@ export default function resourceKeyReducer(
 
     case actionTypes.CREATE_RESOURCE_KEY_REQUESTED:
     case actionTypes.REVOKE_RESOURCE_KEY_REQUESTED:
+    case actionTypes.UPDATE_RESOURCE_KEY_REQUESTED:
     case actionTypes.DELETE_RESOURCE_KEY_REQUESTED:
       return {
         ...state,
@@ -99,6 +100,7 @@ export default function resourceKeyReducer(
     }
 
     case actionTypes.REVOKE_RESOURCE_KEY_SUCCEEDED:
+    case actionTypes.UPDATE_RESOURCE_KEY_SUCCEEDED:
       return {
         ...state,
         items: replaceById(state.items, action.payload as ApiKey),

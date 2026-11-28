@@ -22,6 +22,7 @@ import { shallowEqual } from "react-redux";
 import { Form } from "@/components/form";
 import { StepIndicator } from "@/components/Onboarding/StepIndicator";
 import { fromAssetFormValue, NATIVE_ASSET } from "@/components/PriceField";
+import { useEnvironmentNetworks } from "@/hooks/useNetworkOptions";
 import { useOnSuccess } from "@/hooks/useOnSuccess";
 import { useServerIssues } from "@/hooks/useServerIssues";
 import { firstStepWith, useStepWithIssue } from "@/hooks/useStepWithIssue";
@@ -52,6 +53,7 @@ export function CreateAgentModal({
   const sellerWallets = useAppSelector(selectSellerWallets, shallowEqual);
   const payerWallets = useAppSelector(selectPayerWallets, shallowEqual);
 
+  const [defaultNetwork] = useEnvironmentNetworks();
   const [step, setStep] = useState(0);
   useStepWithIssue(issues, CREATE_STEP_FIELDS, setStep);
 
@@ -63,7 +65,7 @@ export function CreateAgentModal({
       slug: "",
       headline: "",
       description: "",
-      network: "BASE_SEPOLIA",
+      network: defaultNetwork,
       status: "PENDING",
       visibility: "PRIVATE",
       payerWalletId: "",

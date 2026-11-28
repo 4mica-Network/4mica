@@ -32,7 +32,7 @@ const parseResource = (resource: unknown): ResourceRef | null => {
 };
 
 interface Target {
-  ownerId: string;
+  organizationId: string;
   path: string | null;
 }
 
@@ -48,9 +48,9 @@ const resolveTarget = async (
     ...(publicOnly ? { visibility: PUBLIC_VISIBILITY } : {}),
   };
   const select = {
-    ownerId: true,
+    organizationId: true,
     slug: true,
-    owner: { select: { username: true } },
+    organization: { select: { handle: true } },
   } as const;
 
   if (resource.kind === "listing") {
@@ -58,9 +58,9 @@ const resolveTarget = async (
 
     return listing
       ? {
-          ownerId: listing.ownerId,
-          path: listing.owner.username
-            ? `/${listing.owner.username}/api/${listing.slug}`
+          organizationId: listing.organizationId,
+          path: listing.organization.handle
+            ? `/${listing.organization.handle}/api/${listing.slug}`
             : null,
         }
       : null;
@@ -68,14 +68,14 @@ const resolveTarget = async (
 
   const agent = await prisma.agent.findFirst({ where, select });
 
-  if (!agent?.ownerId) {
+  if (!agent?.organizationId) {
     return null;
   }
 
   return {
-    ownerId: agent.ownerId,
-    path: agent.owner?.username
-      ? `/${agent.owner.username}/agents/${agent.slug ?? resource.id}`
+    organizationId: agent.organizationId,
+    path: agent.organization?.handle
+      ? `/${agent.organization.handle}/agents/${agent.slug ?? resource.id}`
       : null,
   };
 };
@@ -125,14 +125,14 @@ export const submitReview = async (
     return { ok: false, error: "not_found" };
   }
 
-  if (target.ownerId === viewer.id) {
+  if (viewer.organizationIds.includes(target.organizationId)) {
     return { ok: false, error: "own_resource" };
   }
 
   const verifiedPurchase = await hasSettledPayment(
     resource.kind,
     resource.id,
-    viewer.id,
+    viewer.organizationIds,
   );
 
   const data = { ...parsed.output, verifiedPurchase };
@@ -233,7 +233,7 @@ export const fileReport = async (
     return { ok: false, error: "not_found" };
   }
 
-  if (target.ownerId === viewer.id) {
+  if (viewer.organizationIds.includes(target.organizationId)) {
     return { ok: false, error: "own_resource" };
   }
 

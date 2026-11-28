@@ -6,7 +6,7 @@ export type AuthTokenProvider = (
   options?: AuthTokenOptions,
 ) => Promise<string | null> | string | null;
 
-export type UnauthorizedHandler = () => void;
+export type UnauthorizedHandler = (body?: unknown) => void;
 
 let provider: AuthTokenProvider | null = null;
 let unauthorizedHandler: UnauthorizedHandler | null = null;
@@ -21,9 +21,9 @@ export const setUnauthorizedHandler = (
   unauthorizedHandler = next;
 };
 
-export const notifyUnauthorized = (): void => {
+export const notifyUnauthorized = (body?: unknown): void => {
   try {
-    unauthorizedHandler?.();
+    unauthorizedHandler?.(body);
   } catch {}
 };
 

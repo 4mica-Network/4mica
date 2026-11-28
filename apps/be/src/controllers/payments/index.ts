@@ -1,7 +1,9 @@
-import { PAYMENT_NETWORKS } from "@4mica/rules";
+import { environmentForNetwork, PAYMENT_NETWORKS } from "@4mica/rules";
 import { GuaranteeReceipt } from "@4mica/sdk";
 import { toDisplayAmount } from "@4mica/sdk/app";
-import { requireApiKeyOwner } from "@auth/api-key";
+import { requireApiKeyScope } from "@auth/api-key";
+import { effectiveProjectRole } from "@auth/permissions";
+import { requestedEnvironment } from "@auth/project";
 import { redeemPaymentBenefits } from "@controllers/customers/repository";
 import { MAX_OFFSET } from "@controllers/schema-primitives";
 import {
@@ -9,18 +11,20 @@ import {
   invalidBody,
   notFound,
   parseBody,
-  requireUserId,
+  requireTenant,
 } from "@controllers/shared";
+import { reconcileReportedPayment } from "@controllers/spend/decide";
 import { appLogger } from "@logger/index";
 import { getCoreClient } from "@services/core";
 import { guaranteeMismatch } from "@utils/guarantee";
-import type { RouteHandler } from "fastify";
+import type { FastifyReply, FastifyRequest, RouteHandler } from "fastify";
 import {
   getPayment,
   listPayments,
   ownsRecipientWallet,
   paymentStats,
   paymentSummary,
+  projectVisibleTo,
   reportPayment,
   resolveReportTargets,
 } from "./repository";
@@ -31,9 +35,27 @@ import {
   ReportPaymentSchema,
 } from "./schema";
 
+const requirePaymentReader = async (
+  request: FastifyRequest,
+  reply: FastifyReply,
+) => {
+  const tenant = await requireTenant(request, reply, "payments.read");
+  if (!tenant) {
+    return null;
+  }
+
+  const environment = requestedEnvironment(request);
+  if (!environment) {
+    notFound(reply, "environment");
+    return null;
+  }
+
+  return { ...tenant, environment };
+};
+
 export const listPaymentsHandler: RouteHandler = async (request, reply) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const tenant = await requirePaymentReader(request, reply);
+  if (!tenant) {
     return reply;
   }
 
@@ -48,21 +70,43 @@ export const listPaymentsHandler: RouteHandler = async (request, reply) => {
     ]);
   }
 
-  return reply.send(await listPayments(userId, parsed.data));
+  const { projectId } = parsed.data;
+  if (projectId) {
+    const project = await projectVisibleTo(
+      tenant.orgId,
+      tenant.userId,
+      projectId,
+    );
+    const visible =
+      project &&
+      effectiveProjectRole({
+        orgRole: tenant.role,
+        customProjectRole: tenant.custom?.projectRole ?? null,
+        projectRole: project.members[0]?.role ?? null,
+        restricted: project.restricted,
+      });
+    if (!visible) {
+      return notFound(reply, "project");
+    }
+  }
+
+  return reply.send(
+    await listPayments(tenant.orgId, tenant.environment, parsed.data),
+  );
 };
 
 export const paymentSummaryHandler: RouteHandler = async (request, reply) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const tenant = await requirePaymentReader(request, reply);
+  if (!tenant) {
     return reply;
   }
 
-  return reply.send(await paymentSummary(userId));
+  return reply.send(await paymentSummary(tenant.orgId, tenant.environment));
 };
 
 export const paymentStatsHandler: RouteHandler = async (request, reply) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const tenant = await requirePaymentReader(request, reply);
+  if (!tenant) {
     return reply;
   }
 
@@ -71,17 +115,19 @@ export const paymentStatsHandler: RouteHandler = async (request, reply) => {
     return invalidBody(reply, parsed.issues);
   }
 
-  return reply.send(await paymentStats(userId, parsed.data.months));
+  return reply.send(
+    await paymentStats(tenant.orgId, tenant.environment, parsed.data.months),
+  );
 };
 
 export const getPaymentHandler: RouteHandler = async (request, reply) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const tenant = await requirePaymentReader(request, reply);
+  if (!tenant) {
     return reply;
   }
 
   const { id } = request.params as { id: string };
-  const payment = await getPayment(userId, id);
+  const payment = await getPayment(tenant.orgId, tenant.environment, id);
 
   return payment ? reply.send(payment) : notFound(reply, "payment");
 };
@@ -128,10 +174,11 @@ const checkGuarantee = async (
 };
 
 export const reportPaymentHandler: RouteHandler = async (request, reply) => {
-  const ownerId = requireApiKeyOwner(request, reply);
-  if (!ownerId) {
+  const key = requireApiKeyScope(request, reply, "PAYMENTS_WRITE");
+  if (!key) {
     return reply;
   }
+  const { orgId } = key;
 
   const parsed = parseBody(ReportPaymentSchema, request.body);
   if (!parsed.success) {
@@ -139,6 +186,16 @@ export const reportPaymentHandler: RouteHandler = async (request, reply) => {
   }
 
   const data = parsed.data;
+
+  if (environmentForNetwork(data.network) !== key.environment) {
+    return reply.code(403).send({
+      error: "environment_mismatch",
+      message: `This key belongs to ${key.environment === "PRODUCTION" ? "production" : "sandbox"} and cannot report a payment on ${data.network}.`,
+      issues: [
+        { path: "network", message: "is outside the key's environment" },
+      ],
+    });
+  }
 
   if (data.payerAddress === data.recipientAddress) {
     return reply.code(400).send({
@@ -157,7 +214,7 @@ export const reportPaymentHandler: RouteHandler = async (request, reply) => {
   }
 
   if (
-    !(await ownsRecipientWallet(ownerId, data.recipientAddress, data.network))
+    !(await ownsRecipientWallet(orgId, data.recipientAddress, data.network))
   ) {
     return invalidBody(reply, [
       {
@@ -187,7 +244,7 @@ export const reportPaymentHandler: RouteHandler = async (request, reply) => {
 
     if (check.kind === "mismatch") {
       appLogger.warn("Payment report failed guarantee verification", {
-        ownerId,
+        orgId,
         reqId: data.reqId,
         field: check.path,
       });
@@ -206,7 +263,14 @@ export const reportPaymentHandler: RouteHandler = async (request, reply) => {
     }
   }
 
-  const targets = await resolveReportTargets(ownerId, data);
+  const targets = await resolveReportTargets(
+    {
+      orgId,
+      projectId: key.projectId,
+      environmentId: key.environmentId,
+    },
+    data,
+  );
 
   if (data.listingSlug && !targets.listingId) {
     return invalidBody(reply, [
@@ -219,8 +283,7 @@ export const reportPaymentHandler: RouteHandler = async (request, reply) => {
     ]);
   }
 
-  const key = request.apiKey;
-  if (key?.listingId) {
+  if (key.listingId) {
     if (targets.listingId && targets.listingId !== key.listingId) {
       return invalidBody(reply, [
         { path: "listingSlug", message: "does not match this key" },
@@ -228,7 +291,7 @@ export const reportPaymentHandler: RouteHandler = async (request, reply) => {
     }
     targets.listingId = key.listingId;
   }
-  if (key?.agentId) {
+  if (key.agentId) {
     if (targets.agentId && targets.agentId !== key.agentId) {
       return invalidBody(reply, [
         { path: "agentSlug", message: "does not match this key" },
@@ -237,11 +300,17 @@ export const reportPaymentHandler: RouteHandler = async (request, reply) => {
     targets.agentId = key.agentId;
   }
 
-  const outcome = await reportPayment(ownerId, data, targets);
+  const outcome = await reportPayment(
+    orgId,
+    key.projectId,
+    data,
+    targets,
+    key.id,
+  );
 
   if (outcome.kind === "conflict") {
     appLogger.warn("Payment report conflicts with an earlier one", {
-      ownerId,
+      orgId,
       reqId: data.reqId,
       field: outcome.field,
     });
@@ -255,7 +324,7 @@ export const reportPaymentHandler: RouteHandler = async (request, reply) => {
   const { row, kind, redeemable } = outcome;
 
   appLogger.info(kind === "created" ? "Payment reported" : "Payment updated", {
-    ownerId,
+    orgId,
     paymentId: row.id,
     reqId: row.reqId,
     status: row.status,
@@ -263,17 +332,27 @@ export const reportPaymentHandler: RouteHandler = async (request, reply) => {
 
   if (redeemable) {
     try {
-      const redemption = await redeemPaymentBenefits(ownerId, row.id);
+      const redemption = await redeemPaymentBenefits(orgId, row.id);
       if (redemption) {
-        appLogger.info("Payment benefits redeemed", { ownerId, ...redemption });
+        appLogger.info("Payment benefits redeemed", { orgId, ...redemption });
       }
     } catch (error) {
       appLogger.error("Payment benefits could not be redeemed", {
-        ownerId,
+        orgId,
         paymentId: row.id,
         error,
       });
     }
+  }
+
+  try {
+    await reconcileReportedPayment(row, request.server.email);
+  } catch (error) {
+    appLogger.error("Reported payment could not be reconciled", {
+      orgId,
+      paymentId: row.id,
+      error,
+    });
   }
 
   return reply.code(kind === "created" ? 201 : 200).send(row);

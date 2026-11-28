@@ -54,6 +54,14 @@ halves: `pre_up` runs `check-bind.sh` and refuses anything but a private address
 on the box, and a final step fails the run if the GitHub runner — which is on
 the public internet — can open the port.
 
+**Egress from `be`.** `be` may reach only Valkey, `email:4100`, Postgres, the
+playground revalidation endpoint, and public HTTPS (Clerk, Core, audit streams).
+[`infra/egress/be-egress.sh`](../infra/egress/be-egress.sh) enforces that list
+in `DOCKER-USER`, dropping every private, link-local and metadata address and
+every non-HTTPS public port (see [its README](../infra/egress/README.md)). No
+workflow applies it; it must be applied by hand on Box B and re-applied after
+each `be` deploy, because its rules match the container's current address.
+
 **Monitoring.** `playground` reports to Sentry when the environment has
 `SENTRY_DSN`, `SENTRY_ORG`, `SENTRY_PROJECT` (variables) and
 `SENTRY_AUTH_TOKEN` (secret). Each deploy becomes a Sentry release named after

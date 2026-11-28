@@ -1,9 +1,19 @@
+import { prisma } from "@4mica/db";
 import { clearUserCache } from "@auth/user-store";
 import { walletRoutes } from "@routes/wallets";
 import { buildWalletLinkMessage } from "@utils/siwe";
 import { privateKeyToAccount } from "viem/accounts";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { initApp } from "@/server";
+import { AUDIT_DOWN, failAuditInTransaction } from "@/test-support/audit";
+import {
+  APPROVAL_HEADERS,
+  APPROVAL_ID,
+  approvedFor,
+  governOff,
+  governOn,
+} from "@/test-support/governance";
+import { actAs, ORG_ID, OTHER_ORG_ID } from "@/test-support/tenancy";
 
 const {
   authenticateRequest,
@@ -14,7 +24,21 @@ const {
   walletNonce,
   apiListing,
   agent,
+  tenancy,
+  governance,
 } = vi.hoisted(() => ({
+  tenancy: {
+    membership: { findFirst: vi.fn(), create: vi.fn() },
+    auditLog: { create: vi.fn() },
+  },
+  governance: {
+    governanceSettings: { findUnique: vi.fn() },
+    approvalRequest: {
+      findFirst: vi.fn(),
+      create: vi.fn(),
+      updateMany: vi.fn(),
+    },
+  },
   authenticateRequest: vi.fn(),
   getUser: vi.fn(),
   findUnique: vi.fn(),
@@ -46,6 +70,8 @@ vi.mock("@clerk/backend", () => ({
 
 vi.mock("@4mica/db", () => ({
   prisma: {
+    ...tenancy,
+    ...governance,
     agent,
     apiListing,
     user: { findUnique, upsert, update: vi.fn() },
@@ -55,6 +81,8 @@ vi.mock("@4mica/db", () => ({
     $transaction: vi.fn(async (arg: unknown) =>
       typeof arg === "function"
         ? (arg as (tx: unknown) => unknown)({
+            ...tenancy,
+            ...governance,
             wallet,
             walletNonce,
             apiListing,
@@ -164,6 +192,8 @@ describe("wallet routes", () => {
       }
     }
     clearUserCache();
+    actAs(tenancy);
+    governOff(governance);
 
     authenticateRequest.mockResolvedValue(signedIn());
     upsert.mockResolvedValue(AUTH_USER);
@@ -227,7 +257,7 @@ describe("wallet routes", () => {
 
     await app.inject({ method: "GET", url: "/me/wallets", headers: AUTH });
     expect(wallet.findMany.mock.calls[0][0].where).toMatchObject({
-      ownerId: USER_ID,
+      organizationId: ORG_ID,
     });
 
     await app.inject({
@@ -237,7 +267,7 @@ describe("wallet routes", () => {
     });
     expect(wallet.findFirst.mock.calls[0][0].where).toEqual({
       id: WALLET_ID,
-      ownerId: USER_ID,
+      organizationId: ORG_ID,
     });
 
     await app.inject({
@@ -247,13 +277,111 @@ describe("wallet routes", () => {
     });
     expect(wallet.findFirst.mock.calls[1][0].where).toEqual({
       id: WALLET_ID,
-      ownerId: USER_ID,
+      organizationId: ORG_ID,
     });
     expect(wallet.deleteMany.mock.calls[0][0].where).toEqual({
       id: { in: [WALLET_ID] },
-      ownerId: USER_ID,
+      organizationId: ORG_ID,
     });
 
+    await app.close();
+  });
+
+  it("404s and reads nothing for an organization the caller is not in", async () => {
+    const app = await initApp([{ plugin: walletRoutes }]);
+
+    const res = await app.inject({
+      method: "GET",
+      url: "/me/wallets",
+      headers: { ...AUTH, "x-org-id": OTHER_ORG_ID },
+    });
+
+    expect(res.statusCode).toBe(404);
+    expect(wallet.findMany).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("lets a member read wallets but not manage them", async () => {
+    actAs(tenancy, "DEVELOPER");
+    const app = await initApp([{ plugin: walletRoutes }]);
+
+    const list = await app.inject({
+      method: "GET",
+      url: "/me/wallets",
+      headers: AUTH,
+    });
+    expect(list.statusCode).toBe(200);
+
+    for (const [method, url, payload] of [
+      [
+        "POST",
+        "/me/wallets",
+        {
+          label: "Treasury",
+          address: signer.address,
+          network: "BASE_SEPOLIA",
+          nonce: "test-nonce",
+          signature: `0x${"1".repeat(130)}`,
+        },
+      ],
+      ["PATCH", `/me/wallets/${WALLET_ID}`, { label: "Mine now" }],
+      ["PATCH", `/me/wallets/${WALLET_ID}`, { isDefault: true }],
+      ["DELETE", `/me/wallets/${WALLET_ID}`, undefined],
+      ["POST", "/me/wallets/batch-delete", { ids: [WALLET_ID] }],
+    ] as const) {
+      const res = await app.inject({ method, url, headers: AUTH, payload });
+      expect(res.statusCode, `${method} ${url}`).toBe(403);
+      expect(res.json().error).toBe("forbidden");
+    }
+
+    expect(walletNonce.findFirst).not.toHaveBeenCalled();
+    expect(wallet.create).not.toHaveBeenCalled();
+    expect(wallet.update).not.toHaveBeenCalled();
+    expect(wallet.deleteMany).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("audits linking, updating and removing a wallet", async () => {
+    const row = challenge();
+    walletNonce.findFirst.mockResolvedValue(row);
+    const app = await initApp([{ plugin: walletRoutes }]);
+
+    await app.inject({
+      method: "POST",
+      url: "/me/wallets",
+      headers: AUTH,
+      payload: {
+        label: "Treasury",
+        address: signer.address,
+        network: "BASE_SEPOLIA",
+        nonce: row.nonce,
+        signature: await signChallenge(row),
+      },
+    });
+    await app.inject({
+      method: "PATCH",
+      url: `/me/wallets/${WALLET_ID}`,
+      headers: AUTH,
+      payload: { label: "Renamed" },
+    });
+    await app.inject({
+      method: "DELETE",
+      url: `/me/wallets/${WALLET_ID}`,
+      headers: AUTH,
+    });
+
+    expect(
+      tenancy.auditLog.create.mock.calls.map(([arg]) => arg.data),
+    ).toMatchObject([
+      {
+        organizationId: ORG_ID,
+        actorUserId: USER_ID,
+        action: "wallet.added",
+        targetId: WALLET_ID,
+      },
+      { action: "wallet.updated", targetId: WALLET_ID },
+      { action: "wallet.removed", targetId: WALLET_ID },
+    ]);
     await app.close();
   });
 
@@ -342,7 +470,8 @@ describe("wallet routes", () => {
 
       expect(res.statusCode).toBe(201);
       expect(wallet.create.mock.calls[0][0].data).toMatchObject({
-        ownerId: USER_ID,
+        organizationId: ORG_ID,
+        createdById: USER_ID,
         address: ADDRESS,
         verificationMethod: "EOA_SIGNATURE",
         verifiedChainId: 84532,
@@ -559,6 +688,65 @@ describe("wallet routes", () => {
       await app.close();
     });
 
+    it("shows only the active environment's networks", async () => {
+      const app = await initApp([{ plugin: walletRoutes }]);
+
+      const sandbox = await app.inject({
+        method: "GET",
+        url: "/me/wallets",
+        headers: AUTH,
+      });
+      expect(sandbox.json().items[0].environment).toBe("SANDBOX");
+      expect(wallet.findMany.mock.calls[0][0].where.network).toEqual({
+        in: ["BASE_SEPOLIA", "ETHEREUM_SEPOLIA"],
+      });
+
+      await app.inject({
+        method: "GET",
+        url: "/me/wallets",
+        headers: { ...AUTH, "x-environment": "Production" },
+      });
+      expect(wallet.findMany.mock.calls[1][0].where.network).toEqual({
+        in: ["BASE"],
+      });
+
+      await app.inject({
+        method: "GET",
+        url: "/me/wallets?network=BASE",
+        headers: AUTH,
+      });
+      expect(wallet.findMany.mock.calls[2][0].where.network).toEqual({
+        in: [],
+      });
+      await app.close();
+    });
+
+    it("404s on an unknown environment", async () => {
+      const app = await initApp([{ plugin: walletRoutes }]);
+      const res = await app.inject({
+        method: "GET",
+        url: "/me/wallets",
+        headers: { ...AUTH, "x-environment": "staging" },
+      });
+
+      expect(res.statusCode).toBe(404);
+      expect(wallet.findMany).not.toHaveBeenCalled();
+      await app.close();
+    });
+
+    it("reports a mainnet wallet as production", async () => {
+      wallet.findFirst.mockResolvedValue({ ...STORED_WALLET, network: "BASE" });
+      const app = await initApp([{ plugin: walletRoutes }]);
+      const res = await app.inject({
+        method: "GET",
+        url: `/me/wallets/${WALLET_ID}`,
+        headers: AUTH,
+      });
+
+      expect(res.json().environment).toBe("PRODUCTION");
+      await app.close();
+    });
+
     it("returns the paging envelope", async () => {
       const app = await initApp([{ plugin: walletRoutes }]);
       const res = await app.inject({
@@ -622,7 +810,7 @@ describe("wallet routes", () => {
 
         const hidden = {
           where: {
-            ownerId: USER_ID,
+            organizationId: ORG_ID,
             walletId: WALLET_ID,
             visibility: "PUBLIC",
           },
@@ -657,7 +845,11 @@ describe("wallet routes", () => {
       });
 
       expect(wallet.updateMany.mock.calls[0][0]).toMatchObject({
-        where: { ownerId: USER_ID, network: "BASE_SEPOLIA", isDefault: true },
+        where: {
+          organizationId: ORG_ID,
+          network: "BASE_SEPOLIA",
+          isDefault: true,
+        },
         data: { isDefault: false },
       });
       await app.close();
@@ -714,10 +906,39 @@ describe("wallet routes", () => {
 
       expect(res.statusCode).toBe(204);
       expect(apiListing.updateMany.mock.calls[0][0].where).toEqual({
-        ownerId: USER_ID,
+        organizationId: ORG_ID,
         walletId: { in: [WALLET_ID] },
       });
       expect(agent.updateMany).toHaveBeenCalledTimes(2);
+      await app.close();
+    });
+
+    it("keeps the wallet when its removal cannot be audited", async () => {
+      const tx = failAuditInTransaction(prisma, {
+        wallet: {
+          findFirst: vi.fn().mockResolvedValue(STORED_WALLET),
+          deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
+        },
+        apiListing: { updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
+        agent: { updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
+      });
+      const app = await initApp([{ plugin: walletRoutes }]);
+
+      const res = await app.inject({
+        method: "DELETE",
+        url: `/me/wallets/${WALLET_ID}`,
+        headers: AUTH,
+      });
+
+      expect(res.statusCode).toBe(500);
+      expect(tx.wallet.deleteMany).toHaveBeenCalledOnce();
+      expect(wallet.deleteMany).not.toHaveBeenCalled();
+      expect(apiListing.updateMany).not.toHaveBeenCalled();
+      expect(agent.updateMany).not.toHaveBeenCalled();
+      await expect(
+        vi.mocked(prisma.$transaction).mock.results.at(-1)?.value,
+      ).rejects.toBe(AUDIT_DOWN);
+      expect(tenancy.auditLog.create).not.toHaveBeenCalled();
       await app.close();
     });
 
@@ -735,6 +956,117 @@ describe("wallet routes", () => {
       expect(apiListing.updateMany).not.toHaveBeenCalled();
       expect(agent.updateMany).not.toHaveBeenCalled();
       expect(wallet.deleteMany).not.toHaveBeenCalled();
+      await app.close();
+    });
+  });
+
+  describe("governed removal", () => {
+    beforeEach(() => {
+      governOn(governance, "wallet.remove");
+    });
+
+    it("asks for approval instead of removing the wallet", async () => {
+      const app = await initApp([{ plugin: walletRoutes }]);
+
+      const res = await app.inject({
+        method: "DELETE",
+        url: `/me/wallets/${WALLET_ID}`,
+        headers: AUTH,
+      });
+
+      expect(res.statusCode).toBe(202);
+      expect(res.json()).toMatchObject({
+        status: "approval_required",
+        approvalRequest: { id: APPROVAL_ID, action: "wallet.remove" },
+      });
+      expect(
+        governance.approvalRequest.create.mock.calls[0][0].data,
+      ).toMatchObject({
+        organizationId: ORG_ID,
+        kind: "GOVERNANCE",
+        action: "wallet.remove",
+        requestedById: USER_ID,
+        payload: { walletIds: [WALLET_ID] },
+      });
+      expect(wallet.deleteMany).not.toHaveBeenCalled();
+      await app.close();
+    });
+
+    it("removes the wallet with an approval for exactly that wallet", async () => {
+      approvedFor(governance, "wallet.remove", { walletIds: [WALLET_ID] });
+      const app = await initApp([{ plugin: walletRoutes }]);
+
+      const res = await app.inject({
+        method: "DELETE",
+        url: `/me/wallets/${WALLET_ID}`,
+        headers: { ...AUTH, ...APPROVAL_HEADERS },
+      });
+
+      expect(res.statusCode).toBe(204);
+      expect(
+        governance.approvalRequest.updateMany.mock.calls[0][0].where,
+      ).toMatchObject({
+        id: APPROVAL_ID,
+        organizationId: ORG_ID,
+        requestedById: USER_ID,
+        status: "APPROVED",
+        executedAt: null,
+      });
+      expect(wallet.deleteMany).toHaveBeenCalledOnce();
+      expect(tenancy.auditLog.create.mock.calls[0][0].data).toMatchObject({
+        action: "wallet.removed",
+        metadata: { approvalId: APPROVAL_ID },
+      });
+      await app.close();
+    });
+
+    it("refuses an approval granted for different wallets", async () => {
+      approvedFor(governance, "wallet.remove", { walletIds: [OTHER_ID] });
+      wallet.findMany.mockResolvedValue([{ id: WALLET_ID }]);
+      const app = await initApp([{ plugin: walletRoutes }]);
+
+      const res = await app.inject({
+        method: "POST",
+        url: "/me/wallets/batch-delete",
+        headers: { ...AUTH, ...APPROVAL_HEADERS },
+        payload: { ids: [WALLET_ID] },
+      });
+
+      expect(res.statusCode).toBe(409);
+      expect(res.json().error).toBe("approval_invalid");
+      expect(wallet.deleteMany).not.toHaveBeenCalled();
+      await app.close();
+    });
+
+    it("governs batch removal with the same payload as a single removal", async () => {
+      approvedFor(governance, "wallet.remove", { walletIds: [WALLET_ID] });
+      wallet.findMany.mockResolvedValue([{ id: WALLET_ID }]);
+      const app = await initApp([{ plugin: walletRoutes }]);
+
+      const res = await app.inject({
+        method: "POST",
+        url: "/me/wallets/batch-delete",
+        headers: { ...AUTH, ...APPROVAL_HEADERS },
+        payload: { ids: [WALLET_ID] },
+      });
+
+      expect(res.statusCode).toBe(200);
+      expect(wallet.deleteMany).toHaveBeenCalledOnce();
+      await app.close();
+    });
+
+    it("404s before asking for approval of a wallet the caller does not own", async () => {
+      wallet.findFirst.mockResolvedValue(null);
+      const app = await initApp([{ plugin: walletRoutes }]);
+
+      const res = await app.inject({
+        method: "DELETE",
+        url: `/me/wallets/${OTHER_ID}`,
+        headers: AUTH,
+      });
+
+      expect(res.statusCode).toBe(404);
+      expect(governance.approvalRequest.create).not.toHaveBeenCalled();
       await app.close();
     });
   });
@@ -758,7 +1090,7 @@ describe("wallet routes", () => {
       });
       expect(wallet.deleteMany.mock.calls[0][0].where).toEqual({
         id: { in: [WALLET_ID] },
-        ownerId: USER_ID,
+        organizationId: ORG_ID,
       });
       await app.close();
     });
@@ -774,7 +1106,10 @@ describe("wallet routes", () => {
         payload: { ids: [WALLET_ID, OTHER_ID] },
       });
 
-      const receiving = { ownerId: USER_ID, walletId: { in: [WALLET_ID] } };
+      const receiving = {
+        organizationId: ORG_ID,
+        walletId: { in: [WALLET_ID] },
+      };
       expect(apiListing.updateMany).toHaveBeenCalledWith({
         where: receiving,
         data: { payToAddress: null, visibility: "PRIVATE" },
@@ -784,7 +1119,7 @@ describe("wallet routes", () => {
         data: { payToAddress: null, visibility: "PRIVATE" },
       });
       expect(agent.updateMany).toHaveBeenCalledWith({
-        where: { ownerId: USER_ID, payerWalletId: { in: [WALLET_ID] } },
+        where: { organizationId: ORG_ID, payerWalletId: { in: [WALLET_ID] } },
         data: { walletAddress: null },
       });
       await app.close();

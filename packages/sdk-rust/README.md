@@ -402,6 +402,64 @@ Notes:
 - `sign_payment` and `sign_payment_v2` sign the x402 v1 and v2 flows respectively; both sign as the flow's own signer and error if the scheme is not 4mica.
 - `settle_payment` only hits `/settle`; resource servers should still call the facilitator `/verify` first when enforcing access (see the Python example for the end-to-end pattern).
 
+### Spending governance
+
+This crate has no paying HTTP client: you send the paid request yourself, so nothing checks your
+organization's spending policies unless you call the 4Mica app API around `X402Flow` explicitly.
+`AppClient` (with an API key holding the `SPEND_AUTHORIZE` scope) has `authorize_spend`,
+`get_spend_authorization`, `consume_spend_authorization`, `release_spend_authorization`,
+`create_approval` and `get_approval`. To match the TypeScript and Python SDKs' `governance` option:
+
+1. After your own limits pass and before signing, call `authorize_spend`. On `PendingApproval`,
+   poll `get_spend_authorization` until it is `Reserved` or something else; if your deadline passes
+   first, call `release_spend_authorization` and do not pay. Anything other than `Reserved` means
+   do not sign. An `AppError` means do not sign either: fail closed.
+2. Release only on a definitive rejection: signing failed before anything was sent, or the seller
+   answered the paid request with a 402.
+3. Every other outcome (a 2xx, any other non-2xx, a timeout, a network error, a dropped future)
+   is a payment the seller may still redeem: consume it with the signed payment's request id,
+   `envelope["payload"]["payload"]["req_id"]` of the `X402SignedPayment`.
+4. Retry a consume or release only while `AppError::is_transient()` holds (a network error, a 429 or
+   a 5xx), at most three attempts with jittered backoff, and never turn a failure there into a
+   failed payment: the seller has been paid, and 4mica reconciles by request id once it reports
+   the payment.
+
+```rust
+use sdk_4mica::{AppClient, AuthorizeSpend, ConsumeSpend, Network, SpendAuthorizationStatus};
+
+let app = AppClient::new(std::env::var("FOURMICA_API_KEY")?)?;
+let granted = app
+    .authorize_spend(&AuthorizeSpend {
+        network: Network::BaseSepolia,
+        asset_address: Some(usdc.to_lowercase()),
+        amount: "0.01".into(),
+        payer_address: payer.to_string(),
+        recipient_address: requirements.pay_to.clone(),
+        req_id: None,
+        agent_id: None,
+    })
+    .await?;
+if granted.status != SpendAuthorizationStatus::Reserved {
+    return Err("refused by the organization's spending policies".into());
+}
+
+let signed = flow.sign_payment_v2(payment_required, requirements).await?;
+let req_id = signed.envelope["payload"]["payload"]["req_id"]
+    .as_str()
+    .map(str::to_string);
+let paid = http.get(url).header("PAYMENT-SIGNATURE", &signed.header).send().await;
+if matches!(&paid, Ok(response) if response.status() == 402) {
+    app.release_spend_authorization(&granted.id).await.ok();
+} else {
+    app.consume_spend_authorization(&granted.id, &ConsumeSpend { req_id, tx_hash: None })
+        .await
+        .ok();
+}
+```
+
+These controls are cooperative, not hard enforcement: see `docs/SPENDING_GOVERNANCE.md` in the
+monorepo.
+
 ### API Methods Summary
 
 #### `client.deposit`

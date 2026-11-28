@@ -2,10 +2,11 @@ import type { PaymentNetwork } from "@4mica/db";
 import { slugify } from "@4mica/rules";
 import { MAX_OFFSET } from "@controllers/schema-primitives";
 import {
+  auditProject,
   invalidBody,
   notFound,
   parseBody,
-  requireUserId,
+  requireProject,
   sellerWalletError,
 } from "@controllers/shared";
 import {
@@ -18,6 +19,7 @@ import {
   isUniqueViolation,
   uniqueViolationTargets,
 } from "@utils/prisma-errors";
+import { networkAllowed, networkIssue } from "@utils/scope";
 import { nextFreeSlug } from "@utils/slug";
 import type { FastifyReply, RouteHandler } from "fastify";
 import {
@@ -75,8 +77,8 @@ const uniqueConflict = (reply: FastifyReply, error: unknown) => {
 };
 
 export const listAgentsHandler: RouteHandler = async (request, reply) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const scope = await requireProject(request, reply, "resources.read");
+  if (!scope) {
     return reply;
   }
 
@@ -91,24 +93,24 @@ export const listAgentsHandler: RouteHandler = async (request, reply) => {
     ]);
   }
 
-  return reply.send(await listAgents(userId, parsed.data));
+  return reply.send(await listAgents(scope, parsed.data));
 };
 
 export const getAgentHandler: RouteHandler = async (request, reply) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const scope = await requireProject(request, reply, "resources.read");
+  if (!scope) {
     return reply;
   }
 
   const { id } = request.params as { id: string };
-  const agent = await getAgent(userId, id);
+  const agent = await getAgent(scope, id);
 
   return agent ? reply.send(agent) : notFound(reply, "agent");
 };
 
 export const createAgentHandler: RouteHandler = async (request, reply) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const scope = await requireProject(request, reply, "resources.write");
+  if (!scope) {
     return reply;
   }
 
@@ -119,12 +121,15 @@ export const createAgentHandler: RouteHandler = async (request, reply) => {
 
   const data = parsed.data;
   const network = data.network as PaymentNetwork;
+  if (!networkAllowed(scope, network)) {
+    return invalidBody(reply, [networkIssue(scope)]);
+  }
 
   let payerWalletId: string | null = null;
   let walletAddress: string | null = null;
   if (data.payerWalletId) {
     const resolved = await resolvePayerWallet(
-      userId,
+      scope.orgId,
       data.payerWalletId,
       network,
     );
@@ -138,7 +143,11 @@ export const createAgentHandler: RouteHandler = async (request, reply) => {
   let walletId: string | null = null;
   let payToAddress: string | null = null;
   if (data.walletId) {
-    const resolved = await resolveSellerWallet(userId, data.walletId, network);
+    const resolved = await resolveSellerWallet(
+      scope.orgId,
+      data.walletId,
+      network,
+    );
     if (!resolved.ok) {
       return sellerWalletError(reply, resolved);
     }
@@ -156,14 +165,14 @@ export const createAgentHandler: RouteHandler = async (request, reply) => {
     return notPayable(reply);
   }
 
-  const taken = await takenSlugs(userId);
+  const taken = await takenSlugs(scope.orgId);
   if (data.slug && taken.has(data.slug)) {
     return slugTaken(reply);
   }
   const slug = data.slug ?? nextFreeSlug(slugify(data.name), taken);
 
   try {
-    const agent = await createAgent(userId, {
+    const agent = await createAgent(scope, scope.userId, {
       slug,
       name: data.name,
       headline: data.headline ?? null,
@@ -189,8 +198,14 @@ export const createAgentHandler: RouteHandler = async (request, reply) => {
       x402Endpoint: data.x402Endpoint ?? null,
     });
 
+    await auditProject(request, scope, {
+      action: "agent.created",
+      targetType: "agent",
+      targetId: agent.id,
+    });
+
     appLogger.info("Agent created", {
-      userId,
+      userId: scope.userId,
       agentId: agent.id,
       slug: agent.slug,
     });
@@ -200,14 +215,14 @@ export const createAgentHandler: RouteHandler = async (request, reply) => {
     if (isUniqueViolation(error)) {
       return uniqueConflict(reply, error);
     }
-    appLogger.error("Agent create failed", { error, userId });
+    appLogger.error("Agent create failed", { error, userId: scope.userId });
     throw error;
   }
 };
 
 export const updateAgentHandler: RouteHandler = async (request, reply) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const scope = await requireProject(request, reply, "resources.write");
+  if (!scope) {
     return reply;
   }
 
@@ -217,7 +232,7 @@ export const updateAgentHandler: RouteHandler = async (request, reply) => {
   }
 
   const { id } = request.params as { id: string };
-  const current = await getAgent(userId, id);
+  const current = await getAgent(scope, id);
   if (!current) {
     return notFound(reply, "agent");
   }
@@ -235,6 +250,9 @@ export const updateAgentHandler: RouteHandler = async (request, reply) => {
   const data: Record<string, unknown> = { ...rest };
 
   const effectiveNetwork = (network ?? current.network) as PaymentNetwork;
+  if (network && !networkAllowed(scope, network)) {
+    return invalidBody(reply, [networkIssue(scope)]);
+  }
   if (network && network !== current.network) {
     const keepsPayer =
       payerWalletId === undefined
@@ -265,7 +283,7 @@ export const updateAgentHandler: RouteHandler = async (request, reply) => {
       data.walletAddress = null;
     } else {
       const resolved = await resolvePayerWallet(
-        userId,
+        scope.orgId,
         payerWalletId,
         effectiveNetwork,
       );
@@ -283,7 +301,7 @@ export const updateAgentHandler: RouteHandler = async (request, reply) => {
       data.payToAddress = null;
     } else {
       const resolved = await resolveSellerWallet(
-        userId,
+        scope.orgId,
         walletId,
         effectiveNetwork,
       );
@@ -319,7 +337,7 @@ export const updateAgentHandler: RouteHandler = async (request, reply) => {
       return notPayable(reply);
     }
     if (walletId === undefined && current.walletId) {
-      const resolved = await resolveSellerWallet(userId, current.walletId);
+      const resolved = await resolveSellerWallet(scope.orgId, current.walletId);
       if (!resolved.ok) {
         return sellerWalletError(reply, resolved);
       }
@@ -334,14 +352,14 @@ export const updateAgentHandler: RouteHandler = async (request, reply) => {
   }
 
   if (next.slug && next.slug !== current.slug) {
-    const taken = await takenSlugs(userId);
+    const taken = await takenSlugs(scope.orgId);
     if (taken.has(next.slug)) {
       return slugTaken(reply);
     }
   }
 
   try {
-    const updated = await updateAgent(userId, id, data);
+    const updated = await updateAgent(scope, id, data);
     return updated ? reply.send(updated) : notFound(reply, "agent");
   } catch (error) {
     if (isUniqueViolation(error)) {
@@ -352,13 +370,13 @@ export const updateAgentHandler: RouteHandler = async (request, reply) => {
 };
 
 export const publishAgentHandler: RouteHandler = async (request, reply) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const scope = await requireProject(request, reply, "resources.write");
+  if (!scope) {
     return reply;
   }
 
   const { id } = request.params as { id: string };
-  const current = await getAgent(userId, id);
+  const current = await getAgent(scope, id);
   if (!current) {
     return notFound(reply, "agent");
   }
@@ -372,19 +390,27 @@ export const publishAgentHandler: RouteHandler = async (request, reply) => {
   }
 
   if (current.walletId) {
-    const resolved = await resolveSellerWallet(userId, current.walletId);
+    const resolved = await resolveSellerWallet(scope.orgId, current.walletId);
     if (!resolved.ok) {
       return sellerWalletError(reply, resolved);
     }
   }
 
-  const updated = await updateAgent(userId, id, {
+  const updated = await updateAgent(scope, id, {
     visibility: "PUBLIC",
     publishedAt: current.publishedAt ?? new Date(),
   });
 
+  if (updated) {
+    await auditProject(request, scope, {
+      action: "agent.published",
+      targetType: "agent",
+      targetId: id,
+    });
+  }
+
   appLogger.info("Agent published", {
-    userId,
+    userId: scope.userId,
     agentId: id,
     slug: current.slug,
   });
@@ -392,33 +418,45 @@ export const publishAgentHandler: RouteHandler = async (request, reply) => {
 };
 
 export const unpublishAgentHandler: RouteHandler = async (request, reply) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const scope = await requireProject(request, reply, "resources.write");
+  if (!scope) {
     return reply;
   }
 
   const { id } = request.params as { id: string };
-  const updated = await updateAgent(userId, id, { visibility: "PRIVATE" });
+  const updated = await updateAgent(scope, id, {
+    visibility: "PRIVATE",
+  });
 
   if (!updated) {
     return notFound(reply, "agent");
   }
 
-  appLogger.info("Agent unpublished", { userId, agentId: id });
+  await auditProject(request, scope, {
+    action: "agent.unpublished",
+    targetType: "agent",
+    targetId: id,
+  });
+  appLogger.info("Agent unpublished", { userId: scope.userId, agentId: id });
   return reply.send(updated);
 };
 
 export const deleteAgentHandler: RouteHandler = async (request, reply) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const scope = await requireProject(request, reply, "resources.write");
+  if (!scope) {
     return reply;
   }
 
   const { id } = request.params as { id: string };
-  const deleted = await softDeleteAgent(userId, id);
+  const deleted = await softDeleteAgent(scope, id);
 
   if (deleted) {
-    appLogger.info("Agent removed", { userId, agentId: id });
+    await auditProject(request, scope, {
+      action: "agent.deleted",
+      targetType: "agent",
+      targetId: id,
+    });
+    appLogger.info("Agent removed", { userId: scope.userId, agentId: id });
     return reply.code(204).send();
   }
 
@@ -429,8 +467,8 @@ export const batchDeleteAgentsHandler: RouteHandler = async (
   request,
   reply,
 ) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
+  const scope = await requireProject(request, reply, "resources.write");
+  if (!scope) {
     return reply;
   }
 
@@ -439,8 +477,18 @@ export const batchDeleteAgentsHandler: RouteHandler = async (
     return invalidBody(reply, parsed.issues);
   }
 
-  const result = await batchSoftDeleteAgents(userId, parsed.data.ids);
-  appLogger.info("Agents removed", { userId, count: result.deleted.length });
+  const result = await batchSoftDeleteAgents(scope, parsed.data.ids);
+  if (result.deleted.length > 0) {
+    await auditProject(request, scope, {
+      action: "agent.deleted",
+      targetType: "agent",
+      metadata: { ids: result.deleted },
+    });
+  }
+  appLogger.info("Agents removed", {
+    userId: scope.userId,
+    count: result.deleted.length,
+  });
 
   return reply.send(result);
 };

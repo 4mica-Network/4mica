@@ -1,6 +1,7 @@
 import type { Account } from "viem/accounts";
 import type { TokenLike } from "@/amounts";
 import type { Route, TokenRoute } from "@/client/model";
+import type { SpendAccountingError } from "@/errors";
 
 export type AssetRef = TokenLike;
 
@@ -19,6 +20,24 @@ export interface SpendLimits {
   payTo?: readonly string[];
 }
 
+export interface GovernanceOptions {
+  apiKey: string;
+  baseUrl?: string;
+  agentId?: string;
+  approvalTimeoutMs?: number;
+  pollIntervalMs?: number;
+  requestTimeoutMs?: number;
+  accountingTimeoutMs?: number;
+  onAccountingError?: (error: SpendAccountingError) => void;
+}
+
+export type AccountingStatus = "recorded" | "pending" | "failed";
+
+export interface GovernanceOutcome {
+  authorizationId: string;
+  accounting: AccountingStatus;
+}
+
 export interface FourMicaOptions {
   privateKey?: string;
   /** Any viem `Account` with `signTypedData` and `signMessage`. */
@@ -31,6 +50,7 @@ export interface FourMicaOptions {
   /** Self-hosted core. */
   rpcUrl?: string;
   spend?: SpendLimits;
+  governance?: GovernanceOptions;
   /** In order of preference. Default `["x402"]`. */
   protocols?: readonly string[];
   fetch?: typeof fetch;

@@ -4,7 +4,8 @@ import { unstable_cache } from "next/cache";
 
 export const PUBLIC_DATA_TTL_SECONDS = 60;
 
-export const ownerTag = (ownerId: string): string => `owner:${ownerId}`;
+export const organizationTag = (organizationId: string): string =>
+  `organization:${organizationId}`;
 
 export const resourceTag = (kind: string, id: string): string =>
   `resource:${kind}:${id}`;

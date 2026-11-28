@@ -1,3 +1,4 @@
+import { setRequestHeadersProvider } from "@4mica/http";
 import {
   applyMiddleware,
   combineReducers,
@@ -6,6 +7,7 @@ import {
   type Reducer,
 } from "redux";
 import createSagaMiddleware from "redux-saga";
+import { all } from "redux-saga/effects";
 import type agentReducer from "./agent/reducer";
 import type apiListingReducer from "./apiListing/reducer";
 import type balanceReducer from "./balance/reducer";
@@ -16,12 +18,23 @@ import configReducer from "./config/reducer";
 import configSaga from "./config/saga";
 import type customerReducer from "./customer/reducer";
 import type developerReducer from "./developer/reducer";
+import type financeReducer from "./finance/reducer";
+import financeBadgeReducer from "./financeBadge/reducer";
+import financeBadgeSaga from "./financeBadge/saga";
+import organizationReducer from "./organization/reducer";
+import organizationSaga from "./organization/saga";
 import type paymentReducer from "./payment/reducer";
+import projectReducer from "./project/reducer";
+import projectSaga from "./project/saga";
+import { projectHeaders } from "./project/selector";
 import { onStoreRegistered } from "./registry";
 import type resourceKeyReducer from "./resourceKey/reducer";
 import { sessionScoped } from "./rootSaga";
+import type securityReducer from "./security/reducer";
+import type serviceAccountReducer from "./serviceAccount/reducer";
 import { withSessionReset } from "./session";
 import type supportReducer from "./support/reducer";
+import type teamReducer from "./team/reducer";
 import type trustReducer from "./trust/reducer";
 import userReducer from "./user/reducer";
 import userSaga from "./user/saga";
@@ -31,6 +44,9 @@ const eagerReducers = {
   user: userReducer,
   config: configReducer,
   banner: bannerReducer,
+  organization: organizationReducer,
+  project: projectReducer,
+  financeBadge: financeBadgeReducer,
 };
 
 export interface LazyReducers {
@@ -45,6 +61,10 @@ export interface LazyReducers {
   resourceKey: typeof resourceKeyReducer;
   compliance: typeof complianceReducer;
   support: typeof supportReducer;
+  team: typeof teamReducer;
+  serviceAccount: typeof serviceAccountReducer;
+  finance: typeof financeReducer;
+  security: typeof securityReducer;
 }
 
 type AllReducers = typeof eagerReducers & LazyReducers;
@@ -75,7 +95,17 @@ export const store = createStore(
   composeEnhancers(applyMiddleware(sagaMiddleware)),
 );
 
-sagaMiddleware.run(sessionScoped, [...userSaga, ...configSaga, ...bannerSaga]);
+sagaMiddleware.run(sessionScoped, [
+  ...userSaga,
+  ...configSaga,
+  ...bannerSaga,
+  ...financeBadgeSaga,
+]);
+sagaMiddleware.run(function* () {
+  yield all([...organizationSaga, ...projectSaga]);
+});
+
+setRequestHeadersProvider(() => projectHeaders(store.getState()));
 
 onStoreRegistered(({ name, reducer, watchers }) => {
   Object.assign(lazyReducers, { [name]: reducer });

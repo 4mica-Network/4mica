@@ -6,6 +6,7 @@ import {
   DEFAULT_TESTNET,
   isKnownSafe,
   readEnv,
+  requireApiUrl,
   resolveSettings,
 } from "./settings.js";
 
@@ -494,6 +495,34 @@ describe("a core given by url", () => {
         resolveSettings({ flags: { network: "base" }, env: {}, config: {} }),
       ),
     ).toBe(false);
+  });
+});
+
+describe("the platform url", () => {
+  const check = (value: string) => () =>
+    requireApiUrl({ value, source: "env" });
+
+  it.each([
+    ["https://api.example"],
+    ["https://api.example/"],
+    ["http://127.0.0.1:4000"],
+  ])("takes %s", (url) => {
+    expect(check(url)).not.toThrow();
+  });
+
+  it.each([
+    ["https://gateway.example/4mica"],
+    ["https://gateway.example/4mica/"],
+    ["https://api.example/?tenant=a"],
+    ["https://api.example/#x"],
+  ])("refuses %s, since only its origin would be used", (url) => {
+    expect(check(url)).toThrow(
+      expect.objectContaining({
+        code: "BAD_API_URL",
+        oclif: { exit: EXIT.config },
+        suggestions: [`give only the origin: ${new URL(url).origin}`],
+      }),
+    );
   });
 });
 

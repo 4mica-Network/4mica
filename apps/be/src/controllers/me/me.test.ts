@@ -2,6 +2,7 @@ import { clearUserCache } from "@auth/user-store";
 import { meRoutes } from "@routes/me";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { initApp } from "@/server";
+import { actAs, ORG_ID, OTHER_ORG_ID } from "@/test-support/tenancy";
 
 const {
   authenticateRequest,
@@ -13,7 +14,14 @@ const {
   businessUpsert,
   tokenCreate,
   sendAccountVerification,
+  organization,
+  tenancy,
 } = vi.hoisted(() => ({
+  tenancy: {
+    membership: { findFirst: vi.fn(), create: vi.fn() },
+    auditLog: { create: vi.fn() },
+  },
+  organization: { findFirst: vi.fn(), update: vi.fn() },
   authenticateRequest: vi.fn(),
   getUser: vi.fn(),
   findUnique: vi.fn(),
@@ -34,11 +42,25 @@ vi.mock("@clerk/backend", () => ({
 
 vi.mock("@4mica/db", () => ({
   prisma: {
+    ...tenancy,
     agent: { count: vi.fn() },
     user: { findUnique, upsert, update },
+    organization,
     business: { findUnique: businessFindUnique, upsert: businessUpsert },
     emailVerificationToken: { create: tokenCreate, deleteMany: vi.fn() },
-    $transaction: vi.fn(async (ops: unknown[]) => Promise.all(ops)),
+    $transaction: vi.fn(async (arg: unknown) =>
+      typeof arg === "function"
+        ? (arg as (tx: unknown) => unknown)({
+            ...tenancy,
+            user: { findUnique, update },
+            organization,
+            business: {
+              findUnique: businessFindUnique,
+              upsert: businessUpsert,
+            },
+          })
+        : Promise.all(arg as Promise<unknown>[]),
+    ),
   },
   disconnect: vi.fn(async () => {}),
 }));
@@ -144,16 +166,20 @@ describe("account routes", () => {
       businessUpsert,
       tokenCreate,
       sendAccountVerification,
+      organization.findFirst,
+      organization.update,
     ]) {
       m.mockReset();
     }
     clearUserCache();
+    actAs(tenancy);
 
     authenticateRequest.mockResolvedValue(signedIn());
     findUnique.mockResolvedValue(FULL_USER);
     upsert.mockResolvedValue(AUTH_USER);
     update.mockResolvedValue(FULL_USER);
     businessFindUnique.mockResolvedValue(null);
+    organization.findFirst.mockResolvedValue(null);
     sendAccountVerification.mockResolvedValue({ id: "msg_1" });
   });
 
@@ -433,6 +459,76 @@ describe("account routes", () => {
     await app.close();
   });
 
+  it("PATCH /me/profile renames the personal organization with the username", async () => {
+    update.mockResolvedValue({ ...FULL_USER, username: "lovelace" });
+    organization.findFirst.mockResolvedValue({ id: ORG_ID });
+
+    const app = await initApp([{ plugin: meRoutes }]);
+    const res = await app.inject({
+      method: "PATCH",
+      url: "/me/profile",
+      headers: AUTH,
+      payload: { username: "lovelace" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(organization.findFirst.mock.calls[0][0].where).toEqual({
+      personal: true,
+      memberships: { some: { userId: AUTH_USER.id } },
+    });
+    expect(organization.update).toHaveBeenCalledWith({
+      where: { id: ORG_ID },
+      data: { handle: "lovelace" },
+    });
+
+    await app.close();
+  });
+
+  it("PATCH /me/profile leaves the organization alone when the username is unchanged", async () => {
+    const app = await initApp([{ plugin: meRoutes }]);
+    const res = await app.inject({
+      method: "PATCH",
+      url: "/me/profile",
+      headers: AUTH,
+      payload: { username: "ada", bio: "hi" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(organization.update).not.toHaveBeenCalled();
+
+    await app.close();
+  });
+
+  it("PATCH /me/profile answers a clash with an organization handle as a taken username", async () => {
+    update.mockResolvedValue({ ...FULL_USER, username: "acme" });
+    organization.findFirst.mockResolvedValue({ id: ORG_ID });
+    organization.update.mockRejectedValue(
+      Object.assign(new Error("unique"), {
+        code: "P2002",
+        meta: { target: ["handle"] },
+      }),
+    );
+
+    const app = await initApp([{ plugin: meRoutes }]);
+    const res = await app.inject({
+      method: "PATCH",
+      url: "/me/profile",
+      headers: AUTH,
+      payload: { username: "acme" },
+    });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.json()).toEqual({
+      error: "conflict",
+      message: "That username is already taken.",
+      issues: [
+        { path: "username", message: "That username is already taken." },
+      ],
+    });
+
+    await app.close();
+  });
+
   it("PATCH /me/profile lowercases the username", async () => {
     const app = await initApp([{ plugin: meRoutes }]);
     const res = await app.inject({
@@ -487,6 +583,22 @@ describe("account routes", () => {
           "username" in where ? owner : FULL_USER,
       );
     };
+
+    it("reports a handle held by an organization as taken", async () => {
+      withUsernameOwner(null);
+      organization.findFirst.mockResolvedValue({ id: OTHER_ORG_ID });
+
+      const res = await check("acme");
+
+      expect(res.json()).toMatchObject({ available: false, reason: "taken" });
+      expect(organization.findFirst.mock.calls[0][0].where).toEqual({
+        handle: "acme",
+        NOT: {
+          personal: true,
+          memberships: { some: { userId: AUTH_USER.id } },
+        },
+      });
+    });
 
     const check = async (username: string) => {
       const app = await initApp([{ plugin: meRoutes }]);
@@ -664,7 +776,7 @@ describe("account routes", () => {
   it("PUT /me/business upserts and normalises country and currency", async () => {
     businessUpsert.mockResolvedValue({
       id: "b1",
-      ownerId: AUTH_USER.id,
+      organizationId: ORG_ID,
       legalName: "Acme Ltd",
       payoutCurrency: "EUR",
       country: "DE",
@@ -705,6 +817,112 @@ describe("account routes", () => {
     await app.close();
   });
 
+  describe("organization business", () => {
+    it("GET /me/business reads the active organization's business", async () => {
+      const app = await initApp([{ plugin: meRoutes }]);
+      const res = await app.inject({
+        method: "GET",
+        url: "/me/business",
+        headers: AUTH,
+      });
+
+      expect(res.statusCode).toBe(200);
+      expect(businessFindUnique.mock.calls[0][0].where).toEqual({
+        organizationId: ORG_ID,
+      });
+
+      await app.close();
+    });
+
+    it("404s and reads nothing for an organization the caller is not in", async () => {
+      const app = await initApp([{ plugin: meRoutes }]);
+      const res = await app.inject({
+        method: "GET",
+        url: "/me/business",
+        headers: { ...AUTH, "x-org-id": OTHER_ORG_ID },
+      });
+
+      expect(res.statusCode).toBe(404);
+      expect(businessFindUnique).not.toHaveBeenCalled();
+
+      await app.close();
+    });
+
+    it.each([
+      "DEVELOPER",
+      "VIEWER",
+    ] as const)("lets a %s read but not edit the business", async (role) => {
+      actAs(tenancy, role);
+      const app = await initApp([{ plugin: meRoutes }]);
+      const read = await app.inject({
+        method: "GET",
+        url: "/me/business",
+        headers: AUTH,
+      });
+      expect(read.statusCode).toBe(200);
+
+      const res = await app.inject({
+        method: "PUT",
+        url: "/me/business",
+        headers: AUTH,
+        payload: { legalName: "Acme Ltd" },
+      });
+
+      expect(res.statusCode).toBe(403);
+      expect(res.json()).toMatchObject({
+        error: "forbidden",
+        permission: "business.manage",
+      });
+      expect(businessUpsert).not.toHaveBeenCalled();
+
+      await app.close();
+    });
+
+    it("audits a business update", async () => {
+      businessUpsert.mockResolvedValue({
+        id: "b1",
+        organizationId: ORG_ID,
+        legalName: "Acme Ltd",
+        kybStatus: "UNVERIFIED",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+      const app = await initApp([{ plugin: meRoutes }]);
+      await app.inject({
+        method: "PUT",
+        url: "/me/business",
+        headers: AUTH,
+        payload: { legalName: "Acme Ltd" },
+      });
+
+      expect(tenancy.auditLog.create.mock.calls[0][0].data).toMatchObject({
+        organizationId: ORG_ID,
+        actorUserId: AUTH_USER.id,
+        action: "business.updated",
+        targetId: "b1",
+        metadata: { fields: ["legalName"] },
+      });
+
+      await app.close();
+    });
+
+    it("fails a business update when its audit entry cannot be written", async () => {
+      businessUpsert.mockResolvedValue({ id: "b1" });
+      tenancy.auditLog.create.mockRejectedValue(new Error("audit down"));
+      const app = await initApp([{ plugin: meRoutes }]);
+      const response = await app.inject({
+        method: "PUT",
+        url: "/me/business",
+        headers: AUTH,
+        payload: { legalName: "Acme Ltd" },
+      });
+
+      expect(response.statusCode).toBe(500);
+
+      await app.close();
+    });
+  });
+
   describe("authorization", () => {
     const MUTATIONS = [
       ["PATCH", "/me/profile"],
@@ -730,15 +948,17 @@ describe("account routes", () => {
         method: "PUT",
         url: "/me/business",
         headers: AUTH,
-        payload: { ownerId: OTHER_USER_ID, legalName: "Evil Ltd" },
+        payload: { organizationId: OTHER_ORG_ID, legalName: "Evil Ltd" },
       });
 
       expect(businessUpsert.mock.calls[0][0].where).toEqual({
-        ownerId: AUTH_USER.id,
+        organizationId: ORG_ID,
       });
-      expect(businessUpsert.mock.calls[0][0].create.ownerId).toBe(AUTH_USER.id);
+      expect(businessUpsert.mock.calls[0][0].create.organizationId).toBe(
+        ORG_ID,
+      );
       expect(businessUpsert.mock.calls[0][0].update).not.toHaveProperty(
-        "ownerId",
+        "organizationId",
       );
 
       await app.close();

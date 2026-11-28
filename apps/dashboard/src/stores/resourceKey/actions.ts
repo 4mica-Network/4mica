@@ -30,9 +30,13 @@ export const fetchResourceKeysFailed = (message: string) => ({
   payload: { message },
 });
 
-export const createResourceKey = (resource: ResourceRef, name: string) => ({
+export const createResourceKey = (
+  resource: ResourceRef,
+  name: string,
+  ipAllowlist?: string[],
+) => ({
   type: actionTypes.CREATE_RESOURCE_KEY_REQUESTED,
-  payload: { resource, name },
+  payload: { resource, name, ...(ipAllowlist ? { ipAllowlist } : {}) },
   meta: { pendingKey: "createResourceKey" },
 });
 
@@ -57,6 +61,25 @@ export const revokeResourceKeySucceeded = (
   meta: ResourceMeta,
 ) => ({
   type: actionTypes.REVOKE_RESOURCE_KEY_SUCCEEDED,
+  payload: apiKey,
+  meta,
+});
+
+export const updateResourceKey = (
+  resource: ResourceRef,
+  keyId: string,
+  ipAllowlist: string[],
+) => ({
+  type: actionTypes.UPDATE_RESOURCE_KEY_REQUESTED,
+  payload: { resource, keyId, ipAllowlist },
+  meta: { pendingKey: resourceKeyPendingKeys.row(keyId) },
+});
+
+export const updateResourceKeySucceeded = (
+  apiKey: ApiKey,
+  meta: ResourceMeta,
+) => ({
+  type: actionTypes.UPDATE_RESOURCE_KEY_SUCCEEDED,
   payload: apiKey,
   meta,
 });

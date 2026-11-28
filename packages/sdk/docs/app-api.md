@@ -92,6 +92,11 @@ console.log(decision.gross, decision.payable, decision.creditApplied);
 
 An unknown payer is allowed at full price.
 
+When `needsApproval` is `true`, ask your organization for a one-off approval with
+`app.createApproval()` (below), and once it is `APPROVED` call `resolveCustomer()` again with the
+same `payerAddress`, `network` and `amount` plus `approvalRequestId`. A matching approved request
+clears `needsApproval` and is used up.
+
 ### Record a payment: `app.reportPayment()`
 
 Writes the payment your service took to your dashboard ledger, so it shows in Payments and
@@ -120,6 +125,87 @@ credit is never drawn below zero.
 
 With a listing or agent key the payment is attributed automatically. You can still pass
 `listingSlug` or `agentSlug`, but it must match the key or the API answers 400.
+
+### Ask for an approval: `app.createApproval()` and `app.getApproval()`
+
+Needs a key with the `APPROVALS_WRITE` scope. The request shows up in the dashboard under
+Approvals, where people with the approver role decide it.
+
+```ts
+const { id } = await app.createApproval({
+  payerAddress: "0x…",
+  network: "base",
+  assetAddress: listing.assetAddress, // null for the chain's native asset
+  amount: "250",
+  customerId: decision.customerId ?? undefined,
+  resource: request.url,
+  reason: "Order above the approval threshold",
+});
+
+const { status } = await app.getApproval(id);
+// "PENDING" | "APPROVED" | "REJECTED" | "EXPIRED" | "CANCELLED"
+if (status === "APPROVED") {
+  await app.resolveCustomer({ payerAddress, network: "base", amount: "250", approvalRequestId: id });
+}
+```
+
+### Check a payment against your spending policies: `app.authorizeSpend()`
+
+The paying side of governance. Needs a key with the `SPEND_AUTHORIZE` scope. `FourMica.connect({
+governance })` calls these for you around every payment `client.fetch` makes; call them directly
+when you sign payments yourself.
+
+```ts
+const auth = await app.authorizeSpend({
+  network: "base-sepolia",
+  assetAddress: "0x…",       // null for the chain's native asset
+  amount: "2.5",             // decimal string in the asset's display units
+  payerAddress: "0x…",       // one of your organization's payer wallets
+  recipientAddress: "0x…",
+  agentId: "…",              // optional, when the key is not an agent's key
+});
+
+switch (auth.status) {
+  case "RESERVED":
+    // sign and send, then, unless the seller answered 402:
+    await app.consumeSpendAuthorization(auth.id, { reqId });
+    // or, if signing failed or the seller answered 402:
+    await app.releaseSpendAuthorization(auth.id);
+    break;
+  case "PENDING_APPROVAL":
+    // poll app.getSpendAuthorization(auth.id) until RESERVED or DENIED
+    break;
+  case "DENIED":
+    console.log(auth.deniedReason); // "frozen" | "recipient_not_allowed" | "per_payment_limit"
+    break;                          //   | "daily_limit" | "monthly_limit" | ...
+}
+```
+
+Release only when the payment was definitively not taken: signing failed before anything was
+sent, or the seller answered the signed request with a fresh 402. Once the signed payment has left
+your process, a seller error, a timeout, a network failure or an aborted request leaves the outcome
+unknown, since the seller holds a payment it may still redeem; consume with the `reqId` in that
+case, so the spend is over-counted rather than under-counted. 4mica reconciles by `reqId` when the
+seller reports the payment.
+
+Both calls are idempotent: consuming again with the same `reqId`, or releasing again, answers 200.
+Retry a network error, a 5xx or a 429 with backoff; another 4xx will not succeed on retry. A failure
+here is bookkeeping, not a failed payment: never sign the payment again because of it.
+`FourMica.connect({ governance })` retries up to three attempts, reports what is left through
+`onAccountingError`, and exposes the result as `governanceOutcome(response)`.
+
+A reservation expires 10 minutes after it is granted. Release one you will not use, so it stops
+counting toward your limits.
+
+Each of these methods takes an optional last argument `{ signal }`, passed to `fetch`, so you can
+cancel or time-bound a single call. Before you send the payment, cancel freely and release what you
+were granted; after you send it, finish the consume or release on a signal of its own rather than the
+caller's, because the seller may still redeem the payment.
+
+**This is a cooperative check, not hard enforcement.** 4mica's API is not in the payment path:
+the payer signs locally, so anyone holding the wallet key can pay without asking. Such payments are
+detected afterwards, when the seller reports them with `reportPayment()`: they raise an
+unauthorized-spend alert in the dashboard and still count toward your limits.
 
 ### Helpers
 
@@ -255,6 +341,11 @@ Every failed call throws `AppError`:
 | -------- | --------------------- | ------------------------------------------------------------ |
 | 401      | `unauthorized`        | Missing, revoked or expired key, or its listing/agent was deleted |
 | 403      | `key_not_scoped`      | `resource()` called with an account-wide key                 |
+| 403      | `payer_not_owned`     | `authorizeSpend()` with a payer that is not one of your organization's wallets on that network |
+| 403      | `environment_mismatch` | `authorizeSpend()` on a network outside the key's environment |
+| 404      | `not_found`           | An authorization or approval of another organization, or an unknown id |
+| 409      |                       | Consuming an authorization that is not `RESERVED`            |
+| 403      | `insufficient_scope`  | The key lacks `SPEND_AUTHORIZE` or `APPROVALS_WRITE`         |
 | 400      | `invalid_request`     | A field failed validation; see `issues`                      |
 | 409      | `conflict`            | A payment report contradicts an earlier one for the same `reqId` |
 | 429      | `rate_limit_exceeded` | Slow down                                                    |

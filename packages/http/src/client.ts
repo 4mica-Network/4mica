@@ -1,3 +1,4 @@
+import { resolveRequestHeaders } from "./headers";
 import { normalizeUrl } from "./normalize-url";
 import {
   backoffDelay,
@@ -186,6 +187,14 @@ export class HttpClient {
 
     const fetchHeaders = new Headers(headers);
 
+    if (!skipAuth) {
+      for (const [name, value] of Object.entries(resolveRequestHeaders())) {
+        if (!fetchHeaders.has(name)) {
+          fetchHeaders.set(name, value);
+        }
+      }
+    }
+
     if (data && !isFormData && !fetchHeaders.has("Content-Type")) {
       fetchHeaders.set("Content-Type", "application/json");
     }
@@ -224,7 +233,12 @@ export class HttpClient {
         response = await send();
       }
       if (response.status === 401) {
-        notifyUnauthorized();
+        notifyUnauthorized(
+          await response
+            .clone()
+            .json()
+            .catch(() => null),
+        );
       }
     }
 

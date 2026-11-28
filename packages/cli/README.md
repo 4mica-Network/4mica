@@ -28,6 +28,10 @@ PROJECT
   dev          run the current project's dev server
   dashboard    open the 4mica dashboard
 
+ACCOUNT
+  auth         sign the cli in to and out of your 4mica account
+  account      show your 4mica account and the wallets linked to it
+
 WALLET
   wallets      list the wallets this cli has created
   whoami       show the wallet and network the cli will use
@@ -238,6 +242,95 @@ A withdrawal takes two steps, with a grace period between them:
 4mica withdrawals finalize --asset USDC
 4mica withdrawals cancel --asset USDC  # instead of finalizing
 ```
+
+## Account
+
+The wallet commands above need no account: a key is enough to deposit, pay
+and withdraw. Signing in is for the things the platform keeps for you, and
+is a separate thing from the wallet.
+
+```bash
+4mica auth login      # shows a code, opens the dashboard to approve it
+4mica auth status     # which account, and whether the session still holds
+4mica account         # the account, and the wallets linked to it
+4mica auth logout     # signs out; revokes a browser session
+```
+
+`auth login` prints a one-time code and opens `app.4mica.io/cli/authorize`,
+where you approve it while signed in to the dashboard. The cli then receives
+a token of its own; no password or key is typed into the terminal. It works
+over SSH and in a container too: `--no-open` prints the address, to open on
+any device. The dashboard lists every signed-in terminal under Settings →
+Developer, where each can be revoked.
+
+| | Account | Wallet |
+| --- | --- | --- |
+| Who | a 4mica user, signed in through the dashboard | an address, from a private key |
+| Proved by | a token, from `auth login` | a signature, made on this machine |
+| Used for | the account and its linked wallets | deposits, payments, withdrawals |
+| Shown by | `auth status` | `whoami` |
+
+A token cannot move funds. What it may do is chosen when it is made:
+
+| Scope | Allows |
+| --- | --- |
+| `account:read` | reading the account; always included |
+| `wallets:read` | listing linked wallets |
+| `wallets:link` | linking a wallet the cli holds the key for |
+| `wallets:unlink` | removing a wallet from the account |
+
+`auth login` asks for the first three. Removing wallets has to be asked for,
+because it also takes the wallet off any API or agent paid to it:
+`4mica auth login --scopes account:read,wallets:read,wallets:link,wallets:unlink`.
+Payments are signed by the wallet key whether or not you are signed in.
+
+`auth logout` forgets the token here, and revokes it on the platform when
+`auth login` made it in the browser. A token made in the dashboard may be in
+use elsewhere, such as in CI, so it stays valid unless you pass `--revoke`.
+Signing in again replaces the stored token the same way.
+
+### Linking a wallet
+
+```bash
+4mica wallets link                 # the wallet in use, on the network in use
+4mica wallets link --network base --label Treasury
+4mica wallets unlink               # take it off the account again
+```
+
+`wallets link` proves to the platform that you hold the key, by signing a
+one-time message with it. The message is plain text that names the account
+and says it authorizes no transfer; the cli checks every field before
+signing: a 4Mica domain, this address, chain, account and nonce, an expiry
+still ahead, and the wallet-link purpose. It signs nothing else. The key
+stays on this machine. A linked wallet shows in the dashboard, where an API
+or an agent can be paid to it.
+
+### Where the token is kept
+
+In the system keychain when there is one: the macOS keychain, or the Secret
+Service (GNOME Keyring, KWallet) on Linux when `secret-tool` is installed.
+Otherwise, and on Windows, in a file under `credentials/` beside the config
+file, one per platform API, readable by your user only.
+`auth login --insecure-storage` or `FOURMICA_CREDENTIAL_STORE=file` chooses
+the file; `FOURMICA_CREDENTIAL_STORE=keychain` refuses it, so signing in
+fails rather than write the token to disk. `auth status` says which is in use.
+A keychain that is locked or will not answer is reported as such
+(`CREDENTIAL_STORE_UNAVAILABLE`), never as being signed out.
+
+### In CI
+
+Create a token in the dashboard under Settings → Developer → CLI sessions,
+and give it to the job as `FOURMICA_TOKEN`:
+
+```bash
+FOURMICA_TOKEN=4mica_cli_… 4mica account --json
+```
+
+Nothing is written to disk that way. To store one instead:
+`4mica auth login --with-token < token.txt`. A dashboard token has the
+permissions and lifetime (30 days, 90 days or a year) chosen when it is made,
+and is read-only by default. A browser session lasts 90 days. Either stops
+working the moment it is revoked.
 
 ## Paying
 
@@ -493,12 +586,15 @@ in a terminal, `4mica --yes`), and `init --type`, `--role` and `--framework`
 | `FOURMICA_ASSET` | default asset, like `--asset` |
 | `FOURMICA_WALLET_PRIVATE_KEY` | the wallet key (see [A key you already have](#a-key-you-already-have)) |
 | `FOURMICA_REQUEST_TIMEOUT` | seconds, like `--request-timeout` |
+| `FOURMICA_TOKEN` | account token, used instead of the one `auth login` stored (see [In CI](#in-ci)) |
+| `FOURMICA_API_URL` | platform API to sign in to, in place of `https://api.app.4mica.io`; `https`, or `http` to this machine. Read from the environment only, never from `./.env` |
+| `FOURMICA_CREDENTIAL_STORE` | `file` keeps the account token out of the system keychain; `keychain` refuses to keep it anywhere else |
 | `FOURMICA_DEBUG=1`, `DEBUG=4mica` | like `--debug` |
 | `FOURMICA_CONTRACT_ADDRESS`, `FOURMICA_ETHEREUM_HTTP_RPC_URL`, `FOURMICA_AUTH_URL`, `FOURMICA_BEARER_TOKEN` | passed to `@4mica/sdk`; see its README |
 | `NO_COLOR`, `FOURMICA_NO_COLOR` | color off |
 | `FORCE_COLOR` | color on when piped; `0` turns it off |
 | `HTTPS_PROXY`, `HTTP_PROXY`, `NO_PROXY` | proxy for requests, and the hosts that skip it |
-| `XDG_CONFIG_HOME` | where `4mica/config.json` and `4mica/wallets/` live |
+| `XDG_CONFIG_HOME` | where `4mica/config.json`, `4mica/credentials/` and `4mica/wallets/` live |
 
 All of the cli's own variables start with `FOURMICA_`: a shell cannot export
 a name that starts with a digit, which is why it is not `4MICA_`.
@@ -510,6 +606,11 @@ a name that starts with a digit, which is why it is not `4MICA_`.
   backup of your home directory, can read them. There is no keychain,
   passphrase or hardware wallet support yet. On Windows the files rely on
   your profile's permissions.
+- The account token is kept in the system keychain on macOS and on Linux
+  with `secret-tool`; on Windows, and wherever there is no keyring, it is a
+  file readable by your user only.
+- `wallets link` proves an ordinary key (an EOA). A smart contract wallet
+  cannot be linked from the cli.
 - One pending withdrawal per asset.
 - `payments` cannot name the asset of each payment: core's list does not
   say.

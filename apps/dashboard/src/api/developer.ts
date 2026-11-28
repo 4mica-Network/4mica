@@ -1,6 +1,7 @@
 import { HttpMethod } from "@4mica/http";
 import type {
   ApiKey,
+  ApiKeyScope,
   Webhook,
   WebhookEvent,
   WebhookStatus,
@@ -31,7 +32,9 @@ export const getApiKeys = () =>
 
 export const createApiKey = (data: {
   name: string;
+  scopes?: ApiKeyScope[];
   expiresAt?: string | null;
+  ipAllowlist?: string[];
 }) =>
   httpClient.request<CreatedApiKey, typeof data>({
     url: "/me/api-keys",
@@ -39,11 +42,14 @@ export const createApiKey = (data: {
     data,
   });
 
-export const renameApiKey = (id: string, name: string) =>
-  httpClient.request<ApiKey, { name: string }>({
+export const updateApiKey = (
+  id: string,
+  data: { name?: string; ipAllowlist?: string[] },
+) =>
+  httpClient.request<ApiKey, typeof data>({
     url: `/me/api-keys/${encodeURIComponent(id)}`,
     method: HttpMethod.PATCH,
-    data: { name },
+    data,
   });
 
 export const revokeApiKey = (id: string) =>

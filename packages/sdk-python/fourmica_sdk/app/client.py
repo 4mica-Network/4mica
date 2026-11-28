@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from http import HTTPStatus
 from typing import Any, cast
+from urllib.parse import quote
 
 import httpx
 
@@ -15,6 +16,7 @@ from .models import (
     CustomerResolution,
     ReportedPayment,
     ResourceContext,
+    SpendAuthorization,
 )
 from .networks import to_app_network
 
@@ -166,6 +168,70 @@ class AppClient:
         return ReportedPayment(
             payment=cast(AppPayment, body), created=code == HTTPStatus.CREATED
         )
+
+    async def authorize_spend(
+        self,
+        *,
+        network: str,
+        amount: str,
+        payer_address: str,
+        recipient_address: str,
+        asset_address: str | None = None,
+        req_id: str | None = None,
+        agent_id: str | None = None,
+    ) -> SpendAuthorization:
+        """Checks a payment against the organization's spending policies before
+        it is signed. *asset_address* ``None`` is the native asset."""
+        _, body = await self._request(
+            "POST",
+            "/v1/spend/authorize",
+            {
+                **_without_none(
+                    {
+                        "network": to_app_network(network),
+                        "amount": amount,
+                        "payerAddress": payer_address,
+                        "recipientAddress": recipient_address,
+                        "reqId": req_id,
+                        "agentId": agent_id,
+                    }
+                ),
+                "assetAddress": asset_address,
+            },
+        )
+        return cast(SpendAuthorization, body)
+
+    async def get_spend_authorization(
+        self, authorization_id: str
+    ) -> SpendAuthorization:
+        _, body = await self._request(
+            "GET", f"/v1/spend/authorizations/{quote(authorization_id, safe='')}"
+        )
+        return cast(SpendAuthorization, body)
+
+    async def consume_spend_authorization(
+        self,
+        authorization_id: str,
+        *,
+        req_id: str | None = None,
+        tx_hash: str | None = None,
+    ) -> SpendAuthorization:
+        _, body = await self._request(
+            "POST",
+            f"/v1/spend/authorizations/{quote(authorization_id, safe='')}/consume",
+            _without_none({"reqId": req_id, "txHash": tx_hash}),
+        )
+        return cast(SpendAuthorization, body)
+
+    async def release_spend_authorization(
+        self, authorization_id: str
+    ) -> SpendAuthorization:
+        _, body = await self._request(
+            "POST",
+            f"/v1/spend/authorizations/{quote(authorization_id, safe='')}/release",
+            {},
+        )
+        return cast(SpendAuthorization, body)
 
     async def _request(
         self, method: str, path: str, payload: dict[str, Any] | None = None

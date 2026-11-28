@@ -1,4 +1,5 @@
 import { type Prisma, prisma } from "@4mica/db";
+import { type ResourceScope, scopeWhere } from "@utils/scope";
 import type {
   FaqItemInput,
   ListReportsQuery,
@@ -10,19 +11,19 @@ export type ResourceKind = "listing" | "agent";
 
 export const ownsResource = async (
   kind: ResourceKind,
-  ownerId: string,
+  scope: ResourceScope,
   id: string,
 ): Promise<boolean> => {
   if (kind === "listing") {
     const row = await prisma.apiListing.findFirst({
-      where: { id, ownerId, deletedAt: null },
+      where: { id, ...scopeWhere(scope), deletedAt: null },
       select: { id: true },
     });
     return row !== null;
   }
 
   const row = await prisma.agent.findFirst({
-    where: { id, ownerId, deletedAt: null },
+    where: { id, ...scopeWhere(scope), deletedAt: null },
     select: { id: true },
   });
   return row !== null;
@@ -59,21 +60,22 @@ export const upsertPolicy = async (
   kind: ResourceKind,
   id: string,
   input: UpsertPolicyInput,
+  db: Prisma.TransactionClient,
 ) => {
-  const existing = await prisma.resourcePolicy.findFirst({
+  const existing = await db.resourcePolicy.findFirst({
     where: target(kind, id),
     select: { id: true },
   });
 
   if (existing) {
-    return prisma.resourcePolicy.update({
+    return db.resourcePolicy.update({
       where: { id: existing.id },
       data: input,
       select: POLICY_SELECT,
     });
   }
 
-  return prisma.resourcePolicy.create({
+  return db.resourcePolicy.create({
     data: { ...target(kind, id), ...input },
     select: POLICY_SELECT,
   });

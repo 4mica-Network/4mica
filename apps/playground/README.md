@@ -44,7 +44,17 @@ pnpm test:e2e                                # all four, through turbo
 
 The config starts what it needs (`next dev` here; `apps/be` plus Vite for the
 dashboard) and reuses servers that are already listening. Postgres must be up
-and seeded. The Playwright agent skill lives in
+and seeded. Here `E2E_PORT` (default `3100`) picks the port, so a
+server already listening on `3100` against another database is not reused by
+accident, and `E2E_SERVER=production` runs `next start` instead of `next dev`
+after a `next build`. The keyboard suite skips the focus stop of the Next.js
+dev-tools overlay (`nextjs-portal`), which exists only under `next dev`; run it
+against a production build to check what users get:
+
+```bash
+pnpm --filter @4mica/playground exec next build
+E2E_PORT=3188 E2E_SERVER=production pnpm --filter @4mica/playground exec playwright test keyboard.spec.ts --project=public --project=public-mobile
+``` The Playwright agent skill lives in
 `.agents/skills/playwright-cli/`; refresh it with
 `pnpm --filter @4mica/dashboard exec playwright cli install --skills` from the
 repo root.

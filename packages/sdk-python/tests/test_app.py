@@ -223,3 +223,51 @@ async def test_closes_its_own_http_client_but_not_one_it_was_given():
     own = AppClient("k")
     await own.aclose()
     assert own._http.is_closed
+
+
+async def test_spend_authorizations_use_the_apis_own_names_and_escape_the_id():
+    calls = []
+    answer = {"id": "auth/1", "status": "RESERVED"}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(
+            (
+                request.method,
+                request.url.raw_path.decode(),
+                json.loads(request.content) if request.content else None,
+            )
+        )
+        return httpx.Response(200, json=answer)
+
+    async with app_with(handler) as app:
+        assert (
+            await app.authorize_spend(
+                network="base-sepolia",
+                amount="0.01",
+                payer_address=PAYER,
+                recipient_address=SELLER,
+                req_id="0x7",
+            )
+            == answer
+        )
+        await app.get_spend_authorization("auth/1")
+        await app.consume_spend_authorization("auth/1", tx_hash="0xabc")
+        await app.release_spend_authorization("auth/1")
+
+    assert calls == [
+        (
+            "POST",
+            "/v1/spend/authorize",
+            {
+                "network": "BASE_SEPOLIA",
+                "amount": "0.01",
+                "payerAddress": PAYER,
+                "recipientAddress": SELLER,
+                "reqId": "0x7",
+                "assetAddress": None,
+            },
+        ),
+        ("GET", "/v1/spend/authorizations/auth%2F1", None),
+        ("POST", "/v1/spend/authorizations/auth%2F1/consume", {"txHash": "0xabc"}),
+        ("POST", "/v1/spend/authorizations/auth%2F1/release", {}),
+    ]

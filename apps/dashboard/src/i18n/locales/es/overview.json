@@ -57,5 +57,16 @@
   "overview.leaders.sort.amount": "Volumen",
   "overview.leaders.sort.settledCount": "Pagos",
   "overview.leaders.listingsEmpty": "Ninguna API ha recibido un pago liquidado en este periodo.",
-  "overview.leaders.agentsEmpty": "Ningún agente ha pagado nada en este periodo."
+  "overview.leaders.agentsEmpty": "Ningún agente ha pagado nada en este periodo.",
+  "overview.setup.title": "Configura tu organización",
+  "overview.setup.progress": "{{done}} de {{total}} completados",
+  "overview.setup.dismiss": "Descartar",
+  "overview.setup.statusDone": "Completado",
+  "overview.setup.statusTodo": "Pendiente",
+  "overview.setup.invite.title": "Invita a tu equipo",
+  "overview.setup.invite.hint": "Añade a las personas con las que trabajas y elige sus roles.",
+  "overview.setup.project.title": "Crear un proyecto (opcional)",
+  "overview.setup.project.hint": "Mantén separados los agentes, las API y las claves de cada producto.",
+  "overview.setup.access.title": "Elige quién accede a cada proyecto",
+  "overview.setup.access.hint": "Abre un proyecto a todos o solo a las personas que elijas."
 }

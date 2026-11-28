@@ -178,6 +178,14 @@ export const AccountDeletedSchema = v.object({
   feedbackUrl: v.optional(absoluteUrl),
 });
 
+export const FinancialAlertSchema = v.object({
+  ...base,
+  workspaceName: nonEmpty("workspaceName"),
+  title: nonEmpty("title"),
+  lines: v.optional(v.pipe(v.array(v.string()), v.maxLength(20)), []),
+  dashboardUrl: absoluteUrl,
+});
+
 // --- Digest & announcements -------------------------------------------------
 
 export const WeeklyReportSchema = v.object({
@@ -233,6 +241,7 @@ export type DisputeCreatedPayload = v.InferInput<typeof DisputeCreatedSchema>;
 export type CreditLimitChangedPayload = v.InferInput<
   typeof CreditLimitChangedSchema
 >;
+export type FinancialAlertPayload = v.InferInput<typeof FinancialAlertSchema>;
 export type AgentCreatedPayload = v.InferInput<typeof AgentCreatedSchema>;
 export type AccountDeletedPayload = v.InferInput<typeof AccountDeletedSchema>;
 export type WeeklyReportPayload = v.InferInput<typeof WeeklyReportSchema>;

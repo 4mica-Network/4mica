@@ -1,4 +1,5 @@
-import { Prisma, prisma } from "@4mica/db";
+import { type PaymentNetwork, Prisma, prisma } from "@4mica/db";
+import { type EnvironmentKind, networksForEnvironment } from "@4mica/rules";
 import { amountText } from "@utils/amount";
 import type { ListPaymentsQuery, ReportPaymentInput } from "./schema";
 
@@ -78,10 +79,16 @@ const toRow = (row: RawPayment, myAddresses: Set<string>): PaymentRow => {
 };
 
 export const walletAddressesFor = async (
-  ownerId: string,
+  orgId: string,
+  environment?: EnvironmentKind,
 ): Promise<string[]> => {
   const rows = await prisma.wallet.findMany({
-    where: { ownerId },
+    where: {
+      organizationId: orgId,
+      ...(environment
+        ? { network: { in: networksForEnvironment(environment) } }
+        : {}),
+    },
     select: { address: true },
   });
 
@@ -90,12 +97,12 @@ export const walletAddressesFor = async (
 
 /** A seller may only report payments into a wallet it has proved it controls. */
 export const ownsRecipientWallet = async (
-  ownerId: string,
+  orgId: string,
   address: string,
   network: ReportPaymentInput["network"],
 ): Promise<boolean> =>
   (await prisma.wallet.findFirst({
-    where: { ownerId, address, network },
+    where: { organizationId: orgId, address, network },
     select: { id: true },
   })) !== null;
 
@@ -117,8 +124,21 @@ const orderFor = (
   }
 };
 
+const inEnvironment = (
+  environment: EnvironmentKind,
+  only?: PaymentNetwork,
+): Prisma.PaymentWhereInput => {
+  const networks = networksForEnvironment(environment);
+  return {
+    network: {
+      in: only ? networks.filter((network) => network === only) : networks,
+    },
+  };
+};
+
 const whereFor = (
   addresses: string[],
+  environment: EnvironmentKind,
   query: ListPaymentsQuery,
 ): Prisma.PaymentWhereInput => {
   const sent: Prisma.PaymentWhereInput = {
@@ -128,18 +148,20 @@ const whereFor = (
     recipientAddress: { in: addresses },
   };
 
-  const where: Prisma.PaymentWhereInput =
-    query.direction === "sent"
+  const where: Prisma.PaymentWhereInput = {
+    ...(query.direction === "sent"
       ? sent
       : query.direction === "received"
         ? received
-        : { OR: [sent, received] };
+        : { OR: [sent, received] }),
+    ...inEnvironment(environment, query.network),
+  };
 
   if (query.status) {
     where.status = query.status;
   }
-  if (query.network) {
-    where.network = query.network;
+  if (query.projectId) {
+    where.projectId = query.projectId;
   }
 
   if (query.q) {
@@ -162,7 +184,8 @@ const whereFor = (
 };
 
 export const listPayments = async (
-  ownerId: string,
+  orgId: string,
+  environment: EnvironmentKind,
   query: ListPaymentsQuery,
 ): Promise<{
   items: PaymentRow[];
@@ -170,7 +193,7 @@ export const listPayments = async (
   page: number;
   limit: number;
 }> => {
-  const addresses = await walletAddressesFor(ownerId);
+  const addresses = await walletAddressesFor(orgId, environment);
   const scope = query.wallet
     ? addresses.filter((address) => address === query.wallet)
     : addresses;
@@ -179,7 +202,7 @@ export const listPayments = async (
     return { items: [], total: 0, page: query.page, limit: query.limit };
   }
 
-  const where = whereFor(scope, query);
+  const where = whereFor(scope, environment, query);
   const skip = (query.page - 1) * query.limit;
   const mine = new Set(addresses);
 
@@ -254,27 +277,35 @@ const totalsFor = async (
 };
 
 export const paymentSummary = async (
-  ownerId: string,
+  orgId: string,
+  environment: EnvironmentKind,
 ): Promise<PaymentSummary> => {
-  const addresses = await walletAddressesFor(ownerId);
+  const addresses = await walletAddressesFor(orgId, environment);
 
   if (addresses.length === 0) {
     return { sent: emptyTotals(), received: emptyTotals() };
   }
 
   const [sent, received] = await Promise.all([
-    totalsFor({ payerAddress: { in: addresses } }),
-    totalsFor({ recipientAddress: { in: addresses } }),
+    totalsFor({
+      payerAddress: { in: addresses },
+      ...inEnvironment(environment),
+    }),
+    totalsFor({
+      recipientAddress: { in: addresses },
+      ...inEnvironment(environment),
+    }),
   ]);
 
   return { sent, received };
 };
 
 export const getPayment = async (
-  ownerId: string,
+  orgId: string,
+  environment: EnvironmentKind,
   id: string,
 ): Promise<PaymentRow | null> => {
-  const addresses = await walletAddressesFor(ownerId);
+  const addresses = await walletAddressesFor(orgId, environment);
 
   if (addresses.length === 0) {
     return null;
@@ -287,6 +318,7 @@ export const getPayment = async (
         { payerAddress: { in: addresses } },
         { recipientAddress: { in: addresses } },
       ],
+      ...inEnvironment(environment),
     },
     select: PAYMENT_SELECT,
   });
@@ -299,20 +331,45 @@ export interface ReportResolution {
   agentId: string | null;
 }
 
+export interface ReportScope {
+  orgId: string;
+  projectId: string;
+  environmentId: string;
+}
+
+export const projectVisibleTo = async (
+  orgId: string,
+  userId: string,
+  projectId: string,
+) =>
+  prisma.project.findFirst({
+    where: { id: projectId, organizationId: orgId, deletedAt: null },
+    select: {
+      restricted: true,
+      members: { where: { userId }, select: { role: true } },
+    },
+  });
+
 export const resolveReportTargets = async (
-  ownerId: string,
+  scope: ReportScope,
   data: ReportPaymentInput,
 ): Promise<ReportResolution> => {
+  const owner = {
+    organizationId: scope.orgId,
+    projectId: scope.projectId,
+    environmentId: scope.environmentId,
+    deletedAt: null,
+  };
   const [listing, agent] = await Promise.all([
     data.listingSlug
       ? prisma.apiListing.findFirst({
-          where: { ownerId, slug: data.listingSlug, deletedAt: null },
+          where: { ...owner, slug: data.listingSlug },
           select: { id: true },
         })
       : Promise.resolve(null),
     data.agentSlug
       ? prisma.agent.findFirst({
-          where: { ownerId, slug: data.agentSlug, deletedAt: null },
+          where: { ...owner, slug: data.agentSlug },
           select: { id: true },
         })
       : Promise.resolve(null),
@@ -409,9 +466,11 @@ const isRedeemable = (row: RawPayment): boolean =>
   (row.couponCode !== null || row.creditApplied !== null);
 
 export const reportPayment = async (
-  ownerId: string,
+  orgId: string,
+  projectId: string,
   data: ReportPaymentInput,
   targets: ReportResolution,
+  apiKeyId: string | null = null,
 ): Promise<ReportOutcome> => {
   const identity = {
     payerAddress: data.payerAddress,
@@ -435,7 +494,9 @@ export const reportPayment = async (
   };
 
   const reportedSettledAt = data.settledAt ? new Date(data.settledAt) : null;
-  const where = { ownerId_reqId: { ownerId, reqId: data.reqId } };
+  const where = {
+    organizationId_reqId: { organizationId: orgId, reqId: data.reqId },
+  };
 
   for (let attempt = 0; attempt < 2; attempt += 1) {
     const existing = await prisma.payment.findUnique({
@@ -447,7 +508,9 @@ export const reportPayment = async (
       try {
         const row = await prisma.payment.create({
           data: {
-            ownerId,
+            organizationId: orgId,
+            projectId,
+            apiKeyId,
             reqId: data.reqId,
             ...identity,
             ...detail,
@@ -503,6 +566,10 @@ export const reportPayment = async (
       if (data.status === "SETTLED") {
         update.settledAt = reportedSettledAt ?? new Date();
       }
+      update.reconciliationState = "PENDING";
+      update.reconcileAttempts = 0;
+      update.reconcileAfter = new Date();
+      update.reconcileError = null;
     }
 
     if (Object.keys(update).length > 0) {
@@ -607,11 +674,12 @@ const monthKeys = (months: number): string[] => {
 };
 
 export const paymentStats = async (
-  ownerId: string,
+  orgId: string,
+  environment: EnvironmentKind,
   months: number,
 ): Promise<PaymentStats> => {
   const keys = monthKeys(months);
-  const addresses = await walletAddressesFor(ownerId);
+  const addresses = await walletAddressesFor(orgId, environment);
 
   const empty = (): MonthlyBucket[] =>
     keys.map((month) => ({
@@ -633,6 +701,7 @@ export const paymentStats = async (
 
   const since = new Date(`${keys[0]}-01T00:00:00.000Z`);
   const owned = Prisma.join(addresses);
+  const networks = Prisma.join(networksForEnvironment(environment));
 
   const [counts, volumes, listings, agents] = await Promise.all([
     prisma.$queryRaw<CountRow[]>`
@@ -642,6 +711,7 @@ export const paymentStats = async (
              COUNT(*) AS count
         FROM payments
        WHERE created_at >= ${since}
+         AND network::text IN (${networks})
          AND (payer_address IN (${owned}) OR recipient_address IN (${owned}))
        GROUP BY 1, 2, 3
     `,
@@ -654,6 +724,7 @@ export const paymentStats = async (
         FROM payments
        WHERE created_at >= ${since}
          AND status = 'SETTLED'
+         AND network::text IN (${networks})
          AND (payer_address IN (${owned}) OR recipient_address IN (${owned}))
        GROUP BY 1, 2, 3, 4
     `,
@@ -663,6 +734,7 @@ export const paymentStats = async (
         JOIN api_listings l ON l.id = p.listing_id
        WHERE p.created_at >= ${since}
          AND p.status = 'SETTLED'
+         AND p.network::text IN (${networks})
          AND p.recipient_address IN (${owned})
        GROUP BY 1, 2, 3
        ORDER BY amount DESC
@@ -674,6 +746,7 @@ export const paymentStats = async (
         JOIN agents a ON a.id = p.agent_id
        WHERE p.created_at >= ${since}
          AND p.status = 'SETTLED'
+         AND p.network::text IN (${networks})
          AND p.payer_address IN (${owned})
        GROUP BY 1, 2, 3
        ORDER BY amount DESC

@@ -24,8 +24,8 @@ export async function GET(
   }
 
   const [listings, agents] = await Promise.all([
-    listPublicApiListings(result.ownerId),
-    listPublicAgents(result.ownerId),
+    listPublicApiListings(result.organizationId),
+    listPublicAgents(result.organizationId),
   ]);
 
   return new Response(buildProfileLlmsTxt(result.profile, listings, agents), {

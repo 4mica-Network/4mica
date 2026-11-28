@@ -11,6 +11,7 @@ export interface Viewer {
   username: string | null;
   name: string;
   avatarUrl: string | null;
+  organizationIds: string[];
 }
 
 const asString = (value: unknown): string | null =>
@@ -49,6 +50,10 @@ export const getViewer = cache(async (): Promise<Viewer | null> => {
       banned: true,
       locked: true,
       deletedAt: true,
+      memberships: {
+        where: { organization: { deletedAt: null } },
+        select: { organizationId: true },
+      },
     },
   });
 
@@ -61,6 +66,9 @@ export const getViewer = cache(async (): Promise<Viewer | null> => {
     username: row.username,
     name: row.name,
     avatarUrl: row.avatarUrl,
+    organizationIds: row.memberships.map(
+      (membership) => membership.organizationId,
+    ),
   };
 });
 

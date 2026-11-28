@@ -1,33 +1,57 @@
+import * as cliApi from "@api/cli";
 import * as api from "@api/developer";
 import i18n from "@i18n";
+import { handledAsApproval } from "@stores/approvalRequired";
+import type { RootState } from "@stores/index";
 import {
   refreshAfterWrite,
   writeSucceededTypes,
 } from "@stores/refreshAfterWrite";
 import type { PendingMeta } from "@stores/utils";
 import { toIssueMap, toMessage } from "@utils/http-errors";
-import { all, call, put, takeEvery, takeLatest } from "redux-saga/effects";
+import {
+  all,
+  call,
+  put,
+  select,
+  takeEvery,
+  takeLatest,
+} from "redux-saga/effects";
 import { notifyError, notifySuccess } from "@/lib/notify";
 import {
   createApiKeySucceeded,
+  createCliTokenSucceeded,
   createWebhookSucceeded,
   deleteApiKeySucceeded,
   deleteWebhookSucceeded,
   developerActionFailed,
+  fetchCliSessions as fetchCliSessionsAgain,
+  fetchCliSessionsFailed,
+  fetchCliSessionsPending,
+  fetchCliSessionsSucceeded,
   fetchDeveloperFailed,
   fetchDeveloperPending,
   fetchDeveloperSucceeded,
   renameApiKeySucceeded,
   revokeApiKeySucceeded,
+  revokeCliSessionSucceeded,
   rotateWebhookSecretSucceeded,
   updateWebhookSucceeded,
 } from "./actions";
 import actionTypes from "./actionTypes";
-import type { RevealSecret, WebhookStatus } from "./type";
+import type {
+  ApiKeyScope,
+  NewCliToken,
+  RevealSecret,
+  WebhookStatus,
+} from "./type";
 
 const t = (key: string, defaultValue: string) => i18n.t(key, { defaultValue });
 
 function* fail(error: unknown, fallback: string, meta: PendingMeta) {
+  if (yield* handledAsApproval(error, developerActionFailed("", {}, meta))) {
+    return;
+  }
   const message = toMessage(error, fallback);
   yield put(developerActionFailed(message, toIssueMap(error), meta));
   notifyError({
@@ -63,7 +87,7 @@ export function* fetchDeveloper(): Generator {
 
 export function* createApiKey(action: {
   type: string;
-  payload: { name: string };
+  payload: { name: string; scopes?: ApiKeyScope[]; ipAllowlist?: string[] };
   meta: PendingMeta;
   onReveal?: RevealSecret;
 }): Generator {
@@ -92,13 +116,14 @@ export function* createApiKey(action: {
 
 export function* renameApiKey(action: {
   type: string;
-  payload: { id: string; name: string };
+  payload: { id: string; name?: string; ipAllowlist?: string[] };
   meta: PendingMeta;
 }): Generator {
   try {
-    const key = (yield call(() =>
-      api.renameApiKey(action.payload.id, action.payload.name),
-    )) as Awaited<ReturnType<typeof api.renameApiKey>>;
+    const { id, ...data } = action.payload;
+    const key = (yield call(() => api.updateApiKey(id, data))) as Awaited<
+      ReturnType<typeof api.updateApiKey>
+    >;
     yield put(renameApiKeySucceeded(key, action.meta));
   } catch (error) {
     yield* fail(error, "Couldn't rename the API key.", action.meta);
@@ -234,6 +259,83 @@ export function* deleteWebhook(action: {
   }
 }
 
+const cliSessionsVersion = (state: RootState) =>
+  state.developer.cliSessionsVersion;
+
+export function* fetchCliSessions(): Generator {
+  try {
+    yield put(fetchCliSessionsPending());
+    const before = (yield select(cliSessionsVersion)) as number;
+    const sessions = (yield call(cliApi.getCliSessions)) as Awaited<
+      ReturnType<typeof cliApi.getCliSessions>
+    >;
+    const after = (yield select(cliSessionsVersion)) as number;
+    if (after !== before) {
+      yield put(fetchCliSessionsAgain());
+      return;
+    }
+    yield put(fetchCliSessionsSucceeded(sessions, before));
+  } catch (error) {
+    yield put(
+      fetchCliSessionsFailed(
+        toMessage(
+          error,
+          t("store.developer.cliSessionsFailed", "Couldn't load CLI sessions."),
+        ),
+      ),
+    );
+  }
+}
+
+export function* createCliToken(action: {
+  type: string;
+  payload: NewCliToken;
+  meta: PendingMeta;
+  onReveal?: RevealSecret;
+}): Generator {
+  try {
+    const created = (yield call(() =>
+      cliApi.createCliToken(action.payload),
+    )) as Awaited<ReturnType<typeof cliApi.createCliToken>>;
+
+    yield put(createCliTokenSucceeded(created.session, action.meta));
+    action.onReveal?.({
+      kind: "cliToken",
+      id: created.session.id,
+      plaintext: created.plaintext,
+    });
+    notifySuccess({
+      title: t("store.developer.cliTokenCreated", "CLI token created"),
+      content: t(
+        "store.developer.cliTokenCreatedBody",
+        "Copy it now — it will not be shown again.",
+      ),
+    });
+  } catch (error) {
+    yield* fail(error, "Couldn't create the CLI token.", action.meta);
+  }
+}
+
+export function* revokeCliSession(action: {
+  type: string;
+  payload: { id: string };
+  meta: PendingMeta;
+}): Generator {
+  try {
+    yield call(() => cliApi.revokeCliSession(action.payload.id));
+    yield put(revokeCliSessionSucceeded(action.payload.id, action.meta));
+    notifySuccess({
+      title: t("store.developer.cliSessionRevoked", "CLI session revoked"),
+      content: t(
+        "store.developer.cliSessionRevokedBody",
+        "That terminal is signed out and its token no longer works.",
+      ),
+    });
+  } catch (error) {
+    yield* fail(error, "Couldn't revoke the CLI session.", action.meta);
+  }
+}
+
 export default [
   refreshAfterWrite({
     fetchType: actionTypes.FETCH_DEVELOPER_REQUESTED,
@@ -249,4 +351,7 @@ export default [
   takeEvery(actionTypes.UPDATE_WEBHOOK_REQUESTED, updateWebhook),
   takeEvery(actionTypes.ROTATE_WEBHOOK_SECRET_REQUESTED, rotateWebhookSecret),
   takeEvery(actionTypes.DELETE_WEBHOOK_REQUESTED, deleteWebhook),
+  takeLatest(actionTypes.FETCH_CLI_SESSIONS_REQUESTED, fetchCliSessions),
+  takeEvery(actionTypes.CREATE_CLI_TOKEN_REQUESTED, createCliToken),
+  takeEvery(actionTypes.REVOKE_CLI_SESSION_REQUESTED, revokeCliSession),
 ];

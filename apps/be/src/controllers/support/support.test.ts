@@ -2,6 +2,7 @@ import { clearUserCache } from "@auth/user-store";
 import { supportRoutes } from "@routes/support";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { initApp } from "@/server";
+import { actAs, ORG_ID, OTHER_ORG_ID } from "@/test-support/tenancy";
 
 const {
   authenticateRequest,
@@ -10,7 +11,12 @@ const {
   upsert,
   supportRequest,
   supportMessage,
+  tenancy,
 } = vi.hoisted(() => ({
+  tenancy: {
+    membership: { findFirst: vi.fn(), create: vi.fn() },
+    auditLog: { create: vi.fn() },
+  },
   authenticateRequest: vi.fn(),
   getUser: vi.fn(),
   findUnique: vi.fn(),
@@ -32,6 +38,7 @@ vi.mock("@clerk/backend", () => ({
 
 vi.mock("@4mica/db", () => ({
   prisma: {
+    ...tenancy,
     user: { findUnique, upsert, update: vi.fn() },
     business: { findUnique: vi.fn(), upsert: vi.fn() },
     supportRequest,
@@ -116,6 +123,7 @@ describe("support routes", () => {
       }
     }
     clearUserCache();
+    actAs(tenancy);
 
     authenticateRequest.mockResolvedValue(signedIn());
     upsert.mockResolvedValue(AUTH_USER);
@@ -163,7 +171,7 @@ describe("support routes", () => {
     expect(res.json()).toMatchObject({ total: 1, page: 1 });
 
     const where = supportRequest.findMany.mock.calls[0][0].where;
-    expect(where).toMatchObject({ ownerId: USER_ID, status: "OPEN" });
+    expect(where).toMatchObject({ organizationId: ORG_ID, status: "OPEN" });
     expect(where.OR).toContainEqual({ number: 1001 });
 
     await app.close();
@@ -188,7 +196,8 @@ describe("support routes", () => {
     expect(supportRequest.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          ownerId: USER_ID,
+          organizationId: ORG_ID,
+          createdById: USER_ID,
           subject: "Payments stuck in pending",
           priority: "NORMAL",
           reference: null,
@@ -230,7 +239,7 @@ describe("support routes", () => {
     expect(res.statusCode).toBe(404);
     expect(supportRequest.findFirst.mock.calls[0][0].where).toEqual({
       id: REQUEST_ID,
-      ownerId: USER_ID,
+      organizationId: ORG_ID,
     });
 
     await app.close();
@@ -266,6 +275,12 @@ describe("support routes", () => {
     expect(supportRequest.update.mock.calls[0][0].data).toMatchObject({
       status: "CLOSED",
       resolvedAt: expect.any(Date),
+    });
+    expect(tenancy.auditLog.create.mock.calls[0][0].data).toMatchObject({
+      organizationId: ORG_ID,
+      actorUserId: USER_ID,
+      action: "support_request.closed",
+      targetId: REQUEST_ID,
     });
 
     await app.close();
@@ -390,8 +405,121 @@ describe("support routes", () => {
     expect(res.json()).toEqual({ deleted: [REQUEST_ID], notFound: [OTHER] });
     expect(supportRequest.deleteMany.mock.calls[0][0].where).toEqual({
       id: { in: [REQUEST_ID] },
-      ownerId: USER_ID,
+      organizationId: ORG_ID,
     });
+
+    await app.close();
+  });
+
+  it("audits opening a request", async () => {
+    const app = await initApp([{ plugin: supportRoutes }]);
+
+    await app.inject({
+      method: "POST",
+      url: "/me/support-requests",
+      headers: AUTH,
+      payload: {
+        subject: "Payments stuck",
+        category: "PAYMENTS",
+        description: "Two payments have been pending for an hour.",
+      },
+    });
+
+    expect(tenancy.auditLog.create.mock.calls[0][0].data).toMatchObject({
+      organizationId: ORG_ID,
+      actorUserId: USER_ID,
+      action: "support_request.created",
+      targetId: REQUEST_ID,
+    });
+
+    await app.close();
+  });
+
+  it("404s and reads nothing for an organization the caller is not in", async () => {
+    const app = await initApp([{ plugin: supportRoutes }]);
+
+    const res = await app.inject({
+      method: "GET",
+      url: "/me/support-requests",
+      headers: { ...AUTH, "x-org-id": OTHER_ORG_ID },
+    });
+
+    expect(res.statusCode).toBe(404);
+    expect(supportRequest.findMany).not.toHaveBeenCalled();
+
+    await app.close();
+  });
+
+  it("lets a developer open a request in their organization", async () => {
+    actAs(tenancy, "DEVELOPER");
+    const app = await initApp([{ plugin: supportRoutes }]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/me/support-requests",
+      headers: AUTH,
+      payload: {
+        subject: "Payments stuck",
+        category: "PAYMENTS",
+        description: "Two payments have been pending for an hour.",
+      },
+    });
+
+    expect(res.statusCode).toBe(201);
+
+    await app.close();
+  });
+
+  it("lets a viewer read support requests", async () => {
+    actAs(tenancy, "VIEWER");
+    const app = await initApp([{ plugin: supportRoutes }]);
+
+    const list = await app.inject({
+      method: "GET",
+      url: "/me/support-requests",
+      headers: AUTH,
+    });
+    const one = await app.inject({
+      method: "GET",
+      url: `/me/support-requests/${REQUEST_ID}`,
+      headers: AUTH,
+    });
+
+    expect(list.statusCode).toBe(200);
+    expect(one.statusCode).toBe(200);
+
+    await app.close();
+  });
+
+  it("refuses a viewer opening or replying to a request", async () => {
+    actAs(tenancy, "VIEWER");
+    const app = await initApp([{ plugin: supportRoutes }]);
+
+    const created = await app.inject({
+      method: "POST",
+      url: "/me/support-requests",
+      headers: AUTH,
+      payload: {
+        subject: "Payments stuck",
+        category: "PAYMENTS",
+        description: "Two payments have been pending for an hour.",
+      },
+    });
+    const replied = await app.inject({
+      method: "POST",
+      url: `/me/support-requests/${REQUEST_ID}/messages`,
+      headers: AUTH,
+      payload: { body: "Any update?" },
+    });
+
+    expect(created.statusCode).toBe(403);
+    expect(created.json()).toMatchObject({
+      error: "forbidden",
+      permission: "resources.write",
+    });
+    expect(replied.statusCode).toBe(403);
+    expect(supportRequest.create).not.toHaveBeenCalled();
+    expect(supportMessage.create).not.toHaveBeenCalled();
 
     await app.close();
   });

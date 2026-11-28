@@ -6,6 +6,7 @@ import { defaultEnv, readEnv } from "@/config/env";
 import { ClientError, ConfigError } from "@/errors";
 import { deposit } from "@/facade/deposit";
 import { payingFetch, SpendLimiter } from "@/facade/fetch";
+import { SpendGovernor } from "@/facade/governance";
 import type {
   AssetRef,
   Balance,
@@ -33,6 +34,7 @@ import {
 } from "@/facade/withdraw";
 import { DEFAULT_NETWORK, NETWORKS, resolveNetwork } from "@/networks";
 
+export { governanceOutcome } from "@/facade/governance";
 export type * from "@/facade/models";
 export type { PaymentProtocol, PaymentTerms } from "@/facade/protocols/types";
 
@@ -114,6 +116,7 @@ export class FourMica {
     private readonly protocols: readonly PaymentProtocol[],
     private readonly limiter: SpendLimiter,
     private readonly fetchFn: typeof fetch,
+    private readonly governor?: SpendGovernor,
   ) {
     this.sessions.set(home.caip2, Promise.resolve(home));
   }
@@ -133,6 +136,9 @@ export class FourMica {
       return protocol;
     });
     const limiter = new SpendLimiter(options.spend);
+    const governor =
+      options.governance &&
+      new SpendGovernor(options.governance, options.fetch);
     const cfg = homeConfig(options);
     return new FourMica(
       cfg.signer,
@@ -140,6 +146,7 @@ export class FourMica {
       protocols,
       limiter,
       options.fetch ?? ((...args) => fetch(...args)),
+      governor,
     );
   }
 
@@ -297,6 +304,7 @@ export class FourMica {
         protocols: this.protocols,
         sessionFor: (caip2) => open.get(caip2),
         limiter: this.limiter,
+        governor: this.governor,
         record: (response, payment) => this.payments.set(response, payment),
       },
       input,

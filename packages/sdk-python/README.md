@@ -112,6 +112,47 @@ holds a signed payment, and its answer does not prove it cannot redeem it. The
 count is kept in memory by this session: a new `connect` starts from zero, and
 across processes sharing a wallet the hard limit is the collateral deposited.
 
+**Your organization's spending policies** apply when you pass `governance`.
+Before it signs, `fetch` asks the 4Mica API (`POST /v1/spend/authorize`, with
+a key holding the `SPEND_AUTHORIZE` scope) whether the payment is allowed,
+waits for an approver when a policy asks for one, and afterwards consumes or
+releases what it was granted:
+
+```python
+from fourmica_sdk import FourMica, GovernanceOptions
+
+client = await FourMica.connect(
+    private_key="0x...",
+    governance=GovernanceOptions(
+        api_key="4mica_sk_...",
+        agent_id="agent_...",
+        approval_timeout_secs=300,
+        on_accounting_error=lambda error: log.warning("%s", error),
+    ),
+)
+response = await client.fetch(url)
+outcome = client.governance_for(response)
+```
+
+`agent_id` is optional. `outcome` is a `GovernanceOutcome` with the
+`authorization_id` and how it was accounted for.
+
+A denied payment, or one no approver decided in time, raises
+`SpendAuthorizationError` before anything is signed; an API that refuses the
+request or cannot be reached raises `AppError`, so a governed session fails
+closed. The session's own `spend` limits are checked first. The grant is
+released only when the payment certainly did not happen: signing failed, or
+the seller answered the paid request with a 402. Any other outcome (a seller
+error, a timeout, a dropped connection, a cancelled task) consumes it under the
+signed payment's request id, so the spend is over-counted rather than
+under-counted. A consume or release that fails is retried up to three times on
+a 5xx, a 429 or a network error, with jittered backoff; it never raises once
+the seller has been paid. `governance_for(response).accounting` is
+`"recorded"` or `"failed"`, and `on_accounting_error` receives a
+`SpendAccountingError`; when the task is cancelled while retrying it receives
+one with `accounting="pending"` before the cancellation propagates. These
+controls are cooperative: see `docs/SPENDING_GOVERNANCE.md` in the monorepo.
+
 **A refusal to checkpoint.** Core holds a payer to so many guarantees no
 checkpoint covers (see [Checkpoints](#checkpoints)). When the seller refuses
 the payment for that, `fetch` signs the checkpoint core asks for and pays once

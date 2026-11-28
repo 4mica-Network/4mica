@@ -1,5 +1,6 @@
 import * as api from "@api/resourceKey";
 import i18n from "@i18n";
+import { handledAsApproval } from "@stores/approvalRequired";
 import {
   refreshAfterWrite,
   writeSucceededTypes,
@@ -18,6 +19,7 @@ import {
   type ResourceMeta,
   resourceKeyActionFailed,
   revokeResourceKeySucceeded,
+  updateResourceKeySucceeded,
 } from "./actions";
 import actionTypes from "./actionTypes";
 
@@ -32,6 +34,9 @@ const toMessage = (error: unknown, fallback: string): string =>
   });
 
 function* fail(error: unknown, fallback: string, meta: ResourceMeta) {
+  if (yield* handledAsApproval(error, resourceKeyActionFailed("", {}, meta))) {
+    return;
+  }
   const message = toMessage(error, fallback);
   yield put(resourceKeyActionFailed(message, toIssueMap(error), meta));
 
@@ -73,14 +78,17 @@ export function* fetchResourceKeys(action: {
 
 export function* createResourceKey(action: {
   type: string;
-  payload: { resource: ResourceRef; name: string };
+  payload: { resource: ResourceRef; name: string; ipAllowlist?: string[] };
   meta: PendingMeta;
 }): Generator {
-  const { resource, name } = action.payload;
+  const { resource, name, ipAllowlist } = action.payload;
 
   try {
     const created = (yield call(() =>
-      api.createResourceKey(resource.kind, resource.id, { name }),
+      api.createResourceKey(resource.kind, resource.id, {
+        name,
+        ...(ipAllowlist ? { ipAllowlist } : {}),
+      }),
     )) as Awaited<ReturnType<typeof api.createResourceKey>>;
 
     yield put(
@@ -100,6 +108,27 @@ export function* createResourceKey(action: {
     });
   } catch (error) {
     yield* fail(error, "Couldn't create the key.", {
+      ...action.meta,
+      resource,
+    });
+  }
+}
+
+export function* updateResourceKey(action: {
+  type: string;
+  payload: { resource: ResourceRef; keyId: string; ipAllowlist: string[] };
+  meta: PendingMeta;
+}): Generator {
+  const { resource, keyId, ipAllowlist } = action.payload;
+
+  try {
+    const key = (yield call(() =>
+      api.updateResourceKey(resource.kind, resource.id, keyId, { ipAllowlist }),
+    )) as Awaited<ReturnType<typeof api.updateResourceKey>>;
+
+    yield put(updateResourceKeySucceeded(key, { ...action.meta, resource }));
+  } catch (error) {
+    yield* fail(error, "Couldn't update the key.", {
       ...action.meta,
       resource,
     });
@@ -170,5 +199,6 @@ export default [
   takeLatest(actionTypes.FETCH_RESOURCE_KEYS_REQUESTED, fetchResourceKeys),
   takeEvery(actionTypes.CREATE_RESOURCE_KEY_REQUESTED, createResourceKey),
   takeEvery(actionTypes.REVOKE_RESOURCE_KEY_REQUESTED, revokeResourceKey),
+  takeEvery(actionTypes.UPDATE_RESOURCE_KEY_REQUESTED, updateResourceKey),
   takeEvery(actionTypes.DELETE_RESOURCE_KEY_REQUESTED, deleteResourceKey),
 ];

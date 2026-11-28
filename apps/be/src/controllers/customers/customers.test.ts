@@ -3,6 +3,14 @@ import { clearUserCache } from "@auth/user-store";
 import { customerRoutes } from "@routes/customers";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { initApp } from "@/server";
+import {
+  actAs,
+  ORG_ID,
+  OTHER_ORG_ID,
+  OTHER_PROJECT_ID,
+  PROJECT_ID,
+  SANDBOX_ENV_ID,
+} from "@/test-support/tenancy";
 
 const {
   authenticateRequest,
@@ -10,14 +18,22 @@ const {
   findUnique,
   upsert,
   apiKey,
+  approvalRequest,
   customer,
   customerCoupon,
   customerCreditEntry,
   customerPaymentIdentity,
   wallet,
   queryRaw,
+  executeRaw,
   FakeDecimal,
+  tenancy,
 } = vi.hoisted(() => ({
+  tenancy: {
+    membership: { findFirst: vi.fn(), create: vi.fn() },
+    auditLog: { create: vi.fn() },
+    project: { findFirst: vi.fn() },
+  },
   authenticateRequest: vi.fn(),
   getUser: vi.fn(),
   findUnique: vi.fn(),
@@ -52,7 +68,9 @@ const {
   },
   wallet: { findMany: vi.fn() },
   apiKey: { findUnique: vi.fn(), update: vi.fn() },
+  approvalRequest: { findFirst: vi.fn(), updateMany: vi.fn() },
   queryRaw: vi.fn(),
+  executeRaw: vi.fn(),
   FakeDecimal: class {
     private readonly raw: string;
     constructor(value: unknown) {
@@ -101,7 +119,9 @@ vi.mock("@4mica/db", () => ({
     Decimal: FakeDecimal,
   },
   prisma: {
+    ...tenancy,
     apiKey,
+    approvalRequest,
     customer,
     customerCoupon,
     customerCreditEntry,
@@ -111,10 +131,14 @@ vi.mock("@4mica/db", () => ({
     user: { findUnique, upsert, update: vi.fn() },
     business: { findUnique: vi.fn(), upsert: vi.fn() },
     $queryRaw: queryRaw,
+    $executeRaw: executeRaw,
     $transaction: vi.fn(async (arg: unknown) =>
       typeof arg === "function"
         ? (arg as (tx: unknown) => unknown)({
+            ...tenancy,
+            $executeRaw: executeRaw,
             customer,
+            customerCoupon,
             customerCreditEntry,
             customerPaymentIdentity,
           })
@@ -130,6 +154,7 @@ const IDENTITY_ID = "019fce62-6666-7000-8000-000000000000";
 const CREDIT_ID = "019fce62-aaaa-7000-8000-000000000000";
 const COUPON_ID = "019fce62-bbbb-7000-8000-000000000000";
 const PAYER = "0x8a1c3f5b7d092e4a6c8b0d2f4e6a8c1b3d5f7e90";
+const APPROVAL_ID = "019fce62-9999-7000-8000-000000000000";
 
 const AUTH_USER = {
   id: USER_ID,
@@ -167,10 +192,21 @@ const KEY_AUTH = { authorization: `Bearer ${API_KEY}` };
 
 const storedKey = (over: Record<string, unknown> = {}) => ({
   id: "key_1",
-  ownerId: USER_ID,
+  organizationId: ORG_ID,
+  projectId: PROJECT_ID,
+  environmentId: SANDBOX_ENV_ID,
+  environment: { kind: "SANDBOX" },
+  project: { deletedAt: null, archivedAt: null },
+  serviceAccountId: null,
+  serviceAccount: null,
+  scopes: ["PAYMENTS_WRITE", "CUSTOMERS_READ", "RESOURCE_READ"],
+  listingId: null,
+  agentId: null,
+  listing: null,
+  agent: null,
   revokedAt: null,
   expiresAt: null,
-  owner: { banned: false, deletedAt: null },
+  organization: { deletedAt: null },
   ...over,
 });
 
@@ -219,6 +255,8 @@ const storedCustomer = (over: Record<string, unknown> = {}) => ({
   dailyLimit: null,
   monthlyLimit: decimal("5000"),
   limitCurrency: "USD",
+  limitNetwork: null,
+  limitAssetAddress: null,
   freeQuotaUnit: null,
   freeQuota: null,
   freeQuotaPeriod: null,
@@ -308,6 +346,7 @@ describe("customer routes", () => {
     }
     for (const group of [
       apiKey,
+      approvalRequest,
       customer,
       customerCoupon,
       customerCreditEntry,
@@ -319,7 +358,9 @@ describe("customer routes", () => {
       }
     }
     queryRaw.mockReset();
+    executeRaw.mockReset();
     clearUserCache();
+    actAs(tenancy);
 
     authenticateRequest.mockResolvedValue(signedIn());
     upsert.mockResolvedValue(AUTH_USER);
@@ -444,7 +485,7 @@ describe("customer routes", () => {
       await instance.close();
     });
 
-    it("scopes the list to the owner", async () => {
+    it("scopes the list to the organization", async () => {
       const instance = await app();
       await instance.inject({
         method: "GET",
@@ -452,7 +493,7 @@ describe("customer routes", () => {
         headers: AUTH,
       });
 
-      expect(sqlValues(rawCall("rank_total") as unknown[])).toContain(USER_ID);
+      expect(sqlValues(rawCall("rank_total") as unknown[])).toContain(ORG_ID);
 
       await instance.close();
     });
@@ -607,10 +648,12 @@ describe("customer routes", () => {
       });
 
       for (const marker of ["rank_total", "WITH matched"]) {
-        expect(sqlText(rawCall(marker) as unknown[])).toContain("p.owner_id =");
+        expect(sqlText(rawCall(marker) as unknown[])).toContain(
+          "p.organization_id =",
+        );
       }
       expect(customer.findMany.mock.calls[0][0].where).toMatchObject({
-        ownerId: USER_ID,
+        organizationId: ORG_ID,
       });
 
       await instance.close();
@@ -662,6 +705,376 @@ describe("customer routes", () => {
     });
   });
 
+  describe("tenancy", () => {
+    it("404s and reads nothing for an organization the caller is not in", async () => {
+      const instance = await app();
+
+      for (const [method, url] of [
+        ["GET", "/me/customers"],
+        ["GET", `/me/customers/${CUSTOMER_ID}`],
+        ["DELETE", `/me/customers/${CUSTOMER_ID}`],
+      ] as const) {
+        const response = await instance.inject({
+          method,
+          url,
+          headers: { ...AUTH, "x-org-id": OTHER_ORG_ID },
+        });
+        expect(response.statusCode, `${method} ${url}`).toBe(404);
+      }
+
+      expect(queryRaw).not.toHaveBeenCalled();
+      expect(customer.findFirst).not.toHaveBeenCalled();
+      expect(customer.updateMany).not.toHaveBeenCalled();
+
+      await instance.close();
+    });
+
+    it("lets a developer manage customers", async () => {
+      actAs(tenancy, "DEVELOPER");
+      const instance = await app();
+
+      const response = await instance.inject({
+        method: "POST",
+        url: "/me/customers",
+        headers: AUTH,
+        payload: { name: "Acme Procurement" },
+      });
+
+      expect(response.statusCode).toBe(201);
+
+      await instance.close();
+    });
+
+    it("404s a project the caller cannot see without reading customers", async () => {
+      const instance = await app();
+
+      for (const [method, url] of [
+        ["GET", "/me/customers"],
+        ["GET", `/me/customers/${CUSTOMER_ID}`],
+        ["POST", `/me/customers/${CUSTOMER_ID}/credit`],
+      ] as const) {
+        const response = await instance.inject({
+          method,
+          url,
+          headers: { ...AUTH, "x-project-id": OTHER_PROJECT_ID },
+          payload: { kind: "PROMOTIONAL", amount: "5" },
+        });
+        expect(response.statusCode, `${method} ${url}`).toBe(404);
+      }
+
+      expect(queryRaw).not.toHaveBeenCalled();
+      expect(customer.findFirst).not.toHaveBeenCalled();
+      expect(customerCreditEntry.create).not.toHaveBeenCalled();
+
+      await instance.close();
+    });
+
+    it("scopes customers to the active project, not the environment", async () => {
+      const instance = await app();
+
+      await instance.inject({
+        method: "GET",
+        url: `/me/customers/${CUSTOMER_ID}`,
+        headers: { ...AUTH, "x-environment": "production" },
+      });
+      const where = customer.findFirst.mock.calls[0][0].where;
+      expect(where).toMatchObject({
+        id: CUSTOMER_ID,
+        organizationId: ORG_ID,
+        projectId: PROJECT_ID,
+      });
+      expect(where).not.toHaveProperty("environmentId");
+
+      await instance.inject({
+        method: "GET",
+        url: "/me/customers",
+        headers: AUTH,
+      });
+      expect(JSON.stringify(rawCall("rank_total"))).toContain(
+        "c.project_id = ",
+      );
+
+      await instance.close();
+    });
+
+    it("writes the project and creator on a new customer", async () => {
+      const instance = await app();
+
+      await instance.inject({
+        method: "POST",
+        url: "/me/customers",
+        headers: AUTH,
+        payload: { name: "Acme Procurement" },
+      });
+
+      expect(customer.create.mock.calls[0][0].data).toMatchObject({
+        organizationId: ORG_ID,
+        projectId: PROJECT_ID,
+        createdById: USER_ID,
+      });
+      expect(
+        tenancy.auditLog.create.mock.calls[0][0].data.metadata,
+      ).toMatchObject({ projectId: PROJECT_ID, environment: "SANDBOX" });
+
+      await instance.close();
+    });
+
+    it("lets a viewer read customers but not change them", async () => {
+      actAs(tenancy, "VIEWER");
+      const instance = await app();
+
+      const list = await instance.inject({
+        method: "GET",
+        url: "/me/customers",
+        headers: AUTH,
+      });
+      expect(list.statusCode).toBe(200);
+
+      for (const [method, url, payload] of [
+        ["POST", "/me/customers", { name: "Acme" }],
+        ["PATCH", `/me/customers/${CUSTOMER_ID}`, { name: "Renamed" }],
+        ["DELETE", `/me/customers/${CUSTOMER_ID}`, undefined],
+        [
+          "POST",
+          `/me/customers/${CUSTOMER_ID}/credit`,
+          { kind: "PROMOTIONAL", amount: "5" },
+        ],
+        [
+          "PATCH",
+          `/me/customers/${CUSTOMER_ID}/coupons/${COUPON_ID}`,
+          { usageLimit: 3 },
+        ],
+      ] as const) {
+        const response = await instance.inject({
+          method,
+          url,
+          headers: AUTH,
+          ...(payload ? { payload } : {}),
+        });
+        expect(response.statusCode, `${method} ${url}`).toBe(403);
+        expect(response.json().permission).toBe("resources.write");
+      }
+
+      expect(customer.create).not.toHaveBeenCalled();
+      expect(customer.updateMany).not.toHaveBeenCalled();
+      expect(customerCreditEntry.create).not.toHaveBeenCalled();
+      expect(customerCoupon.updateMany).not.toHaveBeenCalled();
+
+      await instance.close();
+    });
+
+    it("checks a coupon's or identity's customer is in the active project", async () => {
+      customer.findFirst.mockResolvedValue(null);
+      const instance = await app();
+
+      for (const [method, url, payload] of [
+        [
+          "PATCH",
+          `/me/customers/${CUSTOMER_ID}/coupons/${COUPON_ID}`,
+          { usageLimit: 3 },
+        ],
+        ["DELETE", `/me/customers/${CUSTOMER_ID}/coupons/${COUPON_ID}`],
+        [
+          "PATCH",
+          `/me/customers/${CUSTOMER_ID}/identities/${IDENTITY_ID}`,
+          { blocked: true },
+        ],
+        ["DELETE", `/me/customers/${CUSTOMER_ID}/identities/${IDENTITY_ID}`],
+      ] as const) {
+        const response = await instance.inject({
+          method,
+          url,
+          headers: AUTH,
+          ...(payload ? { payload } : {}),
+        });
+        expect(response.statusCode, `${method} ${url}`).toBe(404);
+      }
+
+      expect(customer.findFirst.mock.calls[0][0].where).toMatchObject({
+        projectId: PROJECT_ID,
+      });
+      expect(customerCoupon.updateMany).not.toHaveBeenCalled();
+      expect(customerCoupon.deleteMany).not.toHaveBeenCalled();
+      expect(customerPaymentIdentity.updateMany).not.toHaveBeenCalled();
+      expect(customerPaymentIdentity.deleteMany).not.toHaveBeenCalled();
+
+      await instance.close();
+    });
+
+    it("audits a status change", async () => {
+      const instance = await app();
+
+      await instance.inject({
+        method: "PATCH",
+        url: `/me/customers/${CUSTOMER_ID}/status`,
+        headers: AUTH,
+        payload: { status: "BLOCKED", reason: "fraud" },
+      });
+
+      expect(tenancy.auditLog.create.mock.calls[0][0].data).toMatchObject({
+        action: "customer.status_changed",
+        targetId: CUSTOMER_ID,
+        metadata: { status: "BLOCKED" },
+      });
+
+      await instance.close();
+    });
+  });
+
+  describe("audit trail", () => {
+    const actions = () =>
+      tenancy.auditLog.create.mock.calls.map(([arg]) => arg.data.action);
+
+    it("records a limit change as a mandatory event with before and after", async () => {
+      customer.findFirst
+        .mockResolvedValueOnce(storedCustomer())
+        .mockResolvedValueOnce(
+          storedCustomer({ monthlyLimit: decimal("250"), dailyLimit: null }),
+        );
+
+      const instance = await app();
+      const response = await instance.inject({
+        method: "PATCH",
+        url: `/me/customers/${CUSTOMER_ID}`,
+        headers: AUTH,
+        payload: { name: "Renamed", monthlyLimit: "250" },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(executeRaw).toHaveBeenCalledOnce();
+      expect(actions()).toEqual(["customer.limits_updated"]);
+      expect(tenancy.auditLog.create.mock.calls[0][0].data).toMatchObject({
+        targetId: CUSTOMER_ID,
+        metadata: {
+          fields: ["name", "monthlyLimit"],
+          before: { monthlyLimit: "5000" },
+          after: { monthlyLimit: "250" },
+        },
+      });
+
+      await instance.close();
+    });
+
+    it("keeps a profile-only edit on customer.updated", async () => {
+      const instance = await app();
+      await instance.inject({
+        method: "PATCH",
+        url: `/me/customers/${CUSTOMER_ID}`,
+        headers: AUTH,
+        payload: { notes: "prefers invoices" },
+      });
+
+      expect(actions()).toEqual(["customer.updated"]);
+
+      await instance.close();
+    });
+
+    it("records a policy change with the approval threshold before and after", async () => {
+      customer.findFirst
+        .mockResolvedValueOnce(storedCustomer())
+        .mockResolvedValueOnce(
+          storedCustomer({ approvalThreshold: decimal("50") }),
+        );
+
+      const instance = await app();
+      await instance.inject({
+        method: "PATCH",
+        url: `/me/customers/${CUSTOMER_ID}/policy`,
+        headers: AUTH,
+        payload: { approvalThreshold: "50" },
+      });
+
+      expect(tenancy.auditLog.create.mock.calls[0][0].data).toMatchObject({
+        action: "customer.limits_updated",
+        metadata: {
+          fields: ["approvalThreshold"],
+          before: { approvalThreshold: null },
+          after: { approvalThreshold: "50" },
+        },
+      });
+
+      await instance.close();
+    });
+
+    it.each([
+      [
+        "a limit change",
+        {
+          method: "PATCH" as const,
+          url: `/me/customers/${CUSTOMER_ID}`,
+          payload: { dailyLimit: "10" },
+        },
+      ],
+      [
+        "a policy change",
+        {
+          method: "PATCH" as const,
+          url: `/me/customers/${CUSTOMER_ID}/policy`,
+          payload: { discountPercent: "10" },
+        },
+      ],
+      [
+        "a delete",
+        { method: "DELETE" as const, url: `/me/customers/${CUSTOMER_ID}` },
+      ],
+      [
+        "a batch delete",
+        {
+          method: "POST" as const,
+          url: "/me/customers/batch-delete",
+          payload: { ids: [CUSTOMER_ID] },
+        },
+      ],
+      [
+        "an identity removal",
+        {
+          method: "DELETE" as const,
+          url: `/me/customers/${CUSTOMER_ID}/identities/${IDENTITY_ID}`,
+        },
+      ],
+    ])("fails %s when its audit entry cannot be written", async (_label, route) => {
+      customer.findMany.mockResolvedValue([{ id: CUSTOMER_ID }]);
+      tenancy.auditLog.create.mockRejectedValue(new Error("audit down"));
+
+      const instance = await app();
+      const response = await instance.inject({ ...route, headers: AUTH });
+
+      expect(response.statusCode).toBe(500);
+
+      await instance.close();
+    });
+
+    it("records deletes and identity changes as mandatory events", async () => {
+      customer.findMany.mockResolvedValue([{ id: CUSTOMER_ID }]);
+      const instance = await app();
+
+      await instance.inject({
+        method: "DELETE",
+        url: `/me/customers/${CUSTOMER_ID}`,
+        headers: AUTH,
+      });
+      await instance.inject({
+        method: "POST",
+        url: "/me/customers/batch-delete",
+        headers: AUTH,
+        payload: { ids: [CUSTOMER_ID] },
+      });
+      await instance.inject({
+        method: "DELETE",
+        url: `/me/customers/${CUSTOMER_ID}/identities/${IDENTITY_ID}`,
+        headers: AUTH,
+      });
+
+      expect(actions()).toEqual([
+        "customer.deleted",
+        "customer.deleted",
+        "customer.identity_changed",
+      ]);
+
+      await instance.close();
+    });
+  });
+
   describe("creating", () => {
     it("creates a customer with an attached wallet identity", async () => {
       const instance = await app();
@@ -680,8 +1093,15 @@ describe("customer routes", () => {
 
       expect(response.statusCode).toBe(201);
       expect(customer.create.mock.calls[0][0].data).toMatchObject({
-        ownerId: USER_ID,
+        organizationId: ORG_ID,
+        createdById: USER_ID,
         name: "Acme Procurement",
+      });
+      expect(tenancy.auditLog.create.mock.calls[0][0].data).toMatchObject({
+        organizationId: ORG_ID,
+        actorUserId: USER_ID,
+        action: "customer.created",
+        targetId: CUSTOMER_ID,
       });
 
       await instance.close();
@@ -762,7 +1182,7 @@ describe("customer routes", () => {
 
     it("refuses a second customer claiming an address already mapped here", async () => {
       customer.create.mockRejectedValue(
-        uniqueViolation(["owner_id", "network", "address"]),
+        uniqueViolation(["organization_id", "network", "address"]),
       );
 
       const instance = await app();
@@ -787,7 +1207,7 @@ describe("customer routes", () => {
 
     it("points a duplicate email identity at the value, not the address", async () => {
       customer.create.mockRejectedValue(
-        uniqueViolation(["owner_id", "type", "value"]),
+        uniqueViolation(["organization_id", "type", "value"]),
       );
 
       const instance = await app();
@@ -825,7 +1245,7 @@ describe("customer routes", () => {
   });
 
   describe("reading and updating", () => {
-    it("scopes read and update to the owner", async () => {
+    it("scopes read and update to the organization", async () => {
       const instance = await app();
 
       await instance.inject({
@@ -835,7 +1255,7 @@ describe("customer routes", () => {
       });
       expect(customer.findFirst.mock.calls[0][0].where).toMatchObject({
         id: CUSTOMER_ID,
-        ownerId: USER_ID,
+        organizationId: ORG_ID,
         deletedAt: null,
       });
 
@@ -847,7 +1267,7 @@ describe("customer routes", () => {
       });
       expect(customer.updateMany.mock.calls[0][0].where).toMatchObject({
         id: CUSTOMER_ID,
-        ownerId: USER_ID,
+        organizationId: ORG_ID,
         deletedAt: null,
       });
 
@@ -1006,13 +1426,13 @@ describe("customer routes", () => {
       await instance.close();
     });
 
-    it("scopes a status change to the owner", async () => {
+    it("scopes a status change to the organization", async () => {
       const instance = await app();
       await instance.inject(setStatus({ status: "BLOCKED" }));
 
       expect(customer.updateMany.mock.calls[0][0].where).toMatchObject({
         id: CUSTOMER_ID,
-        ownerId: USER_ID,
+        organizationId: ORG_ID,
         deletedAt: null,
       });
 
@@ -1240,13 +1660,13 @@ describe("customer routes", () => {
       await instance.close();
     });
 
-    it("scopes a policy change to the owner", async () => {
+    it("scopes a policy change to the organization", async () => {
       const instance = await app();
       await instance.inject(setPolicy({ discountPercent: "10" }));
 
       expect(customer.updateMany.mock.calls[0][0].where).toMatchObject({
         id: CUSTOMER_ID,
-        ownerId: USER_ID,
+        organizationId: ORG_ID,
         deletedAt: null,
       });
 
@@ -1254,7 +1674,7 @@ describe("customer routes", () => {
     });
 
     it("404s a policy change for a customer that is not the caller's", async () => {
-      customer.updateMany.mockResolvedValue({ count: 0 });
+      customer.findFirst.mockResolvedValue(null);
 
       const instance = await app();
       const response = await instance.inject(
@@ -1262,6 +1682,8 @@ describe("customer routes", () => {
       );
 
       expect(response.statusCode).toBe(404);
+      expect(customer.updateMany).not.toHaveBeenCalled();
+      expect(tenancy.auditLog.create).not.toHaveBeenCalled();
 
       await instance.close();
     });
@@ -1370,11 +1792,15 @@ describe("customer routes", () => {
 
       expect(response.statusCode).toBe(201);
       expect(customerCreditEntry.create.mock.calls[0][0].data).toMatchObject({
-        ownerId: USER_ID,
+        organizationId: ORG_ID,
         customerId: CUSTOMER_ID,
         kind: "PROMOTIONAL",
         amount: "5",
         reason: "launch offer",
+      });
+      expect(tenancy.auditLog.create.mock.calls[0][0].data).toMatchObject({
+        action: "customer.credit_adjusted",
+        targetId: CUSTOMER_ID,
       });
 
       await instance.close();
@@ -1509,7 +1935,7 @@ describe("customer routes", () => {
       await instance.close();
     });
 
-    it("scopes the ledger to the owner", async () => {
+    it("scopes the ledger to the organization", async () => {
       const instance = await app();
       await instance.inject({
         method: "GET",
@@ -1518,7 +1944,7 @@ describe("customer routes", () => {
       });
 
       expect(customerCreditEntry.groupBy.mock.calls[0][0].where).toEqual({
-        ownerId: USER_ID,
+        organizationId: ORG_ID,
         customerId: CUSTOMER_ID,
       });
 
@@ -1568,12 +1994,16 @@ describe("customer routes", () => {
 
       expect(response.statusCode).toBe(201);
       expect(customerCoupon.create.mock.calls[0][0].data).toMatchObject({
-        ownerId: USER_ID,
+        organizationId: ORG_ID,
         customerId: CUSTOMER_ID,
         code: "WELCOME10",
         kind: "PERCENT",
         value: "10",
         usageLimit: 5,
+      });
+      expect(tenancy.auditLog.create.mock.calls[0][0].data).toMatchObject({
+        action: "customer.coupon_created",
+        targetId: CUSTOMER_ID,
       });
 
       await instance.close();
@@ -1659,7 +2089,7 @@ describe("customer routes", () => {
 
     it("refuses a second coupon with the same code", async () => {
       customerCoupon.create.mockRejectedValue(
-        uniqueViolation(["owner_id", "code"]),
+        uniqueViolation(["organization_id", "code"]),
       );
 
       const instance = await app();
@@ -1769,7 +2199,7 @@ describe("customer routes", () => {
       await instance.close();
     });
 
-    it("scopes a coupon change to the owner and its customer", async () => {
+    it("scopes a coupon change to the organization and its customer", async () => {
       const instance = await app();
       await instance.inject({
         method: "PATCH",
@@ -1781,7 +2211,7 @@ describe("customer routes", () => {
       expect(customerCoupon.updateMany.mock.calls[0][0].where).toEqual({
         id: COUPON_ID,
         customerId: CUSTOMER_ID,
-        ownerId: USER_ID,
+        organizationId: ORG_ID,
       });
 
       await instance.close();
@@ -1901,7 +2331,7 @@ describe("customer routes", () => {
       expect(
         customerPaymentIdentity.findFirst.mock.calls[0][0].where,
       ).toMatchObject({
-        ownerId: USER_ID,
+        organizationId: ORG_ID,
         type: "WALLET",
         address: PAYER,
         network: "BASE_SEPOLIA",
@@ -2066,6 +2496,156 @@ describe("customer routes", () => {
       await instance.close();
     });
 
+    it("clears the approval flag with a matching approved seller request and marks it used", async () => {
+      customerPaymentIdentity.findFirst.mockResolvedValue(
+        claims({ approvalThreshold: decimal("100") }),
+      );
+      approvalRequest.findFirst.mockResolvedValue({
+        id: APPROVAL_ID,
+        payload: {
+          payerAddress: PAYER,
+          network: "BASE_SEPOLIA",
+          amount: "150",
+        },
+      });
+      approvalRequest.updateMany.mockResolvedValue({ count: 1 });
+
+      const instance = await app();
+      const response = await instance.inject(
+        resolve({ amount: "150.00", approvalRequestId: APPROVAL_ID }),
+      );
+
+      expect(response.json()).toMatchObject({
+        allowed: true,
+        needsApproval: false,
+      });
+      expect(approvalRequest.findFirst.mock.calls[0][0].where).toMatchObject({
+        id: APPROVAL_ID,
+        organizationId: ORG_ID,
+        kind: "SELLER_PAYMENT",
+        status: "APPROVED",
+        executedAt: null,
+        expiresAt: { gt: expect.any(Date) },
+      });
+      expect(approvalRequest.updateMany.mock.calls[0][0]).toMatchObject({
+        where: { id: APPROVAL_ID, status: "APPROVED", executedAt: null },
+      });
+
+      await instance.close();
+    });
+
+    it("keeps the approval flag for a request of another environment or project", async () => {
+      customerPaymentIdentity.findFirst.mockResolvedValue(
+        claims({ approvalThreshold: decimal("100") }),
+      );
+      const production = {
+        id: APPROVAL_ID,
+        projectId: PROJECT_ID,
+        payload: { payerAddress: PAYER, network: "BASE", amount: "150" },
+      };
+      approvalRequest.findFirst.mockImplementation(
+        async ({
+          where,
+        }: {
+          where: {
+            projectId?: string;
+            OR?: { payload: { equals: string } }[];
+          };
+        }) =>
+          where.projectId === production.projectId &&
+          (where.OR ?? []).some(
+            (entry) => entry.payload.equals === production.payload.network,
+          )
+            ? production
+            : null,
+      );
+
+      const instance = await app();
+      const response = await instance.inject(
+        resolve({
+          network: "BASE",
+          amount: "150",
+          approvalRequestId: APPROVAL_ID,
+        }),
+      );
+
+      expect(response.json().needsApproval).toBe(true);
+      expect(approvalRequest.findFirst.mock.calls[0][0].where).toMatchObject({
+        id: APPROVAL_ID,
+        organizationId: ORG_ID,
+        projectId: PROJECT_ID,
+        kind: "SELLER_PAYMENT",
+      });
+      expect(approvalRequest.updateMany).not.toHaveBeenCalled();
+
+      await instance.close();
+    });
+
+    it("keeps the approval flag when the approved request is for a different amount", async () => {
+      customerPaymentIdentity.findFirst.mockResolvedValue(
+        claims({ approvalThreshold: decimal("100") }),
+      );
+      approvalRequest.findFirst.mockResolvedValue({
+        id: APPROVAL_ID,
+        payload: {
+          payerAddress: PAYER,
+          network: "BASE_SEPOLIA",
+          amount: "120",
+        },
+      });
+
+      const instance = await app();
+      const response = await instance.inject(
+        resolve({ amount: "150", approvalRequestId: APPROVAL_ID }),
+      );
+
+      expect(response.json().needsApproval).toBe(true);
+      expect(approvalRequest.updateMany).not.toHaveBeenCalled();
+
+      await instance.close();
+    });
+
+    it("keeps the approval flag when the approved request is for a different token", async () => {
+      customerPaymentIdentity.findFirst.mockResolvedValue(
+        claims({ approvalThreshold: decimal("100") }),
+      );
+      approvalRequest.findFirst.mockResolvedValue({
+        id: APPROVAL_ID,
+        payload: {
+          payerAddress: PAYER,
+          network: "BASE_SEPOLIA",
+          amount: "150",
+          assetAddress: "0x036cbd53842c5426634e7929541ec2318f3dcf7e",
+        },
+      });
+
+      const instance = await app();
+      const response = await instance.inject(
+        resolve({ amount: "150", approvalRequestId: APPROVAL_ID }),
+      );
+
+      expect(response.json().needsApproval).toBe(true);
+      expect(approvalRequest.updateMany).not.toHaveBeenCalled();
+
+      await instance.close();
+    });
+
+    it("keeps the approval flag when the request was already used", async () => {
+      customerPaymentIdentity.findFirst.mockResolvedValue(
+        claims({ approvalThreshold: decimal("100") }),
+      );
+      approvalRequest.findFirst.mockResolvedValue(null);
+
+      const instance = await app();
+      const response = await instance.inject(
+        resolve({ amount: "150", approvalRequestId: APPROVAL_ID }),
+      );
+
+      expect(response.json().needsApproval).toBe(true);
+
+      await instance.close();
+    });
+
     it("spends nothing: no write touches the ledger or the quota", async () => {
       customerPaymentIdentity.findFirst.mockResolvedValue(claims());
       customerCoupon.findFirst.mockResolvedValue(storedCoupon());
@@ -2101,15 +2681,48 @@ describe("customer routes", () => {
       await instance.close();
     });
 
-    it("scopes the payer lookup to the key's owner", async () => {
-      apiKey.findUnique.mockResolvedValue(storedKey({ ownerId: "other" }));
+    it("only resolves customers of the key's project", async () => {
       customerPaymentIdentity.findFirst.mockResolvedValue(null);
 
       const instance = await app();
       await instance.inject(resolve({}));
 
       expect(
-        customerPaymentIdentity.findFirst.mock.calls[0][0].where.ownerId,
+        customerPaymentIdentity.findFirst.mock.calls[0][0].where.customer,
+      ).toEqual({ deletedAt: null, projectId: PROJECT_ID });
+
+      await instance.close();
+    });
+
+    it("refuses a key without the CUSTOMERS_READ scope", async () => {
+      apiKey.findUnique.mockResolvedValue(
+        storedKey({ scopes: ["PAYMENTS_WRITE"] }),
+      );
+
+      const instance = await app();
+      const response = await instance.inject(resolve({}));
+
+      expect(response.statusCode).toBe(403);
+      expect(response.json()).toMatchObject({
+        error: "insufficient_scope",
+        scope: "CUSTOMERS_READ",
+      });
+      expect(customerPaymentIdentity.findFirst).not.toHaveBeenCalled();
+
+      await instance.close();
+    });
+
+    it("scopes the payer lookup to the key's organization", async () => {
+      apiKey.findUnique.mockResolvedValue(
+        storedKey({ organizationId: "other" }),
+      );
+      customerPaymentIdentity.findFirst.mockResolvedValue(null);
+
+      const instance = await app();
+      await instance.inject(resolve({}));
+
+      expect(
+        customerPaymentIdentity.findFirst.mock.calls[0][0].where.organizationId,
       ).toBe("other");
 
       await instance.close();
@@ -2131,7 +2744,7 @@ describe("customer routes", () => {
       expect(
         customerPaymentIdentity.create.mock.calls[0][0].data,
       ).toMatchObject({
-        ownerId: USER_ID,
+        organizationId: ORG_ID,
         customerId: CUSTOMER_ID,
         address: PAYER,
       });
@@ -2156,7 +2769,7 @@ describe("customer routes", () => {
       await instance.close();
     });
 
-    it("scopes an identity change to the owner and its customer", async () => {
+    it("scopes an identity change to the organization and its customer", async () => {
       const instance = await app();
       await instance.inject({
         method: "PATCH",
@@ -2170,7 +2783,7 @@ describe("customer routes", () => {
           where: {
             id: IDENTITY_ID,
             customerId: CUSTOMER_ID,
-            ownerId: USER_ID,
+            organizationId: ORG_ID,
           },
         },
       );
@@ -2469,6 +3082,288 @@ describe("customer routes", () => {
         });
         expect(response.statusCode, panel).toBe(404);
       }
+
+      await instance.close();
+    });
+  });
+
+  describe("per-asset spend limits", () => {
+    const USDC = "0x036CbD53842c5426634e7929541eC2318f3dCF7e";
+    const usdc = USDC.toLowerCase();
+
+    const setPolicy = (payload: Record<string, unknown>) => ({
+      method: "PATCH" as const,
+      url: `/me/customers/${CUSTOMER_ID}/policy`,
+      headers: AUTH,
+      payload,
+    });
+
+    const resolve = (payload: Record<string, unknown>) => ({
+      method: "POST" as const,
+      url: "/v1/customers/resolve",
+      headers: KEY_AUTH,
+      payload: {
+        payerAddress: PAYER,
+        network: "BASE_SEPOLIA",
+        amount: "10",
+        ...payload,
+      },
+    });
+
+    const limited = (over: Record<string, unknown> = {}) => ({
+      blockedAt: null,
+      customer: storedCustomer({
+        monthlyLimit: decimal("100"),
+        limitNetwork: "BASE_SEPOLIA",
+        limitAssetAddress: usdc,
+        ...over,
+      }),
+    });
+
+    const nestedText = (node: unknown): string =>
+      node !== null && typeof node === "object" && "values" in node
+        ? [
+            ...((node as { strings?: string[] }).strings ?? []),
+            ...(node as { values: unknown[] }).values.map(nestedText),
+          ].join(" ")
+        : "";
+
+    const fullText = (call: unknown[]): string =>
+      [sqlText(call), ...call.slice(1).map(nestedText)].join(" ");
+
+    const spentNearlyAll = () =>
+      queryRaw.mockImplementation((...call: unknown[]) =>
+        Promise.resolve(
+          sqlText(call).includes("monthly_spent")
+            ? [{ daily_spent: decimal("0"), monthly_spent: decimal("95") }]
+            : [],
+        ),
+      );
+
+    it("stores the limit asset with the limits", async () => {
+      const instance = await app();
+      const response = await instance.inject(
+        setPolicy({
+          dailyLimit: "10",
+          monthlyLimit: "100",
+          limitNetwork: "BASE_SEPOLIA",
+          limitAssetAddress: USDC,
+        }),
+      );
+
+      expect(response.statusCode).toBe(200);
+      expect(customer.updateMany.mock.calls[0][0].data).toEqual({
+        dailyLimit: "10",
+        monthlyLimit: "100",
+        limitNetwork: "BASE_SEPOLIA",
+        limitAssetAddress: usdc,
+      });
+
+      await instance.close();
+    });
+
+    it("accepts the native asset as a null address", async () => {
+      const instance = await app();
+      const response = await instance.inject(
+        setPolicy({ limitNetwork: "BASE_SEPOLIA", limitAssetAddress: null }),
+      );
+
+      expect(response.statusCode).toBe(200);
+      expect(customer.updateMany.mock.calls[0][0].data).toEqual({
+        limitNetwork: "BASE_SEPOLIA",
+        limitAssetAddress: null,
+      });
+
+      await instance.close();
+    });
+
+    it("refuses an asset without a network", async () => {
+      const instance = await app();
+      const response = await instance.inject(
+        setPolicy({ limitAssetAddress: USDC }),
+      );
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json().issues[0].path).toBe("limitAssetAddress");
+      expect(customer.updateMany).not.toHaveBeenCalled();
+
+      await instance.close();
+    });
+
+    it("refuses a network without an asset", async () => {
+      const instance = await app();
+      const response = await instance.inject(
+        setPolicy({ limitNetwork: "BASE_SEPOLIA" }),
+      );
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json().issues[0].path).toBe("limitNetwork");
+
+      await instance.close();
+    });
+
+    it("refuses a limit on a customer with no limit asset", async () => {
+      customer.findFirst.mockResolvedValue({ limitNetwork: null });
+
+      const instance = await app();
+      const response = await instance.inject(
+        setPolicy({ monthlyLimit: "100" }),
+      );
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json().issues[0].path).toBe("limitNetwork");
+      expect(customer.updateMany).not.toHaveBeenCalled();
+
+      await instance.close();
+    });
+
+    it("changes a limit on a customer that already names its asset", async () => {
+      customer.findFirst.mockResolvedValueOnce({
+        limitNetwork: "BASE_SEPOLIA",
+      });
+
+      const instance = await app();
+      const response = await instance.inject(
+        setPolicy({ monthlyLimit: "100" }),
+      );
+
+      expect(response.statusCode).toBe(200);
+      expect(customer.updateMany.mock.calls[0][0].data).toEqual({
+        monthlyLimit: "100",
+      });
+
+      await instance.close();
+    });
+
+    it("404s a limit change for a customer that is not the caller's", async () => {
+      customer.findFirst.mockResolvedValue(null);
+
+      const instance = await app();
+      const response = await instance.inject(
+        setPolicy({ monthlyLimit: "100" }),
+      );
+
+      expect(response.statusCode).toBe(404);
+
+      await instance.close();
+    });
+
+    it("clears the asset with the network", async () => {
+      const instance = await app();
+      await instance.inject(
+        setPolicy({ limitNetwork: null, limitAssetAddress: null }),
+      );
+
+      expect(customer.updateMany.mock.calls[0][0].data).toEqual({
+        limitNetwork: null,
+        limitAssetAddress: null,
+      });
+
+      await instance.close();
+    });
+
+    it("returns the limit asset on the customer", async () => {
+      customer.findFirst.mockResolvedValue(
+        storedCustomer({
+          limitNetwork: "BASE_SEPOLIA",
+          limitAssetAddress: usdc,
+        }),
+      );
+
+      const instance = await app();
+      const response = await instance.inject({
+        method: "GET",
+        url: `/me/customers/${CUSTOMER_ID}`,
+        headers: AUTH,
+      });
+
+      expect(response.json()).toMatchObject({
+        limitNetwork: "BASE_SEPOLIA",
+        limitAssetAddress: usdc,
+      });
+
+      await instance.close();
+    });
+
+    it("counts only the limit asset toward the limit", async () => {
+      customerPaymentIdentity.findFirst.mockResolvedValue(limited());
+      spentNearlyAll();
+
+      const instance = await app();
+      const response = await instance.inject(resolve({ assetAddress: USDC }));
+
+      expect(response.json()).toMatchObject({
+        allowed: false,
+        deniedReason: "monthly_limit_exceeded",
+      });
+      const call = rawCall("monthly_spent") as unknown[];
+      expect(fullText(call)).toContain("IS NOT DISTINCT FROM");
+      expect(sqlValues(call)).toEqual(
+        expect.arrayContaining(["BASE_SEPOLIA", usdc]),
+      );
+
+      await instance.close();
+    });
+
+    it("checks a payment that does not name its asset against the limit network", async () => {
+      customerPaymentIdentity.findFirst.mockResolvedValue(limited());
+      spentNearlyAll();
+
+      const instance = await app();
+      const response = await instance.inject(resolve({}));
+
+      expect(response.json()).toMatchObject({
+        allowed: false,
+        deniedReason: "monthly_limit_exceeded",
+      });
+
+      await instance.close();
+    });
+
+    it("does not hold a payment in another asset to the limit", async () => {
+      customerPaymentIdentity.findFirst.mockResolvedValue(limited());
+      spentNearlyAll();
+
+      const instance = await app();
+      const response = await instance.inject(resolve({ assetAddress: null }));
+
+      expect(response.json()).toMatchObject({ allowed: true });
+      expect(rawCall("monthly_spent")).toBeUndefined();
+
+      await instance.close();
+    });
+
+    it("does not hold a payment on another network to the limit", async () => {
+      customerPaymentIdentity.findFirst.mockResolvedValue(
+        limited({ limitNetwork: "ETHEREUM_SEPOLIA" }),
+      );
+      spentNearlyAll();
+
+      const instance = await app();
+      const response = await instance.inject(resolve({ assetAddress: USDC }));
+
+      expect(response.json()).toMatchObject({ allowed: true });
+      expect(rawCall("monthly_spent")).toBeUndefined();
+
+      await instance.close();
+    });
+
+    it("keeps counting every asset for a customer without a limit asset", async () => {
+      customerPaymentIdentity.findFirst.mockResolvedValue(
+        limited({ limitNetwork: null, limitAssetAddress: null }),
+      );
+      spentNearlyAll();
+
+      const instance = await app();
+      const response = await instance.inject(resolve({ assetAddress: USDC }));
+
+      expect(response.json()).toMatchObject({
+        allowed: false,
+        deniedReason: "monthly_limit_exceeded",
+      });
+      expect(fullText(rawCall("monthly_spent") as unknown[])).not.toContain(
+        "IS NOT DISTINCT FROM",
+      );
 
       await instance.close();
     });
