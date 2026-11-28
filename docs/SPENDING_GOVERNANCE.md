@@ -22,7 +22,8 @@ Spending policies, budgets and payment approvals are **advisory, cooperatively e
 | TypeScript SDK without `governance`, older TypeScript SDK versions | payer process | no | yes, when the seller reports |
 | Python SDK `FourMica.fetch` with `governance` configured | payer process | yes (`POST /v1/spend/authorize`) | yes, by `reqId` |
 | Python SDK without `governance`, older Python SDK versions | payer process | no | yes, when the seller reports |
-| Rust SDK | payer process | no | yes, when the seller reports |
+| Rust SDK, integrator calls `AppClient::authorize_spend` before signing (no paying client to do it) | payer process | yes, only where the integrator calls it | yes, by `reqId` |
+| Rust SDK without those explicit calls | payer process | no | yes, when the seller reports |
 | Direct Core / protocol integrations (custom code, CLI `cycles pay`) | payer key holder | no | yes, when the seller reports |
 | Payments the seller never reports to 4mica | — | no | no (invisible to 4mica) |
 

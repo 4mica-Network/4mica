@@ -137,6 +137,8 @@ Do not pay again because accounting failed: the payment went through, and the sp
 
 The Python SDK (`sdk-4mica`) has the same behavior: pass `governance=GovernanceOptions(api_key=..., agent_id=..., approval_timeout_secs=..., poll_interval_secs=..., on_accounting_error=...)` to `FourMica.connect`, catch `SpendAuthorizationError`, and read `client.governance_for(response)`. A task cancelled while a consume or release is being retried plays the part of an aborted `signal`: `on_accounting_error` receives `accounting="pending"`, then the cancellation propagates.
 
+The Rust SDK has no paying client, so nothing asks on your behalf: call `AppClient::authorize_spend` before you sign with `X402Flow`, then `consume_spend_authorization` with the signed payment's `req_id` or `release_spend_authorization` after a 402, following the same rules. Its README walks through them.
+
 **This is a cooperative check, not hard enforcement.** 4mica's dashboard is not in the payment path: payments are signed locally, so anyone holding the wallet key can sign without asking, or leave `governance` out. Such a payment is still detected afterwards when the seller reports it: it raises an unauthorized-spend alert and counts toward your limits. Without `governance`, `client.fetch` behaves exactly as before.
 
 `client.paymentFor(response)` returns what was paid for a response: `protocol`, `network`, `asset`, `amount` (a decimal string), `amountRaw` and `payTo`. It returns `undefined` when the request needed no payment, or when the seller failed the request without taking one.
