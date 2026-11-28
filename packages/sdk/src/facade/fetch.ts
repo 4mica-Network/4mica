@@ -118,6 +118,18 @@ export interface FetchContext {
   record(response: Response, payment: PaymentRecord): void;
 }
 
+type PaymentOutcome = "settled" | "rejected" | "unknown";
+
+const paymentOutcome = (
+  protocol: PaymentProtocol,
+  paid: Response,
+): PaymentOutcome =>
+  paid.status === 402
+    ? "rejected"
+    : (protocol.settled(paid) ?? paid.ok)
+      ? "settled"
+      : "unknown";
+
 export async function payingFetch(
   ctx: FetchContext,
   input: RequestInfo | URL,
@@ -181,7 +193,6 @@ export async function payingFetch(
     try {
       signed = await protocol.pay(terms, session.client);
     } catch (err) {
-      // Nothing has left this process.
       ctx.limiter.release(reservation);
       await releaseAuthorization();
       throw err;
@@ -189,28 +200,25 @@ export async function payingFetch(
     for (const [name, value] of Object.entries(signed)) {
       headers.set(name, value);
     }
-    // Retried once; a second 402 goes back to the caller. If this throws the
-    // amount stays reserved: the seller may hold the payment and redeem it.
+    const conclude = async (outcome: PaymentOutcome) => {
+      if (outcome === "rejected") {
+        ctx.limiter.release(reservation);
+        await releaseAuthorization();
+      } else if (authorization) {
+        await ctx.governor?.consume(authorization.id, protocol.reqId?.(signed));
+      }
+    };
+
     let paid: Response;
     try {
       paid = await ctx.fetchFn(new Request(request, { headers }));
     } catch (err) {
-      if (authorization) {
-        await ctx.governor?.consume(authorization.id, protocol.reqId?.(signed));
-      }
+      await conclude("unknown");
       throw err;
     }
-    if (paid.status === 402) {
-      ctx.limiter.release(reservation);
-      await releaseAuthorization();
-      return paid;
-    }
-    // A seller that says nothing is taken to charge for what it delivered.
-    // The amount stays reserved either way: the payment is in its hands.
-    if (protocol.settled(paid) ?? paid.ok) {
-      if (authorization) {
-        await ctx.governor?.consume(authorization.id, protocol.reqId?.(signed));
-      }
+    const outcome = paymentOutcome(protocol, paid);
+    await conclude(outcome);
+    if (outcome === "settled") {
       ctx.record(paid, {
         protocol: protocol.name,
         network: terms.network,
@@ -219,8 +227,6 @@ export async function payingFetch(
         amountRaw: terms.amount,
         payTo: terms.payTo,
       });
-    } else {
-      await releaseAuthorization();
     }
     return paid;
   }

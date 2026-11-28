@@ -167,9 +167,9 @@ const auth = await app.authorizeSpend({
 
 switch (auth.status) {
   case "RESERVED":
-    // sign and send, then:
+    // sign and send, then, unless the seller answered 402:
     await app.consumeSpendAuthorization(auth.id, { reqId });
-    // or, if the payment never went out:
+    // or, if signing failed or the seller answered 402:
     await app.releaseSpendAuthorization(auth.id);
     break;
   case "PENDING_APPROVAL":
@@ -180,6 +180,13 @@ switch (auth.status) {
     break;                          //   | "daily_limit" | "monthly_limit" | ...
 }
 ```
+
+Release only when the payment was definitively not taken: signing failed before anything was
+sent, or the seller answered the signed request with a fresh 402. Once the signed payment has left
+your process, a seller error, a timeout, a network failure or an aborted request leaves the outcome
+unknown, since the seller holds a payment it may still redeem; consume with the `reqId` in that
+case, so the spend is over-counted rather than under-counted. 4mica reconciles by `reqId` when the
+seller reports the payment.
 
 A reservation expires 10 minutes after it is granted. Release one you will not use, so it stops
 counting toward your limits.

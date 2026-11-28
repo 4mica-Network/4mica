@@ -254,18 +254,123 @@ describe("governed paying fetch", () => {
     expect(shop.calls).toHaveLength(1);
   });
 
-  it("releases when the seller does not take the payment", async () => {
+  it.each([
+    500, 502, 503, 400, 409,
+  ])("consumes and keeps the amount counted when the seller answers %i after payment", async (status) => {
     const backend = api();
-    const shop = seller(() => new Response("boom", { status: 500 }));
-    const { ctx, records } = context(shop.fetchFn, governor(backend.fetchFn));
+    const shop = seller(() => new Response("boom", { status }));
+    const limiter = new SpendLimiter({ total: "0.01 USDC" });
+    const { ctx, records } = context(
+      shop.fetchFn,
+      governor(backend.fetchFn),
+      limiter,
+    );
 
     const res = await payingFetch(ctx, URL_);
 
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(status);
     expect(records).toEqual([]);
+    expect(paths(backend.calls)).toEqual([
+      "POST /v1/spend/authorize",
+      "POST /v1/spend/authorizations/auth_1/consume",
+    ]);
+    const envelope = JSON.parse(
+      base64ToUtf8(shop.calls[1].headers.get("PAYMENT-SIGNATURE") ?? ""),
+    );
+    expect(backend.calls[1].body).toEqual({
+      reqId: envelope.payload.payload.req_id,
+    });
+    const again = context(seller().fetchFn, undefined, limiter);
+    await expect(payingFetch(again.ctx, URL_)).rejects.toMatchObject({
+      limit: "total",
+    });
+  });
+
+  it("consumes when the seller says it did not settle but the outcome is not a 402", async () => {
+    const backend = api();
+    const shop = seller(
+      () =>
+        new Response("ok", {
+          headers: {
+            "PAYMENT-RESPONSE": utf8ToBase64(
+              JSON.stringify({ success: false }),
+            ),
+          },
+        }),
+    );
+    const { ctx, records } = context(shop.fetchFn, governor(backend.fetchFn));
+
+    await payingFetch(ctx, URL_);
+
+    expect(records).toEqual([]);
+    expect(paths(backend.calls).at(-1)).toBe(
+      "POST /v1/spend/authorizations/auth_1/consume",
+    );
+  });
+
+  it("releases and frees the session limit when the seller answers 402 to the payment", async () => {
+    const backend = api();
+    const shop = seller(() => v2Challenge());
+    const limiter = new SpendLimiter({ total: "0.01 USDC" });
+    const { ctx, records } = context(
+      shop.fetchFn,
+      governor(backend.fetchFn),
+      limiter,
+    );
+
+    const res = await payingFetch(ctx, URL_);
+
+    expect(res.status).toBe(402);
+    expect(records).toEqual([]);
+    expect(paths(backend.calls)).toEqual([
+      "POST /v1/spend/authorize",
+      "POST /v1/spend/authorizations/auth_1/release",
+    ]);
+    const again = context(seller().fetchFn, undefined, limiter);
+    await expect(payingFetch(again.ctx, URL_)).resolves.toBeInstanceOf(
+      Response,
+    );
+  });
+
+  it("releases when signing fails before anything is sent", async () => {
+    const backend = api();
+    const shop = seller();
+    const { ctx } = context(shop.fetchFn, governor(backend.fetchFn));
+    const failing = {
+      ...x402Protocol,
+      pay: async () => {
+        throw new Error("signer offline");
+      },
+    };
+    ctx.protocols = [failing];
+
+    await expect(payingFetch(ctx, URL_)).rejects.toThrow("signer offline");
+    expect(shop.calls).toHaveLength(1);
     expect(paths(backend.calls).at(-1)).toBe(
       "POST /v1/spend/authorizations/auth_1/release",
     );
+  });
+
+  it.each([
+    ["times out", new DOMException("timed out", "TimeoutError")],
+    ["is aborted", new DOMException("aborted", "AbortError")],
+  ])("consumes and keeps the amount counted when the paid request %s", async (_label, failure) => {
+    const backend = api();
+    const shop = seller(() => {
+      throw failure;
+    });
+    const limiter = new SpendLimiter({ total: "0.01 USDC" });
+    const { ctx } = context(shop.fetchFn, governor(backend.fetchFn), limiter);
+
+    await expect(payingFetch(ctx, URL_)).rejects.toBe(failure);
+    expect(paths(backend.calls)).toEqual([
+      "POST /v1/spend/authorize",
+      "POST /v1/spend/authorizations/auth_1/consume",
+    ]);
+    const again = context(seller().fetchFn, undefined, limiter);
+    await expect(payingFetch(again.ctx, URL_)).rejects.toMatchObject({
+      limit: "total",
+    });
   });
 
   it("consumes with the signed reqId when the paid request throws", async () => {
