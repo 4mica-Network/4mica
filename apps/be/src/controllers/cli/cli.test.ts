@@ -4,6 +4,7 @@ import { cliRoutes } from "@routes/cli";
 import { developerRoutes } from "@routes/developer";
 import { organizationRoutes } from "@routes/organizations";
 import { walletRoutes } from "@routes/wallets";
+import { clearClerkUserCache } from "@services/clerk-users";
 import { hashSecret } from "@utils/secrets";
 import type { FastifyInstance } from "fastify";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -169,6 +170,7 @@ vi.mock("@4mica/db", () => {
           return found && orgOf(wanted)
             ? {
                 role: found.role,
+                suspendedAt: found.suspendedAt ?? null,
                 organization: { id: wanted, personal: false },
               }
             : null;
@@ -228,7 +230,7 @@ const SESSION_AUTH = { authorization: "Bearer clerk-session" };
 const ACME = "019fce62-0000-7000-8000-0000000000ac";
 const GLOBEX = "019fce62-0000-7000-8000-0000000000b0";
 
-const signedIn = () => ({
+const signedIn = (fva?: [number, number]) => ({
   isAuthenticated: true,
   status: "signed-in",
   reason: null,
@@ -236,7 +238,7 @@ const signedIn = () => ({
     tokenType: "session_token",
     userId: "user_123",
     sessionId: "sess_123",
-    sessionClaims: { sub: "user_123", sid: "sess_123" },
+    sessionClaims: { sub: "user_123", sid: "sess_123", ...(fva && { fva }) },
   }),
 });
 
@@ -458,6 +460,7 @@ describe("cli sign-in", () => {
         clientName: "ada-laptop",
         scopes: ["account:read"],
         organizationId: null,
+        mfaVerified: false,
       });
 
       expect(redeemed).toBeNull();
@@ -1102,6 +1105,216 @@ describe("cli sign-in", () => {
         });
         expect(response.statusCode).toBe(401);
       });
+    });
+  });
+
+  describe("identity assurance", () => {
+    const MFA: [number, number] = [1, 1];
+    const NO_MFA: [number, number] = [1, -1];
+    const inAcme = (token: string) => ({ ...asCli(token), "x-org-id": ACME });
+
+    const policy = (over: Record<string, unknown>) =>
+      vi.mocked(prisma.securitySettings.findUnique).mockResolvedValue({
+        requireMfa: false,
+        sessionMaxAgeHours: null,
+        reauthWindowMinutes: 15,
+        ipAllowlist: [],
+        enforceIpAllowlistForApiKeys: false,
+        ...over,
+      } as never);
+
+    const browser = (fva: [number, number]) =>
+      authenticateRequest.mockResolvedValue(signedIn(fva));
+
+    const wallets = (headers: Record<string, string>) =>
+      app.inject({ method: "GET", url: "/me/wallets", headers });
+
+    const deviceToken = async (organizationId?: string) => {
+      const login = await startLogin();
+      const approved = await post(
+        "/me/cli/device/approve",
+        {
+          userCode: login.user_code,
+          ...(organizationId && { organizationId }),
+        },
+        SESSION_AUTH,
+      );
+      return {
+        approved,
+        token: (await poll(login.device_code)).json().access_token as
+          | string
+          | undefined,
+      };
+    };
+
+    beforeEach(() => {
+      clearClerkUserCache();
+      getUser.mockReset();
+    });
+
+    afterEach(() => {
+      vi.mocked(prisma.securitySettings.findUnique).mockResolvedValue(null);
+      vi.mocked(prisma.ssoConnection.findMany).mockResolvedValue([]);
+    });
+
+    it("records that the approving browser session used MFA", async () => {
+      browser(MFA);
+      await deviceToken();
+      browser(NO_MFA);
+      await deviceToken();
+
+      expect(db.sessions.map((row) => row.mfaVerified)).toEqual([true, false]);
+    });
+
+    it("records MFA on a CI token from the creating browser session", async () => {
+      browser(MFA);
+      await post("/me/cli/sessions", { name: "with-mfa" }, SESSION_AUTH);
+      browser(NO_MFA);
+      await post("/me/cli/sessions", { name: "without" }, SESSION_AUTH);
+
+      expect(db.sessions.map((row) => row.mfaVerified)).toEqual([true, false]);
+    });
+
+    it("lets an MFA-issued CLI session into an organization that requires MFA", async () => {
+      browser(MFA);
+      const { token } = await deviceToken();
+      policy({ requireMfa: true });
+
+      expect((await wallets(inAcme(token as string))).statusCode).toBe(200);
+    });
+
+    it("applies a newly required MFA to an existing CLI session at once", async () => {
+      browser(NO_MFA);
+      const { token } = await deviceToken();
+      expect((await wallets(inAcme(token as string))).statusCode).toBe(200);
+
+      policy({ requireMfa: true });
+      const refused = await wallets(inAcme(token as string));
+
+      expect(refused.statusCode).toBe(403);
+      expect(refused.json().error).toBe("mfa_required");
+    });
+
+    it("refuses a CLI session older than the organization's session lifetime", async () => {
+      browser(MFA);
+      const { token } = await deviceToken();
+      policy({ sessionMaxAgeHours: 8 });
+
+      vi.advanceTimersByTime(7 * 60 * 60 * 1000);
+      expect((await wallets(inAcme(token as string))).statusCode).toBe(200);
+
+      vi.advanceTimersByTime(2 * 60 * 60 * 1000);
+      const refused = await wallets(inAcme(token as string));
+      expect(refused.statusCode).toBe(401);
+      expect(refused.json().error).toBe("session_too_old");
+    });
+
+    it("requires single sign-on from CLI sessions of members on an enforced domain", async () => {
+      browser(MFA);
+      const { token } = await deviceToken();
+      vi.mocked(prisma.ssoConnection.findMany).mockResolvedValue([
+        { clerkConnectionId: "samlc_1", domain: { domain: "example.com" } },
+      ] as never);
+      getUser.mockResolvedValue({
+        primaryEmailAddressId: "idn_1",
+        emailAddresses: [{ id: "idn_1", emailAddress: "ada@example.com" }],
+        samlAccounts: [],
+      });
+
+      const refused = await wallets(inAcme(token as string));
+      expect(refused.statusCode).toBe(403);
+      expect(refused.json().error).toBe("sso_required");
+
+      clearClerkUserCache();
+      getUser.mockResolvedValue({
+        primaryEmailAddressId: "idn_1",
+        emailAddresses: [{ id: "idn_1", emailAddress: "ada@example.com" }],
+        samlAccounts: [{ active: true, samlConnection: { id: "samlc_1" } }],
+      });
+      expect((await wallets(inAcme(token as string))).statusCode).toBe(200);
+    });
+
+    it("refuses to bind a device sign-in when the approving session lacks the organization's MFA", async () => {
+      policy({ requireMfa: true });
+      browser(NO_MFA);
+
+      const { approved, token } = await deviceToken(ACME);
+
+      expect(approved.statusCode).toBe(403);
+      expect(approved.json().error).toBe("mfa_required");
+      expect(token).toBeUndefined();
+      expect(db.requests[0].status).toBe("PENDING");
+      expect(db.sessions).toHaveLength(0);
+
+      browser(MFA);
+      const retried = await deviceToken(ACME);
+      expect(retried.approved.statusCode).toBe(204);
+      expect(db.sessions[0]).toMatchObject({
+        organizationId: ACME,
+        mfaVerified: true,
+      });
+    });
+
+    it("refuses to bind a CI token when the creating session does not meet the organization's policy", async () => {
+      policy({ requireMfa: true });
+      browser(NO_MFA);
+      const noMfa = await post(
+        "/me/cli/sessions",
+        { name: "deploy", organizationId: ACME },
+        SESSION_AUTH,
+      );
+      expect(noMfa.statusCode).toBe(403);
+      expect(noMfa.json().error).toBe("mfa_required");
+
+      policy({ sessionMaxAgeHours: 1 });
+      browser([120, 0]);
+      const stale = await post(
+        "/me/cli/sessions",
+        { name: "deploy", organizationId: ACME },
+        SESSION_AUTH,
+      );
+      expect(stale.statusCode).toBe(401);
+      expect(stale.json().error).toBe("session_too_old");
+
+      policy({ ipAllowlist: ["192.0.2.0/24"] });
+      browser(MFA);
+      const elsewhere = await post(
+        "/me/cli/sessions",
+        { name: "deploy", organizationId: ACME },
+        SESSION_AUTH,
+      );
+      expect(elsewhere.statusCode).toBe(403);
+      expect(elsewhere.json().error).toBe("ip_not_allowed");
+
+      expect(db.sessions).toHaveLength(0);
+    });
+
+    it("refuses to bind a sign-in for a suspended member", async () => {
+      browser(MFA);
+      db.memberships[0].suspendedAt = new Date();
+
+      const { approved } = await deviceToken(ACME);
+
+      expect(approved.statusCode).toBe(403);
+      expect(approved.json().error).toBe("member_suspended");
+      expect(db.sessions).toHaveLength(0);
+    });
+
+    it("refuses to bind a sign-in when single sign-on is enforced and was not used", async () => {
+      browser(MFA);
+      vi.mocked(prisma.ssoConnection.findMany).mockResolvedValue([
+        { clerkConnectionId: "samlc_1", domain: { domain: "example.com" } },
+      ] as never);
+      getUser.mockResolvedValue({
+        primaryEmailAddressId: "idn_1",
+        emailAddresses: [{ id: "idn_1", emailAddress: "ada@example.com" }],
+        samlAccounts: [],
+      });
+
+      const { approved } = await deviceToken(ACME);
+
+      expect(approved.statusCode).toBe(403);
+      expect(approved.json().error).toBe("sso_required");
     });
   });
 });

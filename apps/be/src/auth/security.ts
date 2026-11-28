@@ -78,31 +78,43 @@ export const enforceAccessPolicy = async (
     return false;
   }
 
-  if (!isClerkSession(request)) {
+  if (request.apiKey) {
     return true;
   }
 
-  const ages = factorAges(request);
+  const cli = request.cliSession;
+  const ages = cli ? null : factorAges(request);
+  const mfaVerified = cli
+    ? cli.mfaVerified
+    : ages !== null && ages.secondFactorMinutes >= 0;
 
-  if (settings.requireMfa && (!ages || ages.secondFactorMinutes < 0)) {
+  if (settings.requireMfa && !mfaVerified) {
     reply.code(403).send({
       error: "mfa_required",
-      message:
-        "This organization requires multi-factor authentication. Enable it and sign in again.",
+      message: cli
+        ? "This organization requires multi-factor authentication. Sign in to the CLI again from a dashboard session that used it."
+        : "This organization requires multi-factor authentication. Enable it and sign in again.",
     });
     return false;
   }
 
+  const maxAgeMinutes =
+    settings.sessionMaxAgeHours === null
+      ? null
+      : settings.sessionMaxAgeHours * 60;
+  const ageMinutes = cli
+    ? (Date.now() - cli.createdAt.getTime()) / 60_000
+    : (ages?.firstFactorMinutes ?? null);
+
   if (
-    settings.sessionMaxAgeHours !== null &&
-    (!ages ||
-      ages.firstFactorMinutes < 0 ||
-      ages.firstFactorMinutes > settings.sessionMaxAgeHours * 60)
+    maxAgeMinutes !== null &&
+    (ageMinutes === null || ageMinutes < 0 || ageMinutes > maxAgeMinutes)
   ) {
     reply.code(401).send({
       error: "session_too_old",
-      message:
-        "Your session is older than this organization allows. Sign in again.",
+      message: cli
+        ? "This CLI session is older than this organization allows. Sign in again with `4mica auth login`."
+        : "Your session is older than this organization allows. Sign in again.",
     });
     return false;
   }

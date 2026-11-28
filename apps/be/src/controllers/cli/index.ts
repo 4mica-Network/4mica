@@ -6,6 +6,7 @@ import {
   withRequiredScope,
 } from "@auth/cli-token";
 import { findMembership } from "@auth/repository";
+import { enforceAccessPolicy, factorAges } from "@auth/security";
 import {
   audit,
   invalidBody,
@@ -16,7 +17,7 @@ import {
 } from "@controllers/shared";
 import { appLogger } from "@logger/index";
 import { formatUserCode, normalizeUserCode } from "@utils/secrets";
-import type { FastifyReply, RouteHandler } from "fastify";
+import type { FastifyReply, FastifyRequest, RouteHandler } from "fastify";
 import { config } from "@/config/index";
 import {
   claimDevicePoll,
@@ -186,6 +187,7 @@ export const deviceTokenHandler: RouteHandler = async (request, reply) => {
     clientName: found.clientName,
     scopes: found.scopes,
     organizationId: found.organizationId,
+    mfaVerified: found.mfaVerified,
   });
 
   if (!redeemed) {
@@ -244,9 +246,25 @@ export const getDeviceRequestHandler: RouteHandler = async (request, reply) => {
   });
 };
 
-const mayBind = async (userId: string, organizationId: string | null) =>
-  organizationId === null ||
-  (await findMembership(userId, organizationId)) !== null;
+const mayIssue = async (
+  request: FastifyRequest,
+  reply: FastifyReply,
+  userId: string,
+  organizationId: string | null,
+): Promise<boolean> => {
+  if (organizationId === null) {
+    return true;
+  }
+  const tenant = await findMembership(userId, organizationId);
+  if (!tenant) {
+    notFound(reply, "organization");
+    return false;
+  }
+  return enforceAccessPolicy(request, reply, tenant);
+};
+
+const issuedWithMfa = (request: FastifyRequest): boolean =>
+  (factorAges(request)?.secondFactorMinutes ?? -1) >= 0;
 
 export const approveDeviceRequestHandler: RouteHandler = async (
   request,
@@ -285,12 +303,15 @@ export const approveDeviceRequestHandler: RouteHandler = async (
   }
 
   const organizationId = pending.organizationId ?? chosen;
-  if (!(await mayBind(userId, organizationId))) {
-    return notFound(reply, "organization");
+  if (!(await mayIssue(request, reply, userId, organizationId))) {
+    return reply;
   }
 
   if (
-    !(await decideDeviceRequest(userId, userCode, "APPROVED", organizationId))
+    !(await decideDeviceRequest(userId, userCode, "APPROVED", {
+      organizationId,
+      mfaVerified: issuedWithMfa(request),
+    }))
   ) {
     return unknownCode(reply);
   }
@@ -344,8 +365,8 @@ export const createCliTokenHandler: RouteHandler = async (request, reply) => {
   }
 
   const organizationId = parsed.data.organizationId?.toLowerCase() ?? null;
-  if (!(await mayBind(userId, organizationId))) {
-    return notFound(reply, "organization");
+  if (!(await mayIssue(request, reply, userId, organizationId))) {
+    return reply;
   }
 
   const { session, plaintext } = await createCliToken(userId, {
@@ -353,6 +374,7 @@ export const createCliTokenHandler: RouteHandler = async (request, reply) => {
     scopes: withRequiredScope(parsed.data.scopes ?? DEFAULT_TOKEN_SCOPES),
     expiresInDays: parsed.data.expiresInDays,
     organizationId,
+    mfaVerified: issuedWithMfa(request),
   });
   appLogger.info("CLI session created", {
     userId,

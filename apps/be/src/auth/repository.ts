@@ -234,6 +234,7 @@ export const findCliSessionByHash = (hashedToken: string) =>
       name: true,
       scopes: true,
       organizationId: true,
+      mfaVerified: true,
       revokedAt: true,
       expiresAt: true,
       lastUsedAt: true,

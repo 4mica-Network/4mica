@@ -38,7 +38,7 @@ export const ssoRequirement = async (
   request: FastifyRequest,
   tenant: Tenant,
 ): Promise<{ domain: string } | null> => {
-  if (tenant.personal || request.cliSession || request.apiKey) {
+  if (tenant.personal || request.apiKey) {
     return null;
   }
   const clerkUserId = request.user?.clerkUserId;

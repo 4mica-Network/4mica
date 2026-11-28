@@ -515,14 +515,21 @@ describe("ssoRequirement", () => {
     expect(await ssoRequirement(request(), tenant)).toBeNull();
   });
 
-  it("does not apply to personal orgs or CLI tokens", async () => {
+  it("does not apply to personal orgs or API keys", async () => {
     enforced();
     expect(
       await ssoRequirement(request(), { ...tenant, personal: true }),
     ).toBeNull();
     expect(
-      await ssoRequirement(request({ cliSession: { id: "cli" } }), tenant),
+      await ssoRequirement(request({ apiKey: { id: "key" } }), tenant),
     ).toBeNull();
+  });
+
+  it("applies to CLI sessions like browser sessions", async () => {
+    enforced();
+    expect(
+      await ssoRequirement(request({ cliSession: { id: "cli" } }), tenant),
+    ).toEqual({ domain: "acme.com" });
   });
 
   it("fails closed when Clerk is unreachable", async () => {

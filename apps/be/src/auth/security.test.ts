@@ -35,9 +35,24 @@ const TENANT: Tenant = {
 
 interface Caller {
   fva?: unknown;
-  cli?: boolean;
+  cli?: boolean | { mfaVerified?: boolean; ageMinutes?: number };
   ip?: string;
 }
+
+const cliOf = (cli: Caller["cli"]) => {
+  const { mfaVerified = false, ageMinutes = 0 } =
+    typeof cli === "object" ? cli : {};
+  return {
+    id: "cli_1",
+    kind: "TOKEN",
+    name: "laptop",
+    scopes: [],
+    organizationId: TENANT.orgId,
+    mfaVerified,
+    createdAt: new Date(Date.now() - ageMinutes * 60_000),
+    expiresAt: new Date(Date.now() + 86_400_000),
+  };
+};
 
 const requestOf = ({ fva, cli = false, ip = "203.0.113.10" }: Caller = {}) =>
   ({
@@ -50,17 +65,7 @@ const requestOf = ({ fva, cli = false, ip = "203.0.113.10" }: Caller = {}) =>
           sessionId: "sess_1",
           claims: fva === undefined ? {} : { fva },
         },
-    cliSession: cli
-      ? {
-          id: "cli_1",
-          kind: "TOKEN",
-          name: "laptop",
-          scopes: [],
-          organizationId: TENANT.orgId,
-          createdAt: new Date(),
-          expiresAt: new Date(),
-        }
-      : null,
+    cliSession: cli ? cliOf(cli) : null,
     apiKey: null,
   }) as unknown as FastifyRequest;
 
@@ -192,8 +197,18 @@ describe("enforceAccessPolicy", () => {
       });
     });
 
-    it("does not apply to CLI tokens", async () => {
-      expect(await enforce({ cli: true })).toMatchObject({ ok: true });
+    it("admits a CLI session issued from a browser session that used MFA", async () => {
+      expect(await enforce({ cli: { mfaVerified: true } })).toMatchObject({
+        ok: true,
+      });
+    });
+
+    it("refuses a CLI session issued without MFA", async () => {
+      expect(await enforce({ cli: { mfaVerified: false } })).toMatchObject({
+        ok: false,
+        status: 403,
+        body: { error: "mfa_required" },
+      });
     });
   });
 
@@ -222,8 +237,18 @@ describe("enforceAccessPolicy", () => {
       });
     });
 
-    it("does not apply to CLI tokens", async () => {
-      expect(await enforce({ cli: true })).toMatchObject({ ok: true });
+    it("admits a CLI session issued within the limit", async () => {
+      expect(await enforce({ cli: { ageMinutes: 8 * 60 - 1 } })).toMatchObject({
+        ok: true,
+      });
+    });
+
+    it("refuses a CLI session issued longer ago than the limit", async () => {
+      expect(await enforce({ cli: { ageMinutes: 8 * 60 + 1 } })).toMatchObject({
+        ok: false,
+        status: 401,
+        body: { error: "session_too_old" },
+      });
     });
   });
 
@@ -248,11 +273,15 @@ describe("enforceAccessPolicy", () => {
       expect(ssoRequirement).not.toHaveBeenCalled();
     });
 
-    it("is not consulted for CLI tokens", async () => {
+    it("applies to CLI sessions too", async () => {
       ssoRequirement.mockResolvedValue({ domain: "acme.com" });
 
-      expect(await enforce({ cli: true })).toMatchObject({ ok: true });
-      expect(ssoRequirement).not.toHaveBeenCalled();
+      expect(await enforce({ cli: true })).toMatchObject({
+        ok: false,
+        status: 403,
+        body: { error: "sso_required", domain: "acme.com" },
+      });
+      expect(ssoRequirement).toHaveBeenCalledOnce();
     });
   });
 
@@ -307,7 +336,9 @@ describe("requireRecentAuth", () => {
   });
 
   it("refuses CLI tokens however fresh", async () => {
-    expect(await reauth({ cli: true, fva: [0, 0] })).toMatchObject({
+    expect(
+      await reauth({ cli: { mfaVerified: true, ageMinutes: 0 }, fva: [0, 0] }),
+    ).toMatchObject({
       ok: false,
       status: 403,
       body: { error: "reauth_required" },

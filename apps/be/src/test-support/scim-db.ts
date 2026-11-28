@@ -44,6 +44,8 @@ const RELATIONS: Record<string, Record<string, Relation>> = {
     user: one("user", "userId"),
   },
   projectMembership: { project: one("project", "projectId") },
+  cliSession: { user: one("user", "userId") },
+  project: { members: many("projectMembership", "projectId") },
   ssoConnection: { domain: one("organizationDomain", "domainId") },
   user: {},
   organization: { defaultFor: many("user", "defaultOrganizationId") },

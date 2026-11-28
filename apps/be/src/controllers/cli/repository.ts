@@ -108,6 +108,7 @@ export const findDeviceRequestByCode = (deviceCode: string) =>
       clientName: true,
       scopes: true,
       organizationId: true,
+      mfaVerified: true,
       intervalSecs: true,
       lastPolledAt: true,
       expiresAt: true,
@@ -141,6 +142,7 @@ export const redeemDeviceRequest = (request: {
   clientName: string;
   scopes: string[];
   organizationId: string | null;
+  mfaVerified: boolean;
 }) =>
   prisma.$transaction(async (tx) => {
     const { count } = await tx.cliDeviceRequest.updateMany({
@@ -168,6 +170,7 @@ export const redeemDeviceRequest = (request: {
         hashedToken: secret.hash,
         scopes: request.scopes,
         organizationId: request.organizationId,
+        mfaVerified: request.mfaVerified,
         expiresAt: new Date(Date.now() + DEVICE_SESSION_TTL_MS),
       },
       select: CLI_SESSION_SELECT,
@@ -186,7 +189,10 @@ export const decideDeviceRequest = async (
   userId: string,
   userCode: string,
   status: "APPROVED" | "DENIED",
-  organizationId: string | null = null,
+  approval: { organizationId: string | null; mfaVerified: boolean } = {
+    organizationId: null,
+    mfaVerified: false,
+  },
 ): Promise<boolean> => {
   const { count } = await prisma.cliDeviceRequest.updateMany({
     where: { userCode, status: "PENDING", expiresAt: { gt: new Date() } },
@@ -194,7 +200,7 @@ export const decideDeviceRequest = async (
       status,
       userId,
       decidedAt: new Date(),
-      ...(status === "APPROVED" ? { organizationId } : {}),
+      ...(status === "APPROVED" ? approval : {}),
     },
   });
 
@@ -215,6 +221,7 @@ export const createCliToken = async (
     scopes: CliScope[];
     expiresInDays: number;
     organizationId: string | null;
+    mfaVerified: boolean;
   },
 ) => {
   const secret = generateCliToken();
@@ -229,6 +236,7 @@ export const createCliToken = async (
       hashedToken: secret.hash,
       scopes: input.scopes,
       organizationId: input.organizationId,
+      mfaVerified: input.mfaVerified,
       expiresAt: new Date(Date.now() + input.expiresInDays * DAY_MS),
     },
     select: CLI_SESSION_SELECT,

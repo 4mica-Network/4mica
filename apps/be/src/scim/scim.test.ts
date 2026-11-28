@@ -1,4 +1,5 @@
 import { clearUserCache } from "@auth/user-store";
+import { projectRoutes } from "@routes/projects";
 import { SCIM_PREFIX, scimRoutes } from "@routes/scim";
 import { hashSecret } from "@utils/secrets";
 import {
@@ -58,7 +59,10 @@ let tokenA: Row;
 let clerkSeq = 0;
 
 beforeAll(async () => {
-  app = await initApp([{ plugin: scimRoutes, prefix: SCIM_PREFIX }]);
+  app = await initApp([
+    { plugin: scimRoutes, prefix: SCIM_PREFIX },
+    { plugin: projectRoutes },
+  ]);
 });
 
 afterAll(async () => {
@@ -1002,6 +1006,39 @@ describe("deprovisioning", () => {
     });
 
     expect((await scim("GET", `/Users/${ada.id}`)).statusCode).toBe(404);
+  });
+
+  it("shuts an unbound CLI session out of the organization that deprovisioned its user", async () => {
+    const { ada } = seedFootprint();
+    const token = "4mica_cli_unbound-session-token";
+    db.seed("cliSession", {
+      userId: ada.id,
+      organizationId: null,
+      name: "laptop",
+      kind: "DEVICE",
+      hashedToken: hashSecret(token),
+      scopes: ["account:read"],
+      mfaVerified: false,
+      lastUsedAt: null,
+      expiresAt: new Date(Date.now() + 86_400_000),
+      createdAt: new Date(),
+    });
+    const projectsIn = (orgId: unknown) =>
+      app.inject({
+        method: "GET",
+        url: "/me/projects",
+        headers: {
+          authorization: `Bearer ${token}`,
+          "x-org-id": String(orgId),
+        },
+      });
+
+    expect((await projectsIn(orgA.id)).statusCode).toBe(200);
+
+    await scim("DELETE", `/Users/${ada.id}`);
+
+    expect((await projectsIn(orgA.id)).statusCode).toBe(404);
+    expect((await projectsIn(orgB.id)).statusCode).toBe(200);
   });
 
   it("keeps group memberships on deactivation so reactivation restores the role", async () => {

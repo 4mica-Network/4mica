@@ -1513,6 +1513,7 @@ model CliSession {
   last4          String         @db.VarChar(4)
   hashedToken    String         @unique @map("hashed_token")
   scopes         String[]
+  mfaVerified    Boolean        @default(false) @map("mfa_verified")
   lastUsedAt     DateTime?      @map("last_used_at")
   expiresAt      DateTime       @map("expires_at")
   revokedAt      DateTime?      @map("revoked_at")
@@ -1546,6 +1547,7 @@ model CliDeviceRequest {
   intervalSecs   Int                    @map("interval_secs")
   lastPolledAt   DateTime?              @map("last_polled_at")
   expiresAt      DateTime               @map("expires_at")
+  mfaVerified    Boolean                @default(false) @map("mfa_verified")
   decidedAt      DateTime?              @map("decided_at")
   consumedAt     DateTime?              @map("consumed_at")
   createdAt      DateTime               @default(now()) @map("created_at")
