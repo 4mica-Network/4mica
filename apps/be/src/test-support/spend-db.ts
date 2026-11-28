@@ -1,3 +1,4 @@
+import { fromUnits, toUnits } from "@utils/units";
 import { vi } from "vitest";
 import { memoryTable } from "./memory-table";
 import { tenancyMocks } from "./tenancy";
@@ -114,6 +115,73 @@ export const createSpendDb = () => {
   const project = tenancy.project;
   const $executeRaw = vi.fn(async () => 0);
 
+  const unmatchedPayments = (values: unknown[]) => {
+    const [dayStart, reqId, list, network, assetAddress, monthStart, orgId] =
+      values as [
+        Date,
+        string | null,
+        { values: string[] },
+        string,
+        string | null,
+        Date,
+        string,
+      ];
+    const addresses: unknown[] = list.values;
+    const now = values[10] as Date;
+    const covers = (row: Row, reqId: unknown, amount: bigint) =>
+      row.organizationId === orgId &&
+      row.reqId === reqId &&
+      row.network === network &&
+      (row.assetAddress ?? null) === assetAddress &&
+      (row.createdAt as Date) >= monthStart &&
+      toUnits(row.amount as string) >= amount &&
+      (row.status === "CONSUMED" ||
+        ((row.status === "RESERVED" || row.status === "PENDING_APPROVAL") &&
+          (row.expiresAt as Date) > now));
+    const first = new Map<unknown, Row>();
+    for (const row of payment.rows
+      .filter(
+        (entry) =>
+          addresses.includes(entry.payerAddress) &&
+          entry.network === network &&
+          (entry.assetAddress ?? null) === assetAddress &&
+          entry.status !== "FAILED" &&
+          (entry.createdAt as Date) >= monthStart &&
+          !spendAuthorization.rows.some((authorization) =>
+            covers(authorization, entry.reqId, toUnits(entry.amount as string)),
+          ),
+      )
+      .sort(
+        (a, b) =>
+          (a.createdAt as Date).getTime() - (b.createdAt as Date).getTime(),
+      )) {
+      if (!first.has(row.reqId)) {
+        first.set(row.reqId, row);
+      }
+    }
+    const totals = new Map<string, bigint>();
+    for (const row of first.values()) {
+      const key = `${row.payerAddress}|${(row.createdAt as Date) >= dayStart}|${row.reqId === reqId ? row.reqId : ""}`;
+      totals.set(key, (totals.get(key) ?? 0n) + toUnits(row.amount as string));
+    }
+    return [...totals].map(([key, total]) => {
+      const [payerAddress, today, matched] = key.split("|");
+      return {
+        req_id: matched || null,
+        payer_address: payerAddress,
+        today: today === "true",
+        amount: fromUnits(total),
+      };
+    });
+  };
+
+  const $queryRaw = vi.fn(
+    async (strings: TemplateStringsArray, ...values: unknown[]) =>
+      strings.join("?").includes("FROM payments p")
+        ? unmatchedPayments(values)
+        : [],
+  );
+
   const prisma: Record<string, unknown> = {
     approvalRequest,
     spendAuthorization,
@@ -131,7 +199,7 @@ export const createSpendDb = () => {
     organization,
     business: { findUnique: vi.fn(), upsert: vi.fn() },
     $executeRaw,
-    $queryRaw: vi.fn(async () => []),
+    $queryRaw,
   };
   prisma.$transaction = vi.fn(async (work: unknown) =>
     typeof work === "function"

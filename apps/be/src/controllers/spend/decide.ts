@@ -52,12 +52,6 @@ type Db = Prisma.TransactionClient;
 const HOUR_MS = 3_600_000;
 export const PAYMENT_APPROVAL_ACTION = "payment.authorize";
 
-const EMPTY_USAGE: UsageData = {
-  authorizations: [],
-  payments: [],
-  agentWallets: {},
-};
-
 export const assetSymbol = (
   network: PaymentNetwork,
   assetAddress: string | null,
@@ -87,6 +81,7 @@ const usageFor = async (
   assetAddress: string | null,
   policies: EnginePolicy[],
   now: Date,
+  options: { excludeId?: string; reqId?: string | null } = {},
 ): Promise<UsageData> =>
   policies.some((policy) => policy.network !== null)
     ? loadUsage(
@@ -98,8 +93,9 @@ const usageFor = async (
           .filter((policy) => policy.scope === "AGENT" && policy.agentId)
           .map((policy) => policy.agentId as string),
         now,
+        options,
       )
-    : EMPTY_USAGE;
+    : { authorizations: [], payments: [], agentWallets: {} };
 
 const budgetAlerts = (
   orgId: string,
@@ -195,6 +191,7 @@ export const authorizeSpend = async (
       input.assetAddress,
       policies,
       now,
+      { reqId: input.reqId },
     );
     const decision = evaluate(subject, policies, usage, now);
 
@@ -442,10 +439,10 @@ export const resolvePendingAuthorization = async (
     row.assetAddress,
     policies,
     now,
+    { excludeId: row.id },
   );
   const decision = evaluate(subject, policies, usage, now, {
     ignoreApprovalThreshold: true,
-    excludeId: row.id,
   });
 
   if (decision.kind === "deny") {

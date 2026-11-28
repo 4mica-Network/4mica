@@ -1,7 +1,7 @@
 import {
   type EnvironmentKind,
   type PaymentNetwork,
-  type Prisma,
+  Prisma,
   prisma,
   type SpendAuthorizationStatus,
 } from "@4mica/db";
@@ -107,37 +107,87 @@ const USAGE_STATUSES: SpendAuthorizationStatus[] = [
   "PENDING_APPROVAL",
 ];
 
+const COUNTED_FOREVER = new Date(8_640_000_000_000_000);
+
+interface UnmatchedPaymentRow {
+  req_id: string | null;
+  payer_address: string;
+  today: boolean;
+  amount: Prisma.Decimal;
+}
+
+const groupKey = (row: {
+  projectId: string;
+  agentId: string | null;
+  apiKeyId: string | null;
+  status: SpendAuthorizationStatus;
+}) => [row.projectId, row.agentId, row.apiKeyId, row.status].join("|");
+
 export const loadUsage = async (
-  db: Pick<Db, "spendAuthorization" | "wallet" | "payment" | "agent">,
+  db: Pick<Db, "spendAuthorization" | "wallet" | "agent" | "$queryRaw">,
   orgId: string,
   network: PaymentNetwork,
   assetAddress: string | null,
   agentIds: string[],
   now: Date,
+  options: { excludeId?: string; reqId?: string | null } = {},
 ): Promise<UsageData> => {
-  const { monthStart } = windowsAt(now);
-
-  const [authorizations, wallets, agents] = await Promise.all([
-    db.spendAuthorization.findMany({
+  const { excludeId, reqId = null } = options;
+  const { dayStart, monthStart } = windowsAt(now);
+  const counted = (since: Date) =>
+    db.spendAuthorization.groupBy({
+      by: ["projectId", "agentId", "apiKeyId", "status"],
       where: {
         organizationId: orgId,
         network,
         assetAddress,
-        status: { in: USAGE_STATUSES },
-        createdAt: { gte: monthStart },
+        createdAt: { gte: since },
+        OR: [
+          { status: "CONSUMED" },
+          {
+            status: { in: ["RESERVED", "PENDING_APPROVAL"] },
+            expiresAt: { gt: now },
+          },
+        ],
+        ...(excludeId ? { id: { not: excludeId } } : {}),
       },
-      select: {
-        id: true,
-        reqId: true,
-        status: true,
-        amount: true,
-        createdAt: true,
-        expiresAt: true,
-        projectId: true,
-        agentId: true,
-        apiKeyId: true,
-      },
-    }),
+      _sum: { amount: true },
+      orderBy: [{ projectId: "asc" }, { agentId: "asc" }, { apiKeyId: "asc" }],
+    });
+
+  const unmatchedPayments = (addresses: string[]) =>
+    db.$queryRaw<UnmatchedPaymentRow[]>`
+      SELECT u.payer_address,
+             u.created_at >= ${dayStart} AS today,
+             SUM(u.amount) AS amount,
+             CASE WHEN u.req_id = ${reqId}::varchar THEN u.req_id END AS req_id
+        FROM (
+          SELECT DISTINCT ON (p.req_id) p.req_id, p.payer_address, p.amount, p.created_at
+            FROM payments p
+           WHERE p.payer_address IN (${Prisma.join(addresses)})
+             AND p.network = ${network}::"PaymentNetwork"
+             AND p.asset_address IS NOT DISTINCT FROM ${assetAddress}::varchar
+             AND p.status <> 'FAILED'
+             AND p.created_at >= ${monthStart}
+             AND NOT EXISTS (
+                   SELECT 1 FROM spend_authorizations a
+                    WHERE a.organization_id = ${orgId}
+                      AND a.req_id = p.req_id
+                      AND a.network = ${network}::"PaymentNetwork"
+                      AND a.asset_address IS NOT DISTINCT FROM ${assetAddress}::varchar
+                      AND a.created_at >= ${monthStart}
+                      AND a.amount >= p.amount
+                      AND (a.status = 'CONSUMED'
+                           OR (a.status IN ('RESERVED', 'PENDING_APPROVAL')
+                               AND a.expires_at > ${now})))
+           ORDER BY p.req_id, p.created_at, p.id
+        ) u
+       GROUP BY 1, 2, 4
+    `;
+
+  const [month, today, wallets, agents] = await Promise.all([
+    counted(monthStart),
+    counted(dayStart),
     db.wallet.findMany({
       where: { organizationId: orgId, network },
       select: { address: true },
@@ -154,31 +204,39 @@ export const loadUsage = async (
   ]);
 
   const addresses = [...new Set(wallets.map((wallet) => wallet.address))];
-  const payments =
-    addresses.length > 0
-      ? await db.payment.findMany({
-          where: {
-            payerAddress: { in: addresses },
-            network,
-            assetAddress,
-            status: { not: "FAILED" },
-            createdAt: { gte: monthStart },
-          },
-          select: {
-            reqId: true,
-            amount: true,
-            createdAt: true,
-            payerAddress: true,
-          },
-        })
-      : [];
+  const unmatched =
+    addresses.length > 0 ? await unmatchedPayments(addresses) : [];
+
+  const todays = new Map(
+    today.map((row) => [groupKey(row), toUnits(row._sum.amount ?? 0)]),
+  );
+  const authorizations = month.flatMap((row): UsageAuthorization[] => {
+    const base = {
+      reqId: null,
+      status: row.status,
+      expiresAt: COUNTED_FOREVER,
+      projectId: row.projectId,
+      agentId: row.agentId,
+      apiKeyId: row.apiKeyId,
+    };
+    const key = groupKey(row);
+    const day = todays.get(key) ?? 0n;
+    const earlier = toUnits(row._sum.amount ?? 0) - day;
+    return [
+      { ...base, id: `today:${key}`, amount: day, createdAt: dayStart },
+      { ...base, id: `month:${key}`, amount: earlier, createdAt: monthStart },
+    ].filter((entry) => entry.amount > 0n);
+  });
 
   return {
-    authorizations: authorizations.map(
-      (row): UsageAuthorization => ({ ...row, amount: toUnits(row.amount) }),
-    ),
-    payments: payments.map(
-      (row): UsagePayment => ({ ...row, amount: toUnits(row.amount) }),
+    authorizations,
+    payments: unmatched.map(
+      (row, index): UsagePayment => ({
+        reqId: row.req_id ?? `unmatched:${index}`,
+        amount: toUnits(row.amount),
+        createdAt: row.today ? dayStart : monthStart,
+        payerAddress: row.payer_address,
+      }),
     ),
     agentWallets: Object.fromEntries(
       agents.map((agent) => [

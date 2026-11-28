@@ -438,6 +438,49 @@ describe("POST /v1/spend/authorize", () => {
     ).toBe("daily_limit");
   });
 
+  it("sums usage in the database instead of loading the month's rows", async () => {
+    h.db.spendingPolicy.seed(orgPolicy({ dailyLimit: "100" }));
+    h.db.spendAuthorization.seed(authRow({ status: "CONSUMED", amount: "50" }));
+    const rows = [
+      vi.spyOn(h.db.spendAuthorization, "findMany"),
+      vi.spyOn(h.db.payment, "findMany"),
+    ];
+    const groupBy = vi.spyOn(h.db.spendAuthorization, "groupBy");
+
+    expect((await post("/v1/spend/authorize", body())).json().status).toBe(
+      "RESERVED",
+    );
+    for (const spy of rows) {
+      expect(spy).not.toHaveBeenCalled();
+      spy.mockRestore();
+    }
+    expect(groupBy).toHaveBeenCalledTimes(2);
+    expect(groupBy.mock.calls[0]?.[0]).toMatchObject({
+      by: ["projectId", "agentId", "apiKeyId", "status"],
+      _sum: { amount: true },
+    });
+    groupBy.mockRestore();
+  });
+
+  it("lets the new authorization cover an earlier unmatched payment with its reqId when checking budgets", async () => {
+    h.db.spendingPolicy.seed(
+      orgPolicy({ dailyLimit: "10", alertThresholds: [100] }),
+    );
+    h.db.payment.seed({
+      reqId: "0xabc",
+      payerAddress: PAYER,
+      network: "BASE_SEPOLIA",
+      assetAddress: USDC,
+      amount: "5",
+    });
+    const res = await post(
+      "/v1/spend/authorize",
+      body({ amount: "5", reqId: "0xabc" }),
+    );
+    expect(res.json().status).toBe("RESERVED");
+    expect(h.db.financialAlert.rows).toEqual([]);
+  });
+
   it("never denies under a MONITOR policy, and raises its budget alert once", async () => {
     const [policy] = h.db.spendingPolicy.seed(
       orgPolicy({

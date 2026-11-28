@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { fromUnits, toUnits } from "@utils/units";
 
 type Row = Record<string, unknown>;
 type Where = Record<string, unknown>;
@@ -71,6 +72,11 @@ export interface MemoryTable<T extends Row> {
     where?: Where;
     data: Partial<T>;
   }) => Promise<{ count: number }>;
+  groupBy: (args: {
+    by: string[];
+    where?: Where;
+    _sum: Record<string, true>;
+  }) => Promise<Row[]>;
 }
 
 export const memoryTable = <T extends Row>(
@@ -163,6 +169,31 @@ export const memoryTable = <T extends Row>(
         Object.assign(row, data, { updatedAt: new Date() });
       }
       return { count: hit.length };
+    },
+    groupBy: async ({ by, where, _sum }) => {
+      const groups = new Map<string, Row>();
+      for (const row of rows.filter((entry) => matches(entry, where))) {
+        const key = JSON.stringify(by.map((field) => row[field] ?? null));
+        const group = groups.get(key) ?? {
+          ...Object.fromEntries(by.map((field) => [field, row[field] ?? null])),
+          _sum: Object.fromEntries(
+            Object.keys(_sum).map((field) => [field, 0n]),
+          ),
+        };
+        const sums = group._sum as Record<string, bigint>;
+        for (const field of Object.keys(_sum)) {
+          sums[field] = (sums[field] ?? 0n) + toUnits(row[field] as string);
+        }
+        groups.set(key, group);
+      }
+      return [...groups.values()].map((group) => ({
+        ...group,
+        _sum: Object.fromEntries(
+          Object.entries(group._sum as Record<string, bigint>).map(
+            ([field, total]) => [field, fromUnits(total)],
+          ),
+        ),
+      }));
     },
   };
 };
