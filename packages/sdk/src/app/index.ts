@@ -1,6 +1,7 @@
 export {
   AppClient,
   type AppClientOptions,
+  type AppRequestOptions,
   createAppClient,
   DEFAULT_APP_BASE_URL,
 } from "@/app/client";

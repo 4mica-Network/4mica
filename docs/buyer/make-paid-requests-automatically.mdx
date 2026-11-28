@@ -106,6 +106,13 @@ Before signing, `client.fetch` asks `POST /v1/spend/authorize` for the payment's
 
 `agentId` attributes payments to one agent when the key is not already an agent's key.
 
+### Cancellation and deadlines
+
+Every call to the 4mica API is bounded by `requestTimeoutMs` (default 10 s), and the whole decision, from the first `authorize` request through every approval poll, by `approvalTimeoutMs`, which starts before the first request. The request's `signal` is honoured differently on each side of submission:
+
+- **Before the payment is sent** (authorizing, waiting between polls, a poll request, signing): aborting the `signal` stops at once and `client.fetch` rejects with the signal's reason. A pending approval or a reservation that was already granted is released first, and that release is bounded by `accountingTimeoutMs`. If the abort lands while the first `authorize` request is in flight, its response is never read, so a reservation the API may have made is not released; it stops counting when it expires.
+- **After the payment is sent**: the seller may redeem it, so the consume (or the release after a 402) runs to completion under its own lifecycle, `accountingTimeoutMs` (default 30 s) for all attempts together, and ignores the request's `signal`. Aborting the request still rejects `client.fetch` as soon as the paid request does.
+
 ### Accounting after the payment
 
 Consuming or releasing the authorization is bookkeeping that happens after the seller has answered, so its failure never turns a payment into an error: `client.fetch` still returns the seller's response, unchanged. A network error, a 5xx or a 429 from the 4mica API is retried up to three attempts in all, with jittered backoff; any other 4xx is not retried. Both calls are idempotent, so a retry never counts a payment twice.
@@ -113,7 +120,7 @@ Consuming or releasing the authorization is bookkeeping that happens after the s
 `governanceOutcome(response)` tells you how the bookkeeping went for a response that carried a governed payment, and returns `undefined` otherwise:
 
 - `accounting: "recorded"`: the authorization was consumed, or released after a 402.
-- `accounting: "pending"`: a transient failure was being retried when the request's `signal` aborted, so the outcome is not known yet. A consume is reconciled by `reqId` once the seller reports the payment; a release lapses when the reservation expires.
+- `accounting: "pending"`: the call did not finish within `accountingTimeoutMs`, so the outcome is not known yet. A consume is reconciled by `reqId` once the seller reports the payment; a release lapses when the reservation expires.
 - `accounting: "failed"`: the API refused the call, or every attempt failed.
 
 To alert on it, pass `onAccountingError`. It receives a `SpendAccountingError` with the `transition` (`"consume"` or `"release"`), `authorizationId`, `reqId`, `accounting` and the underlying `cause`, for every outcome other than `"recorded"`, including when the paid request itself threw:

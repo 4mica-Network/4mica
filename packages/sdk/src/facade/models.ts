@@ -26,6 +26,8 @@ export interface GovernanceOptions {
   agentId?: string;
   approvalTimeoutMs?: number;
   pollIntervalMs?: number;
+  requestTimeoutMs?: number;
+  accountingTimeoutMs?: number;
   onAccountingError?: (error: SpendAccountingError) => void;
 }
 

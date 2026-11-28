@@ -197,6 +197,11 @@ here is bookkeeping, not a failed payment: never sign the payment again because 
 A reservation expires 10 minutes after it is granted. Release one you will not use, so it stops
 counting toward your limits.
 
+Each of these methods takes an optional last argument `{ signal }`, passed to `fetch`, so you can
+cancel or time-bound a single call. Before you send the payment, cancel freely and release what you
+were granted; after you send it, finish the consume or release on a signal of its own rather than the
+caller's, because the seller may still redeem the payment.
+
 **This is a cooperative check, not hard enforcement.** 4mica's API is not in the payment path:
 the payer signs locally, so anyone holding the wallet key can pay without asking. Such payments are
 detected afterwards, when the seller reports them with `reportPayment()`: they raise an

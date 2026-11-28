@@ -55,12 +55,19 @@ const authorization = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 });
 
+type Answer = (init?: RequestInit) => Response | Promise<Response>;
+
+const hang: Answer = (init) =>
+  new Promise((_resolve, reject) => {
+    init?.signal?.addEventListener("abort", () => reject(init.signal?.reason));
+  });
+
 function api(
   answers: {
-    authorize?: () => Response;
-    poll?: () => Response;
-    consume?: () => Response;
-    release?: () => Response;
+    authorize?: Answer;
+    poll?: Answer;
+    consume?: Answer;
+    release?: Answer;
   } = {},
 ) {
   const calls: { method: string; path: string; body: unknown }[] = [];
@@ -74,17 +81,19 @@ function api(
         body: init?.body ? JSON.parse(String(init.body)) : undefined,
       });
       if (path === "/v1/spend/authorize") {
-        return answers.authorize?.() ?? json(authorization());
+        return answers.authorize?.(init) ?? json(authorization());
       }
       if (method === "GET") {
-        return answers.poll?.() ?? json(authorization());
+        return answers.poll?.(init) ?? json(authorization());
       }
       if (path.endsWith("/consume")) {
         return (
-          answers.consume?.() ?? json(authorization({ status: "CONSUMED" }))
+          answers.consume?.(init) ?? json(authorization({ status: "CONSUMED" }))
         );
       }
-      return answers.release?.() ?? json(authorization({ status: "RELEASED" }));
+      return (
+        answers.release?.(init) ?? json(authorization({ status: "RELEASED" }))
+      );
     },
   );
   return { calls, fetchFn: fetchFn as unknown as typeof fetch };
@@ -122,6 +131,9 @@ const governor = (
   fetchFn: typeof fetch,
   options: {
     approvalTimeoutMs?: number;
+    pollIntervalMs?: number;
+    requestTimeoutMs?: number;
+    accountingTimeoutMs?: number;
     agentId?: string;
     onAccountingError?: (error: SpendAccountingError) => void;
   } = {},
@@ -601,13 +613,16 @@ describe("governance accounting", () => {
     expect(error.reqId).toBe(envelope.payload.payload.req_id);
   });
 
-  it("stops retrying once the request is aborted and reports the consume as pending", async () => {
+  it("keeps retrying the consume after the caller aborts once the payment was sent", async () => {
     fakeTimers();
     const controller = new AbortController();
+    let attempts = 0;
     const backend = api({
       consume: () => {
         controller.abort();
-        return json({ error: "unavailable" }, 503);
+        return ++attempts < 2
+          ? json({ error: "unavailable" }, 503)
+          : json(authorization({ status: "CONSUMED" }));
       },
     });
     const onAccountingError = vi.fn();
@@ -621,12 +636,9 @@ describe("governance accounting", () => {
     );
 
     expect(await res.text()).toBe("ok");
-    expect(consumes(backend.calls)).toHaveLength(1);
-    expect(governanceOutcome(res)?.accounting).toBe("pending");
-    expect(onAccountingError).toHaveBeenCalledTimes(1);
-    expect(onAccountingError.mock.calls[0][0]).toMatchObject({
-      accounting: "pending",
-    });
+    expect(consumes(backend.calls)).toHaveLength(2);
+    expect(governanceOutcome(res)?.accounting).toBe("recorded");
+    expect(onAccountingError).not.toHaveBeenCalled();
   });
 
   it("reports a failed consume when the paid request itself throws", async () => {
@@ -680,5 +692,239 @@ describe("governance accounting", () => {
     const res = await payingFetch(ctx, URL_);
 
     expect(governanceOutcome(res)).toBeUndefined();
+  });
+});
+
+describe("cancellation and deadlines", () => {
+  const PENDING = () =>
+    json(
+      authorization({
+        status: "PENDING_APPROVAL",
+        approvalRequestId: "apr_1",
+      }),
+    );
+
+  const releases = (calls: { method: string; path: string }[]) =>
+    paths(calls).filter((call) => call.endsWith("/release"));
+
+  const timed = async <T>(promise: Promise<T>) => {
+    const started = Date.now();
+    const outcome = await promise.then(
+      (value) => ({ value, error: undefined as unknown }),
+      (error: unknown) => ({ value: undefined, error }),
+    );
+    return { ...outcome, elapsed: Date.now() - started };
+  };
+
+  it("abandons the authorize request when the caller aborts, without signing", async () => {
+    const controller = new AbortController();
+    const backend = api({
+      authorize: (init) => {
+        queueMicrotask(() => controller.abort());
+        return hang(init);
+      },
+    });
+    const shop = seller();
+    const limiter = new SpendLimiter({ total: "0.01 USDC" });
+    const { ctx } = context(shop.fetchFn, governor(backend.fetchFn), limiter);
+
+    const { error, elapsed } = await timed(
+      payingFetch(ctx, URL_, { signal: controller.signal }),
+    );
+
+    expect(error).toMatchObject({ name: "AbortError" });
+    expect(elapsed).toBeLessThan(1_000);
+    expect(shop.calls).toHaveLength(1);
+    expect(paths(backend.calls)).toEqual(["POST /v1/spend/authorize"]);
+    const again = context(seller().fetchFn, undefined, limiter);
+    expect((await payingFetch(again.ctx, URL_)).ok).toBe(true);
+  });
+
+  it("bounds a hanging authorize request by requestTimeoutMs", async () => {
+    const backend = api({ authorize: hang });
+    const { ctx } = context(
+      seller().fetchFn,
+      governor(backend.fetchFn, { requestTimeoutMs: 50 }),
+    );
+
+    const { error, elapsed } = await timed(payingFetch(ctx, URL_));
+
+    expect(error).toMatchObject({
+      name: "AppError",
+      message: "governance request timed out after 50ms",
+    });
+    expect(elapsed).toBeLessThan(1_000);
+  });
+
+  it("stops waiting between polls and releases the pending approval when the caller aborts", async () => {
+    const controller = new AbortController();
+    const backend = api({
+      authorize: () => {
+        setTimeout(() => controller.abort(), 20);
+        return PENDING();
+      },
+      poll: PENDING,
+    });
+    const shop = seller();
+    const { ctx } = context(
+      shop.fetchFn,
+      governor(backend.fetchFn, { pollIntervalMs: 60_000 }),
+    );
+
+    const { error, elapsed } = await timed(
+      payingFetch(ctx, URL_, { signal: controller.signal }),
+    );
+
+    expect(error).toMatchObject({ name: "AbortError" });
+    expect(elapsed).toBeLessThan(1_000);
+    expect(paths(backend.calls)).toEqual([
+      "POST /v1/spend/authorize",
+      "POST /v1/spend/authorizations/auth_1/release",
+    ]);
+    expect(shop.calls).toHaveLength(1);
+  });
+
+  it("abandons a poll request and releases when the caller aborts during it", async () => {
+    const controller = new AbortController();
+    const backend = api({
+      authorize: PENDING,
+      poll: (init) => {
+        queueMicrotask(() => controller.abort());
+        return hang(init);
+      },
+    });
+    const { ctx } = context(seller().fetchFn, governor(backend.fetchFn));
+
+    const { error, elapsed } = await timed(
+      payingFetch(ctx, URL_, { signal: controller.signal }),
+    );
+
+    expect(error).toMatchObject({ name: "AbortError" });
+    expect(elapsed).toBeLessThan(1_000);
+    expect(paths(backend.calls)).toEqual([
+      "POST /v1/spend/authorize",
+      "GET /v1/spend/authorizations/auth_1",
+      "POST /v1/spend/authorizations/auth_1/release",
+    ]);
+  });
+
+  it("ends a hanging poll at the approval deadline, not the request timeout", async () => {
+    const backend = api({ authorize: PENDING, poll: hang });
+    const { ctx } = context(
+      seller().fetchFn,
+      governor(backend.fetchFn, {
+        approvalTimeoutMs: 80,
+        requestTimeoutMs: 60_000,
+      }),
+    );
+
+    const { error, elapsed } = await timed(payingFetch(ctx, URL_));
+
+    expect(error).toMatchObject({
+      reason: "approval_timeout",
+      approvalRequestId: "apr_1",
+    });
+    expect(elapsed).toBeLessThan(1_000);
+    expect(releases(backend.calls)).toHaveLength(1);
+  });
+
+  it("releases a reservation granted after the caller aborted", async () => {
+    const controller = new AbortController();
+    const backend = api({
+      authorize: PENDING,
+      poll: () => {
+        controller.abort();
+        return json(authorization());
+      },
+    });
+    const shop = seller();
+    const { ctx } = context(shop.fetchFn, governor(backend.fetchFn));
+
+    const { error } = await timed(
+      payingFetch(ctx, URL_, { signal: controller.signal }),
+    );
+
+    expect(error).toMatchObject({ name: "AbortError" });
+    expect(releases(backend.calls)).toHaveLength(1);
+    expect(shop.calls).toHaveLength(1);
+  });
+
+  it("bounds the cleanup release by accountingTimeoutMs", async () => {
+    const controller = new AbortController();
+    const backend = api({
+      authorize: () => {
+        setTimeout(() => controller.abort(), 10);
+        return PENDING();
+      },
+      poll: PENDING,
+      release: hang,
+    });
+    const { ctx } = context(
+      seller().fetchFn,
+      governor(backend.fetchFn, {
+        pollIntervalMs: 60_000,
+        accountingTimeoutMs: 80,
+      }),
+    );
+
+    const { error, elapsed } = await timed(
+      payingFetch(ctx, URL_, { signal: controller.signal }),
+    );
+
+    expect(error).toMatchObject({ name: "AbortError" });
+    expect(elapsed).toBeLessThan(1_000);
+    expect(releases(backend.calls)).toHaveLength(1);
+  });
+
+  it("consumes after the caller aborts mid-payment, independent of its signal", async () => {
+    const controller = new AbortController();
+    const backend = api();
+    const shop = seller(() => {
+      controller.abort();
+      throw new DOMException("aborted", "AbortError");
+    });
+    const { ctx } = context(shop.fetchFn, governor(backend.fetchFn));
+
+    const { error } = await timed(
+      payingFetch(ctx, URL_, { signal: controller.signal }),
+    );
+
+    expect(error).toMatchObject({ name: "AbortError" });
+    expect(consumes(backend.calls)).toHaveLength(1);
+    expect(releases(backend.calls)).toHaveLength(0);
+  });
+
+  it("reports the consume as pending when it outlasts accountingTimeoutMs", async () => {
+    const onAccountingError = vi.fn();
+    const backend = api({ consume: hang });
+    const { ctx } = context(
+      seller().fetchFn,
+      governor(backend.fetchFn, {
+        accountingTimeoutMs: 80,
+        requestTimeoutMs: 60_000,
+        onAccountingError,
+      }),
+    );
+
+    const { value, elapsed } = await timed(payingFetch(ctx, URL_));
+
+    expect(elapsed).toBeLessThan(1_000);
+    expect(value && governanceOutcome(value)?.accounting).toBe("pending");
+    expect(onAccountingError.mock.calls[0][0]).toMatchObject({
+      transition: "consume",
+      accounting: "pending",
+    });
+  });
+
+  it("refuses to start for a caller that has already aborted", async () => {
+    const controller = new AbortController();
+    controller.abort();
+    const backend = api();
+    const { ctx } = context(seller().fetchFn, governor(backend.fetchFn));
+
+    await expect(
+      payingFetch(ctx, URL_, { signal: controller.signal }),
+    ).rejects.toMatchObject({ name: "AbortError" });
+    expect(backend.calls).toEqual([]);
   });
 });

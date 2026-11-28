@@ -181,6 +181,7 @@ export async function payingFetch(
           asset: reservation.asset,
           payerAddress: session.client.signerAddress,
           url: request.url,
+          signal: request.signal,
         });
       } catch (err) {
         ctx.limiter.release(reservation);
@@ -194,7 +195,7 @@ export async function payingFetch(
       authorization = granted;
     }
     const releaseAuthorization = () =>
-      authorization && ctx.governor?.release(authorization.id, request.signal);
+      authorization && ctx.governor?.release(authorization.id);
 
     const headers = new Headers(request.headers);
     let signed: Record<string, string>;
@@ -208,6 +209,11 @@ export async function payingFetch(
     for (const [name, value] of Object.entries(signed)) {
       headers.set(name, value);
     }
+    if (request.signal.aborted) {
+      ctx.limiter.release(reservation);
+      await releaseAuthorization();
+      throw request.signal.reason;
+    }
     const conclude = async (
       outcome: PaymentOutcome,
     ): Promise<AccountingStatus | undefined> => {
@@ -217,11 +223,7 @@ export async function payingFetch(
       }
       return (
         authorization &&
-        ctx.governor?.consume(
-          authorization.id,
-          protocol.reqId?.(signed),
-          request.signal,
-        )
+        ctx.governor?.consume(authorization.id, protocol.reqId?.(signed))
       );
     };
 

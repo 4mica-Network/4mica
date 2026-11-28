@@ -27,6 +27,10 @@ export interface AppClientOptions {
   fetch?: FetchFn;
 }
 
+export interface AppRequestOptions {
+  signal?: AbortSignal;
+}
+
 interface ErrorBody {
   error?: unknown;
   message?: unknown;
@@ -88,6 +92,7 @@ export class AppClient {
 
   async authorizeSpend(
     input: AuthorizeSpendInput,
+    options?: AppRequestOptions,
   ): Promise<SpendAuthorization> {
     const { body } = await this.request<SpendAuthorization>(
       "POST",
@@ -97,14 +102,20 @@ export class AppClient {
         network: toAppNetwork(input.network),
         assetAddress: input.assetAddress ?? null,
       },
+      options,
     );
     return body;
   }
 
-  async getSpendAuthorization(id: string): Promise<SpendAuthorization> {
+  async getSpendAuthorization(
+    id: string,
+    options?: AppRequestOptions,
+  ): Promise<SpendAuthorization> {
     const { body } = await this.request<SpendAuthorization>(
       "GET",
       `/v1/spend/authorizations/${encodeURIComponent(id)}`,
+      undefined,
+      options,
     );
     return body;
   }
@@ -112,20 +123,26 @@ export class AppClient {
   async consumeSpendAuthorization(
     id: string,
     input: ConsumeSpendInput = {},
+    options?: AppRequestOptions,
   ): Promise<SpendAuthorization> {
     const { body } = await this.request<SpendAuthorization>(
       "POST",
       `/v1/spend/authorizations/${encodeURIComponent(id)}/consume`,
       input,
+      options,
     );
     return body;
   }
 
-  async releaseSpendAuthorization(id: string): Promise<SpendAuthorization> {
+  async releaseSpendAuthorization(
+    id: string,
+    options?: AppRequestOptions,
+  ): Promise<SpendAuthorization> {
     const { body } = await this.request<SpendAuthorization>(
       "POST",
       `/v1/spend/authorizations/${encodeURIComponent(id)}/release`,
       {},
+      options,
     );
     return body;
   }
@@ -155,6 +172,7 @@ export class AppClient {
     method: "GET" | "POST",
     path: string,
     payload?: unknown,
+    options?: AppRequestOptions,
   ): Promise<{ status: number; body: T }> {
     const url = `${this.baseUrl}${path}`;
     const headers: Record<string, string> = {
@@ -171,12 +189,20 @@ export class AppClient {
         method,
         headers,
         body: payload === undefined ? undefined : JSON.stringify(payload),
+        signal: options?.signal,
       });
     } catch (err) {
       throw new AppError(`request to ${path} failed: ${String(err)}`);
     }
 
-    const text = await response.text();
+    let text: string;
+    try {
+      text = await response.text();
+    } catch (err) {
+      throw new AppError(
+        `reading the response from ${path} failed: ${String(err)}`,
+      );
+    }
     let body: unknown = null;
     if (text) {
       try {
